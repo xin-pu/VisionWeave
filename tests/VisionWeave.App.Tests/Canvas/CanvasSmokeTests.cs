@@ -205,9 +205,33 @@ public sealed class CanvasSmokeTests
         blur = canvas.Nodes.Single(node => node.DisplayName == "Gaussian Blur");
         WorkflowNodeViewModel resize = canvas.Nodes.Single(node => node.DisplayName == "Resize");
 
+        // The wire a drag draws follows the pointer: it starts where the port the
+        // drag began at published, and it is drawn from that end, so a drag that
+        // began at an input is drawn backwards to keep the curve beside the pointer.
+        PortViewModel draggedInput = blur.Inputs.ShouldHaveSingleItem();
+        Connector started = Port(window, draggedInput);
+
+        started.BeginConnecting();
+        started.UpdatePendingConnection(new System.Windows.Point(started.Anchor.X - 120, started.Anchor.Y));
+        Lay(window);
+
+        PendingConnection pending = Descendants<PendingConnection>(window).ShouldHaveSingleItem();
+        pending.IsVisible.ShouldBeTrue();
+        pending.Source.ShouldBeSameAs(draggedInput);
+        pending.Direction.ShouldBe(ConnectionDirection.Backward);
+
+        // A drag the user lets go of over nothing is not an edit: the wire it drew
+        // goes away and the document is never asked about it.
+        started.CancelConnecting();
+        Lay(window);
+
+        pending.IsVisible.ShouldBeFalse();
+        canvas.Connectors.ShouldBeEmpty();
+        status.Condition.ShouldBe(ShellStatus.NoConditionText);
+
         // Connecting: a valid wire is drawn between the two points the ports
         // published, so it follows the ports rather than a copy of where they were.
-        canvas.ConnectCommand.Execute(Dragged(blur.Outputs.ShouldHaveSingleItem(), resize.Inputs.ShouldHaveSingleItem()));
+        Drag(window, blur.Outputs.ShouldHaveSingleItem(), resize.Inputs.ShouldHaveSingleItem());
         Lay(window);
 
         WorkflowConnectionViewModel wire = canvas.Connectors.ShouldHaveSingleItem();
@@ -267,7 +291,7 @@ public sealed class CanvasSmokeTests
         blur = canvas.Nodes.Single(node => node.DisplayName == "Gaussian Blur");
         resize = canvas.Nodes.Single(node => node.DisplayName == "Resize");
 
-        canvas.ConnectCommand.Execute(Dragged(blur.Inputs.ShouldHaveSingleItem(), resize.Inputs.ShouldHaveSingleItem()));
+        Drag(window, blur.Inputs.ShouldHaveSingleItem(), resize.Inputs.ShouldHaveSingleItem());
         Lay(window);
 
         canvas.Nodes.ShouldBeSameAs(nodesBefore);
@@ -575,8 +599,15 @@ public sealed class CanvasSmokeTests
         WorkflowNodeViewModel resize = canvas.Nodes.Single(node => node.DisplayName == "Resize");
         WorkflowNodeViewModel save = canvas.Nodes.Single(node => node.DisplayName == "Save Image");
 
-        canvas.ConnectCommand.Execute(Dragged(image.Outputs.ShouldHaveSingleItem(), resize.Inputs.ShouldHaveSingleItem()));
-        canvas.ConnectCommand.Execute(Dragged(resize.Outputs.ShouldHaveSingleItem(), save.Inputs.ShouldHaveSingleItem()));
+        Drag(window, image.Outputs.ShouldHaveSingleItem(), resize.Inputs.ShouldHaveSingleItem());
+        Lay(window);
+
+        // Connecting redraws the whole surface, so the second drag leaves from the
+        // nodes and connectors drawn by the redraw rather than from the ones the step
+        // before held.
+        resize = canvas.Nodes.Single(node => node.DisplayName == "Resize");
+        save = canvas.Nodes.Single(node => node.DisplayName == "Save Image");
+        Drag(window, resize.Outputs.ShouldHaveSingleItem(), save.Inputs.ShouldHaveSingleItem());
         Lay(window);
 
         canvas.Connectors.Count.ShouldBe(2);
@@ -914,6 +945,34 @@ public sealed class CanvasSmokeTests
         }
     }
 
-    private static Tuple<object, object> Dragged(PortViewModel from, PortViewModel to)
-        => Tuple.Create<object, object>(from, to);
+    /// <summary>
+    /// Drags one port onto another the way the editor reports it: the drag starts at
+    /// one connector, moves, and completes at the connector the pointer reached, and
+    /// the editor turns the two into the command the document answers. Going through
+    /// the connectors rather than the command is what keeps the pair the editor hands
+    /// over — a value tuple, which its own documentation does not name — covered.
+    /// </summary>
+    /// <param name="window">The window the connectors are drawn in.</param>
+    /// <param name="from">The port the drag starts at.</param>
+    /// <param name="to">The port the drag reaches.</param>
+    private static void Drag(Window window, PortViewModel from, PortViewModel to)
+    {
+        Connector source = Port(window, from);
+        Connector target = Port(window, to);
+
+        source.BeginConnecting();
+        source.UpdatePendingConnection(target.Anchor);
+        source.EndConnecting(target);
+    }
+
+    /// <summary>
+    /// The connector control a port is drawn by, which is the element a drag starts
+    /// at or ends on. It is found by the port presentation it carries, because that is
+    /// what the editor reports as the connection's end.
+    /// </summary>
+    /// <param name="window">The window the connector is drawn in.</param>
+    /// <param name="port">The port presentation the connector carries.</param>
+    /// <returns>The connector control.</returns>
+    private static Connector Port(Window window, PortViewModel port)
+        => Descendants<Connector>(window).Single(connector => ReferenceEquals(connector.DataContext, port));
 }

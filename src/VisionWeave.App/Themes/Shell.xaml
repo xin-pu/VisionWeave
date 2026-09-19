@@ -319,19 +319,20 @@
     <!--
         The wire a drag is drawing. It is visual only: the document hears about the
         gesture when the drag completes, and a drag that is refused leaves the canvas
-        exactly as it was. A drag that started at an input is drawn backwards, so the
-        curve follows the pointer whichever end it began at.
+        exactly as it was. The editor draws it outside the nodes, where there is no
+        node to take a data context from, so the template reads the connector the
+        control published for itself rather than a context it does not have. A drag
+        that started at an input is drawn backwards, so the curve follows the pointer
+        whichever end it began at.
     -->
     <DataTemplate x:Key="Shell.CanvasPendingConnection">
-        <nodify:PendingConnection Source="{Binding}"
-                                  SourceAnchor="{Binding Anchor}"
-                                  Stroke="{DynamicResource Brush.Accent.Primary}"
+        <nodify:PendingConnection Stroke="{DynamicResource Brush.Accent.Primary}"
                                   StrokeDashArray="4 2"
                                   StrokeThickness="2">
             <nodify:PendingConnection.Style>
                 <Style TargetType="nodify:PendingConnection">
                     <Style.Triggers>
-                        <DataTrigger Binding="{Binding Direction}" Value="Input">
+                        <DataTrigger Binding="{Binding Source.Direction, RelativeSource={RelativeSource Self}}" Value="Input">
                             <Setter Property="Direction" Value="Backward" />
                         </DataTrigger>
                     </Style.Triggers>
