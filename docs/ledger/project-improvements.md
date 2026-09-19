@@ -154,6 +154,19 @@
 - **Owner:** VisionWeave maintainers.
 - **Review again:** When the composition root pairs the session with the history, or when a canvas intent needs a command the set does not provide.
 
+### PL-2026-014 - Compose the WPF host and validate its settings
+
+- **Status:** Implemented
+- **Priority:** P1
+- **Recorded on:** 2026-09-19
+- **Scope:** The host composition root: dependency injection for the node catalog, the validator, and the resolved options; settings files bound to typed options and validated at startup; the structured logging stack; and the boundary that keeps the host packages out of the core assemblies.
+- **Observation:** The core layers are complete and headless, but nothing composes them. `App` is an empty shell whose window is created by `StartupUri`, no settings file is read, and no project references a dependency-injection, configuration, or logging stack. ADR-0002 named the UI, canvas, OpenCV, and MVVM packages but no host stack, so neither it nor the dependency table said which one to use, and the settings that section 9 describes — execution concurrency, preview limits, cache limits, and the autosave interval — were values only a test could set.
+- **Decision or next step:** Add a host stack that only the composition root references, bind each settings section to the options record of the layer that honors it, validate every section at startup and refuse to start on a rejected value, and record the choice and its boundary in an ADR.
+- **Update (2026-09-19):** Implemented with ADR-0007. `VisionWeaveSettings` binds `appsettings.json` plus an optional `appsettings.user.json` and validates every section, `VisionWeaveServices` registers the options, the `TimeProvider`, every `INodeDefinitionProvider`, the catalog built from all of them, and the validator, and `App` runs that sequence before it opens a window. Microsoft.Extensions 10.0.12 — DependencyInjection, Configuration.Json, Configuration.Binder, Logging, and Logging.Debug — is referenced by `App` alone, and a new architecture test refuses those packages in every core assembly. Validation lives with each options record (`ExecutionOptions`, `FramePreviewOptions`, `WorkflowAutosaveOptions`) and reports `VW-CONFIG-001`; rejected range values and unreadable, malformed, or unbindable configuration are logged, shown in a modal message, and end startup with exit code 1 instead of being clamped or escaping the startup boundary. Headless `VisionWeave.App.Tests` covers the configuration boundary. The asynchronous command and error boundary of the shell, the theme and localization foundations, and run-boundary logging with `OperationId`, `WorkflowId`, `NodeId`, `NodeTypeId`, `DiagnosticCode`, and elapsed milliseconds remain open in this stage.
+- **Evidence:** `src/VisionWeave.App/Composition/`, `src/VisionWeave.App/App.xaml.cs`, `src/VisionWeave.App/ViewModels/MainWindowViewModel.cs`, `src/VisionWeave.App/appsettings.json`, `Directory.Packages.props`, `src/VisionWeave.Application/Execution/ExecutionOptions.cs`, `src/VisionWeave.OpenCv/Preview/FramePreviewOptions.cs`, `src/VisionWeave.Persistence/Workflows/WorkflowAutosaveOptions.cs`, `tests/VisionWeave.Application.Tests/Execution/ExecutionOptionsTests.cs`, `tests/VisionWeave.IntegrationTests/Preview/FramePreviewOptionsTests.cs`, `tests/VisionWeave.Persistence.Tests/Workflows/WorkflowAutosaveOptionsTests.cs`, `tests/VisionWeave.ArchitectureTests/Dependencies/AssemblyDependencyTests.cs`, `docs/adr/0007-host-composition-and-configuration.md`, `docs/design/visionweave-detailed-design.md` (sections 4.3, 9, and 10).
+- **Owner:** VisionWeave maintainers.
+- **Review again:** When the shell's asynchronous command and error boundary is added, or when a plugin provider joins the catalog.
+
 ### PL-2026-013 - Attribute diagnostics to the port or connection they describe
 
 - **Status:** Open
