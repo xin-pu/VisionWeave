@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using VisionWeave.App.Commands;
 using VisionWeave.App.Composition;
+using VisionWeave.App.Notifications;
 using VisionWeave.App.Sessions;
 using VisionWeave.App.ViewModels;
 using VisionWeave.Application.Definitions;
@@ -48,12 +49,29 @@ public partial class App : System.Windows.Application
 
         EditorSession session = _services.GetRequiredService<EditorSession>();
         NodeDefinitionCatalog catalog = _services.GetRequiredService<NodeDefinitionCatalog>();
+        ShellStatus status = _services.GetRequiredService<ShellStatus>();
         logger.LogInformation(
             "Started with the empty workflow document {DocumentId}; {NodeTypeCount} node types are available.",
             session.Document.Id,
             catalog.Definitions.Count);
 
-        MainWindow shell = new(new MainWindowViewModel(session, catalog, OpenDocumentCommand()));
+        // The shell is composed here rather than resolved, because the view model is
+        // built from objects the container already owns: the session, the catalog,
+        // the status area, and the command that opens a document into that session.
+        var openDocument = new OpenDocumentCommand(
+            _services.GetRequiredService<AsyncCommandBoundary>(),
+            session,
+            status);
+
+        MainWindow shell = new(
+            new MainWindowViewModel(
+                session,
+                catalog,
+                openDocument,
+                _services.GetRequiredService<IWorkflowFileChooser>(),
+                status),
+            _services.GetRequiredService<SnackbarNotificationPresenter>());
+
         MainWindow = shell;
         shell.Show();
     }
@@ -63,14 +81,6 @@ public partial class App : System.Windows.Application
         _services?.Dispose();
         base.OnExit(e);
     }
-
-    /// <summary>
-    /// Creates the command the shell opens documents with.
-    /// </summary>
-    private OpenDocumentCommand OpenDocumentCommand()
-        => new(
-            _services!.GetRequiredService<AsyncCommandBoundary>(),
-            _services!.GetRequiredService<EditorSession>());
 
     private static void LogSettings(ILogger logger, VisionWeaveSettings settings)
     {

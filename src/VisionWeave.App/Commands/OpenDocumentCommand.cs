@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.Mvvm.Input;
 using VisionWeave.App.Sessions;
+using VisionWeave.App.ViewModels;
 using VisionWeave.Persistence.Workflows;
 
 namespace VisionWeave.App.Commands;
@@ -8,26 +9,34 @@ namespace VisionWeave.App.Commands;
 /// Opens the file named by <see cref="Path"/> into the editing session. It is the
 /// shell's entry point to the session: the session itself decides what an opened
 /// file means, and it announces the result, so this command only carries the
-/// running state and the failure boundary around the read.
+/// running state, the failure boundary around the read, and the outcome the status
+/// area reports.
 /// </summary>
 internal sealed class OpenDocumentCommand
 {
     /// <summary>The stable name this operation is logged under.</summary>
     internal const string OperationName = "OpenDocument";
 
+    /// <summary>The phrase the status area shows while the read is running.</summary>
+    internal const string OpeningText = "Opening a document…";
+
     private readonly AsyncCommandBoundary _boundary;
     private readonly EditorSession _session;
+    private readonly ShellStatus _status;
 
     /// <summary>Creates the command.</summary>
     /// <param name="boundary">The boundary that runs the operation and reports its outcome.</param>
     /// <param name="session">The session the opened document replaces.</param>
-    internal OpenDocumentCommand(AsyncCommandBoundary boundary, EditorSession session)
+    /// <param name="status">The shell state that reports what this command is doing.</param>
+    internal OpenDocumentCommand(AsyncCommandBoundary boundary, EditorSession session, ShellStatus status)
     {
         ArgumentNullException.ThrowIfNull(boundary);
         ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(status);
 
         _boundary = boundary;
         _session = session;
+        _status = status;
 
         // The toolkit owns the command's state: IsRunning, CanExecute, the token
         // source behind Cancel, and the notifications that report them. Concurrent
@@ -58,7 +67,9 @@ internal sealed class OpenDocumentCommand
     {
         string path = Path ?? string.Empty;
 
-        await _boundary
+        _status.Begin(OpeningText);
+
+        CommandExecutionResult result = await _boundary
             .RunAsync(
                 OperationName,
                 async token =>
@@ -76,5 +87,7 @@ internal sealed class OpenDocumentCommand
                 },
                 cancellationToken)
             .ConfigureAwait(true);
+
+        _status.Report(result);
     }
 }

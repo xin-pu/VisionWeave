@@ -3,79 +3,257 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:nodify="https://miroiu.github.io/nodify"
+        xmlns:design="clr-namespace:VisionWeave.App.Design"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         mc:Ignorable="d"
+        d:DataContext="{x:Static design:ShellDesignData.ViewModel}"
         Title="{Binding WindowTitle}"
         Width="1280"
         Height="800"
         MinWidth="960"
         MinHeight="600"
+        Background="{DynamicResource Brush.Background.Canvas}"
+        Foreground="{DynamicResource Brush.Text.Primary}"
         WindowStartupLocation="CenterScreen">
+
+    <Window.InputBindings>
+        <KeyBinding Key="O"
+                    Command="{Binding OpenCommand}"
+                    Modifiers="Control" />
+    </Window.InputBindings>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="260" />
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="320" />
-        </Grid.ColumnDefinitions>
 
-        <Border Grid.ColumnSpan="3"
+        <!-- What this is, what can be done to the document, and what the last run did. -->
+        <Border x:Name="TopBarRegion"
+                Grid.Row="0"
                 Padding="16,10"
-                BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                Background="{DynamicResource Brush.Background.Surface}"
+                BorderBrush="{DynamicResource Brush.Border.Subtle}"
                 BorderThickness="0,0,0,1">
-            <DockPanel>
-                <TextBlock FontSize="20"
-                           FontWeight="SemiBold"
-                           Text="VisionWeave" />
-                <TextBlock Margin="12,5,0,0"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                           Text="Visual image-processing workflows" />
-            </DockPanel>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <TextBlock VerticalAlignment="Center"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource Brush.Text.Primary}"
+                               Text="VisionWeave" />
+                    <TextBlock Margin="12,0,0,0"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource Brush.Text.Secondary}"
+                               Text="Visual image-processing workflows" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1"
+                            Margin="32,0,0,0"
+                            Orientation="Horizontal">
+                    <Button Command="{Binding OpenCommand}"
+                            Content="_Open…"
+                            Style="{StaticResource Shell.ActionButton}"
+                            ToolTip="Open a workflow document (Ctrl+O)" />
+                    <TextBlock Margin="8,0,0,0"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource Brush.Text.Secondary}"
+                               Text="Ctrl+O" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="3" Orientation="Horizontal">
+                    <TextBlock VerticalAlignment="Center"
+                               Style="{StaticResource Shell.StatusFieldLabel}"
+                               Text="Run state" />
+                    <TextBlock VerticalAlignment="Center"
+                               Style="{StaticResource Shell.StatusFieldValue}"
+                               Text="{Binding Status.RunOutcome}" />
+                </StackPanel>
+            </Grid>
         </Border>
 
-        <ui:Card Grid.Row="1"
-                 Grid.Column="0"
-                 Margin="12"
-                 Padding="16">
-            <StackPanel>
-                <TextBlock FontSize="16"
-                           FontWeight="SemiBold"
-                           Text="Nodes" />
-                <TextBlock Margin="0,8,0,0"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                           Text="{Binding NodeCatalogSummary}" />
-            </StackPanel>
-        </ui:Card>
+        <!-- The work surface: the catalogue that names what exists, the surface the
+             document is edited on, and the inspector that describes the selection. -->
+        <Grid Grid.Row="1" Margin="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="280" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="340" />
+            </Grid.ColumnDefinitions>
 
-        <Border Grid.Row="1"
-                Grid.Column="1"
-                Margin="0,12"
-                Background="#151515"
-                CornerRadius="8">
-            <nodify:NodifyEditor />
+            <Border x:Name="NodeCatalogueRegion"
+                    Grid.Column="0"
+                    Style="{StaticResource Shell.RegionSurface}">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top"
+                               Style="{StaticResource Shell.RegionHeader}"
+                               Text="Node catalogue" />
+                    <TextBlock DockPanel.Dock="Top"
+                               Style="{StaticResource Shell.RegionNote}"
+                               Text="{Binding NodeCatalogSummary}" />
+                    <TextBlock DockPanel.Dock="Bottom"
+                               Style="{StaticResource Shell.RegionNote}"
+                               Text="Search and add-by-drag arrive with the canvas package." />
+                    <ScrollViewer Margin="0,12,0,0" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding CatalogueGroups}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="0,0,0,12">
+                                        <TextBlock FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource Brush.Accent.Primary}"
+                                                   Text="{Binding Category}" />
+                                        <ItemsControl Margin="0,4,0,0" ItemsSource="{Binding NodeNames}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Margin="8,1,0,1"
+                                                               Foreground="{DynamicResource Brush.Text.Primary}"
+                                                               Text="{Binding}" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+
+            <Border x:Name="CanvasRegion"
+                    Grid.Column="1"
+                    Margin="12,0"
+                    Padding="0"
+                    Style="{StaticResource Shell.RegionSurface}">
+                <DockPanel>
+                    <Border DockPanel.Dock="Top"
+                            Padding="16,12"
+                            Background="{DynamicResource Brush.Background.SurfaceRaised}"
+                            BorderBrush="{DynamicResource Brush.Border.Subtle}"
+                            BorderThickness="0,0,0,1"
+                            CornerRadius="8,8,0,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Shell.RegionHeader}" Text="{Binding DocumentTitle}" />
+                            <TextBlock Margin="12,0,0,0"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource Brush.Text.Secondary}"
+                                       Text="{Binding DocumentCounts}" />
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel MaxWidth="420"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center">
+                        <TextBlock HorizontalAlignment="Center"
+                                   FontSize="15"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource Brush.Text.Primary}"
+                                   Text="Workflow canvas" />
+                        <TextBlock HorizontalAlignment="Center"
+                                   Style="{StaticResource Shell.RegionNote}"
+                                   TextAlignment="Center"
+                                   Text="Nodes, wires, and validation marks arrive with the canvas package. This surface already presents the document they will show." />
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <Border x:Name="InspectorRegion"
+                    Grid.Column="2"
+                    Style="{StaticResource Shell.RegionSurface}">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top"
+                               Style="{StaticResource Shell.RegionHeader}"
+                               Text="Inspector" />
+                    <TextBlock DockPanel.Dock="Top"
+                               Style="{StaticResource Shell.RegionNote}"
+                               Text="{Binding SelectionSummary}" />
+                    <TextBlock DockPanel.Dock="Top"
+                               Style="{StaticResource Shell.RegionNote}"
+                               Text="{Binding SelectionConditionSummary}" />
+                    <TextBlock DockPanel.Dock="Bottom"
+                               Style="{StaticResource Shell.RegionNote}"
+                               Text="Parameter editors and the diagnostics panel arrive with the inspector package." />
+
+                    <!-- The last child fills what the docked lines leave, so the note
+                         above stays on the floor of the region instead of floating
+                         under the selection summary. -->
+                    <Border />
+                </DockPanel>
+            </Border>
+        </Grid>
+
+        <!-- Durable state, in contrast to the transient snackbar below. The severity
+             is named in the text as well as coloured, so it reads without colour. -->
+        <Border x:Name="StatusRegion"
+                Grid.Row="2"
+                Padding="16,8"
+                Background="{DynamicResource Brush.Background.Surface}"
+                BorderBrush="{DynamicResource Brush.Border.Subtle}"
+                BorderThickness="0,1,0,0">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock VerticalAlignment="Center"
+                           Style="{StaticResource Shell.StatusFieldLabel}"
+                           Text="Document" />
+                <TextBlock VerticalAlignment="Center"
+                           Style="{StaticResource Shell.StatusFieldValue}"
+                           Text="{Binding Status.DocumentState}" />
+
+                <Border Style="{StaticResource Shell.StatusFieldSeparator}" />
+
+                <TextBlock VerticalAlignment="Center"
+                           Style="{StaticResource Shell.StatusFieldLabel}"
+                           Text="Operation" />
+                <TextBlock VerticalAlignment="Center"
+                           Style="{StaticResource Shell.StatusFieldValue}"
+                           Text="{Binding Status.BackgroundOperation}" />
+
+                <Border Style="{StaticResource Shell.StatusFieldSeparator}" />
+
+                <TextBlock VerticalAlignment="Center"
+                           Style="{StaticResource Shell.StatusFieldLabel}"
+                           Text="Run" />
+                <TextBlock VerticalAlignment="Center"
+                           Style="{StaticResource Shell.StatusFieldValue}"
+                           Text="{Binding Status.RunOutcome}" />
+
+                <Border Style="{StaticResource Shell.StatusFieldSeparator}" />
+
+                <TextBlock VerticalAlignment="Center"
+                           Style="{StaticResource Shell.StatusFieldLabel}"
+                           Text="Condition" />
+                <TextBlock VerticalAlignment="Center" Text="{Binding Status.Condition}">
+                    <TextBlock.Style>
+                        <Style BasedOn="{StaticResource Shell.StatusFieldValue}" TargetType="TextBlock">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Status.ConditionSeverity}" Value="Error">
+                                    <Setter Property="Foreground" Value="{DynamicResource Brush.State.Danger}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Status.ConditionSeverity}" Value="Warning">
+                                    <Setter Property="Foreground" Value="{DynamicResource Brush.State.Warning}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Status.ConditionSeverity}" Value="Information">
+                                    <Setter Property="Foreground" Value="{DynamicResource Brush.State.Info}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </StackPanel>
         </Border>
 
-        <ui:Card Grid.Row="1"
-                 Grid.Column="2"
-                 Margin="12"
-                 Padding="16">
-            <StackPanel>
-                <TextBlock FontSize="16"
-                           FontWeight="SemiBold"
-                           Text="Inspector" />
-                <TextBlock Margin="0,8,0,0"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                           Text="Select a node to edit its parameters." />
-            </StackPanel>
-        </ui:Card>
-
-        <StatusBar Grid.Row="2" Grid.ColumnSpan="3">
-            <StatusBarItem Content="{Binding DocumentSummary}" />
-        </StatusBar>
+        <!-- Where a condition the presenter announces is drawn. -->
+        <ui:SnackbarPresenter x:Name="SnackbarHost"
+                              Grid.Row="0"
+                              Grid.RowSpan="3"
+                              Margin="0,0,24,24"
+                              HorizontalAlignment="Right"
+                              VerticalAlignment="Bottom" />
     </Grid>
 </Window>

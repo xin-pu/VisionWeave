@@ -81,11 +81,12 @@ src/
   VisionWeave.OpenCv/          OpenCvSharp node definitions and executors
   VisionWeave.Persistence/     .vwflow serialization and schema migrations
   VisionWeave.PluginSdk/       public extension contracts
-  VisionWeave.App/             WPF UI, WPF UI, Nodify, composition root
+  VisionWeave.App/             WPF shell, view models, theme, composition root
 tests/
   VisionWeave.Domain.Tests/
   VisionWeave.Application.Tests/
-  VisionWeave.OpenCv.Tests/
+  VisionWeave.Persistence.Tests/
+  VisionWeave.App.Tests/
   VisionWeave.ArchitectureTests/
   VisionWeave.IntegrationTests/
 ```
@@ -408,8 +409,72 @@ zoom remain responsive with hundreds of nodes.
   paste, delete, minimap, and undo/redo.
 - Right pane: property inspector for selected nodes, including validation help.
 - Bottom pane: run history, node diagnostics, and structured log summary.
-- Theme: WPF UI light/dark themes; type colors and error colors must meet
-  contrast requirements in both themes.
+- Theme: the dark-amber semantic theme of section 6.5, which the framework's own
+  resource keys are aliased onto. A light or high-contrast theme replaces the
+  token values without changing a control template, and every theme must keep the
+  contrast ratios the visual direction requires of text and of keyboard focus.
+
+### 6.5 Shell foundation and semantic theme
+
+The first shell ships the five regions the visual direction documents and nothing
+editable inside them: a top strip holding the application identity, the document
+commands, and the run state; a node catalogue that names what exists; the surface
+a document will be edited on; an inspector for the current selection; and a status
+area for durable state. Each region is named in the markup — `TopBarRegion`,
+`NodeCatalogueRegion`, `CanvasRegion`, `InspectorRegion`, `StatusRegion` — so a
+test can hold the layout to the documented architecture, and the canvas region
+presents a placeholder until the projection package puts the editor there.
+
+The shell carries no business rule in code-behind: the window initializes its
+markup, hands its view model to the data context, and attaches the region a
+snackbar is drawn in. Everything else the user sees is derived from the editing
+session by `MainWindowViewModel` and `ShellStatus`, and a test refuses any further
+member in the code-behind.
+
+Two rules hold the visual system together.
+
+**A colour is named once.** `Themes/Tokens.xaml` is the only file in the shell
+that carries a colour literal. Each token declares a `Color.*` value, a `Brush.*`
+alias that reads it, and — for the values the framework theme paints with — an
+alias onto the WPF UI resource key it replaces (`ApplicationBackgroundBrush`,
+`TextFillColorPrimaryBrush`, `AccentFillColorDefaultBrush`, and the rest), so
+framework controls join the palette without a control template of ours changing.
+`Themes/Shell.xaml` holds the shell's styles and names tokens only. Tests assert
+the documented values, that every token has a brush that reads it, that the
+aliases follow the tokens, that no other file names a colour, and the contrast
+ratios the direction requires.
+
+**Status is never colour alone.** The status area names a severity in words beside
+the colour it paints with, and an announcement carries the same word. Colour is
+the second signal, not the only one.
+
+The status area reports what lasts: the document state (never saved, unsaved,
+saved), the operation the shell is running or the state it returned to, the last
+run outcome, and the newest condition with its stable code. The snackbar reports
+what happens once: the `IUserNotificationPresenter` seam of ADR-0008 is now served
+by `SnackbarNotificationPresenter`, which shows the safe message and the stable
+code and never the diagnostic's exception. A cancelled operation is an outcome
+rather than a failure: it reports "Stopped at your request", records no condition,
+and clears the one reported before it. Startup keeps its modal message box as the
+single documented exception.
+
+Keyboard focus uses the accent colour, which the theme test holds to the non-text
+contrast ratio against every surface the ring can be drawn on. `Ctrl+O` is bound
+to the same command as the shell's Open action.
+
+The Open flow reaches the session through two seams rather than through dialog
+calls inside the view model: `IWorkflowFileChooser` asks for the file, with a
+Windows implementation behind it, and `OpenDocumentCommand` opens it through the
+command boundary. A dismissed dialog, a failed open, and a cancelled open are
+therefore covered by tests that never open a window.
+
+WPF binds only to public members, and a binding to anything else fails silently —
+an empty field rather than an error. The view models are internal types whose
+bound members are public, and a test walks every binding path in the markup to
+keep it that way. The XAML designer shows the shell with sample content built from
+the real node catalog, the real validator, and real document commands
+(`ShellDesignData`), so it cannot present a shell the application would never
+produce.
 
 ## 7. Persistence and compatibility
 
@@ -583,18 +648,24 @@ trusted code; sandboxing is a future feature, not an implied security boundary.
 | OpenCV integration tests | Expected pixels / geometry for each migrated node, disposal and cache behavior, preview limit validation. |
 | Persistence integration tests | Save/load round trip, malformed document rejection, migrations, missing-node placeholders, autosave policy validation. |
 | Architecture tests | Dependency direction, no WPF/OpenCV/host stack reference in Domain, and no host stack reference in any core assembly. |
+| Shell tests | The five documented regions and their named elements, token values and brush aliases, contrast of text and of the focus ring, no colour literal outside the token dictionary, every bound path resolvable through a public member, status transitions, and announcements by severity. |
 | UI smoke tests | Canvas add/connect/delete, property edit, run/cancel, light/dark template rendering. |
 
 Tests use xUnit and Shouldly. Test names use the form
 `Member_condition_expected_result`, e.g.
 `ConnectPorts_incompatible_image_and_contours_returns_port_diagnostic`.
 
-The host composition root has no automated test project, so its wiring is
-verified by starting the application twice: once with the shipped settings, which
-must open an empty document, and once with a settings file that holds rejected
-values, which must report `VW-CONFIG-001` and exit without opening a document. The
-validation that decision rests on is unit-tested in the layers that own each
-options record.
+The shell's markup is linked into `VisionWeave.App.Tests` as data, so regions,
+styles, and bindings are checked against the files the application ships without
+creating a window; a WPF element that a test genuinely needs is built on a
+single-threaded-apartment thread, the way the shell builds it.
+
+The composition root is covered by `VisionWeave.App.Tests`, which resolves every
+registered service headlessly and refuses to start on a rejected setting. The
+application is additionally started by hand once with the shipped settings, which
+must open the documented regions, and once with a settings file that holds
+rejected values, which must report `VW-CONFIG-001` and exit without opening a
+document.
 
 The initial CI command sequence is restore, build, test, format verification,
 and analyzer verification. `global.json`, `.editorconfig`, analyzer choices,
