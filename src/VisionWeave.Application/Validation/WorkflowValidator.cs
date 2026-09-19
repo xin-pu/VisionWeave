@@ -63,6 +63,20 @@ public sealed class WorkflowValidator
     }
 
     /// <summary>
+    /// Validates a document and tags the outcome with the revision it was
+    /// computed from, so the editor can tell a current projection from one an
+    /// edit has superseded.
+    /// </summary>
+    /// <param name="document">The document to validate.</param>
+    /// <returns>The projection for the document's current revision.</returns>
+    public ValidationProjection Project(WorkflowDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+
+        return new ValidationProjection(Validate(document), document.Revision);
+    }
+
+    /// <summary>
     /// Decides whether one candidate connection could be added to a document,
     /// reporting only the diagnostics that the connection itself would introduce.
     /// The document is not changed and the diagnostics it already earns are not
