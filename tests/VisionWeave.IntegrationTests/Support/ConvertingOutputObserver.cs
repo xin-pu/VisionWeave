@@ -17,12 +17,17 @@ internal sealed class ConvertingOutputObserver : IExecutionOutputObserver
     private readonly List<bool> _framesAliveAtConversion = [];
     private readonly FramePreviewConverter _converter;
     private readonly TimeSpan _delay;
+    private readonly Action? _onBeforeConvert;
     private int _rejectedFormats;
 
-    internal ConvertingOutputObserver(FramePreviewConverter? converter = null, TimeSpan? delay = null)
+    internal ConvertingOutputObserver(
+        FramePreviewConverter? converter = null,
+        TimeSpan? delay = null,
+        Action? onBeforeConvert = null)
     {
         _converter = converter ?? FramePreviewConverter.Default;
         _delay = delay ?? TimeSpan.FromMilliseconds(10);
+        _onBeforeConvert = onBeforeConvert;
     }
 
     /// <summary>
@@ -78,6 +83,8 @@ internal sealed class ConvertingOutputObserver : IExecutionOutputObserver
             {
                 _framesAliveAtConversion.Add(!lease.IsDisposed);
             }
+
+            _onBeforeConvert?.Invoke();
 
             try
             {
