@@ -3,10 +3,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using VisionWeave.App.Commands;
 using VisionWeave.App.Composition;
+using VisionWeave.App.Sessions;
 using VisionWeave.App.ViewModels;
 using VisionWeave.Application.Definitions;
 using VisionWeave.Contracts.Diagnostics;
-using VisionWeave.Persistence.Workflows;
 
 namespace VisionWeave.App;
 
@@ -46,7 +46,7 @@ public partial class App : System.Windows.Application
             return;
         }
 
-        WorkflowSession session = WorkflowSession.New("Untitled", _services.GetRequiredService<TimeProvider>());
+        EditorSession session = _services.GetRequiredService<EditorSession>();
         NodeDefinitionCatalog catalog = _services.GetRequiredService<NodeDefinitionCatalog>();
         logger.LogInformation(
             "Started with the empty workflow document {DocumentId}; {NodeTypeCount} node types are available.",
@@ -70,7 +70,7 @@ public partial class App : System.Windows.Application
     private OpenDocumentCommand OpenDocumentCommand()
         => new(
             _services!.GetRequiredService<AsyncCommandBoundary>(),
-            _services!.GetRequiredService<IDocumentLoader>());
+            _services!.GetRequiredService<EditorSession>());
 
     private static void LogSettings(ILogger logger, VisionWeaveSettings settings)
     {

@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using VisionWeave.App.Commands;
 using VisionWeave.App.Notifications;
+using VisionWeave.App.Sessions;
 using VisionWeave.Application.Definitions;
 using VisionWeave.Application.Validation;
 using VisionWeave.Contracts.Nodes;
@@ -46,6 +47,11 @@ internal static class VisionWeaveServices
         services.AddSingleton<IUserNotificationPresenter, MessageBoxNotificationPresenter>();
         services.AddSingleton<AsyncCommandBoundary>();
         services.AddSingleton<IDocumentLoader, DocumentLoader>();
+
+        // The one editing session the shell presents. It composes the document, its
+        // undo stack, the selection, and the validation projection, so the layers
+        // that own those pieces stay unaware of each other.
+        services.AddSingleton<EditorSession>();
 
         return services;
     }

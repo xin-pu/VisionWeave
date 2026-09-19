@@ -91,6 +91,9 @@ public static class DiagnosticCodes
     /// <summary>A stored entry or field was incoherent and was skipped while loading.</summary>
     public const string DroppedDocumentEntry = "VW-FILE-003";
 
+    /// <summary>A document that has never been written was asked to save itself.</summary>
+    public const string MissingDocumentPath = "VW-FILE-004";
+
     /// <summary>A configured setting is absent, out of range, or unsupported by this build.</summary>
     public const string InvalidSetting = "VW-CONFIG-001";
 

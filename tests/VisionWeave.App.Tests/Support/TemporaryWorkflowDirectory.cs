@@ -1,4 +1,5 @@
-﻿using VisionWeave.Domain.Workflows;
+﻿using Shouldly;
+using VisionWeave.Domain.Workflows;
 using VisionWeave.Persistence.Workflows;
 
 namespace VisionWeave.App.Tests.Support;
@@ -33,6 +34,32 @@ internal sealed class TemporaryWorkflowDirectory : IDisposable
     {
         string path = PathOf(name);
         System.IO.File.WriteAllText(path, "{ this is not a workflow document");
+        return path;
+    }
+
+    /// <summary>
+    /// Writes a document this build reads but refuses to write, by saving a readable
+    /// one and then declaring a schema version newer than the reader supports.
+    /// </summary>
+    /// <param name="name">The file name to write.</param>
+    /// <returns>The path of the written document.</returns>
+    internal string SaveUnsupportedSchemaDocument(string name = "newer.vwflow")
+    {
+        string path = SaveReadableDocument(name);
+        string content = System.IO.File.ReadAllText(path);
+
+        // The stored key and the version this build writes, so the file declares the
+        // next schema version rather than the supported one.
+        string upgraded = content.Replace(
+            $"\"schemaVersion\": {WorkflowFileFormat.CurrentSchemaVersion}",
+            $"\"schemaVersion\": {WorkflowFileFormat.CurrentSchemaVersion + 1}",
+            StringComparison.Ordinal);
+
+        upgraded.ShouldNotBe(
+            content,
+            "the saved document must declare its schema version so it can be raised to an unsupported one.");
+
+        System.IO.File.WriteAllText(path, upgraded);
         return path;
     }
 
