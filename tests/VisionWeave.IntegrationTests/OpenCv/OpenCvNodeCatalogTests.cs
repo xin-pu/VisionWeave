@@ -33,6 +33,10 @@ public sealed class OpenCvNodeCatalogTests
         catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.SaveImageTypeId));
         catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.GaussianBlurTypeId));
         catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.ResizeTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.CvtColorTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.CropTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.MedianBlurTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.ThresholdTypeId));
 
         foreach (NodeDefinition definition in Definitions)
         {
@@ -72,7 +76,10 @@ public sealed class OpenCvNodeCatalogTests
                 output.Id.ShouldBeOneOf(
                     OpenCvNodeIds.ImagePortId,
                     OpenCvNodeIds.BlurredPortId,
-                    OpenCvNodeIds.ResizedPortId);
+                    OpenCvNodeIds.ResizedPortId,
+                    OpenCvNodeIds.ConvertedPortId,
+                    OpenCvNodeIds.CroppedPortId,
+                    OpenCvNodeIds.ThresholdedPortId);
             }
         }
     }

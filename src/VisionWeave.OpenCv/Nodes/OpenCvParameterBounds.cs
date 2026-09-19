@@ -24,4 +24,16 @@ public static class OpenCvParameterBounds
 
     /// <summary>The greatest frame dimension the resize node produces.</summary>
     public const int MaxDimension = 16384;
+
+    /// <summary>The smallest median kernel dimension. A median of one pixel would smooth nothing.</summary>
+    public const int MinMedianKernelSize = 3;
+
+    /// <summary>The smallest accepted rectangle coordinate.</summary>
+    public const int MinOrigin = 0;
+
+    /// <summary>The smallest accepted threshold, which is also the darkest 8-bit pixel.</summary>
+    public const double MinLevel = 0d;
+
+    /// <summary>The greatest accepted threshold, which is also the brightest 8-bit pixel.</summary>
+    public const double MaxLevel = 255d;
 }

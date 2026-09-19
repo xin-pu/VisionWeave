@@ -845,19 +845,27 @@ Morphology, Contours, Draw, and Inspect.
 | Find Contours / Area / Bounding Rect | Contour blocks | `Contours` is its own typed value. |
 | Draw Contours / Draw Rectangles | Draw blocks | Returns new image; never mutates input. |
 
-The first build ships four of them and the categories they belong to: `Image Source`
-and `Save Image` in Input/Output, and `Gaussian Blur` and `Resize` as the Filter and
-Transform pair that proves the pipeline. The two file-backed nodes are the ones that
+The catalog is filled in batches rather than at once. The first build shipped
+`Image Source` and `Save Image` in Input/Output, and `Gaussian Blur` and `Resize` as
+the Filter and Transform pair that proves the pipeline. The Aries migration then added
+the common single-image operations: `Colour Conversion` and `Crop` in Transform,
+`Median Blur` in Filter, and `Threshold` in Threshold. Those four go first because
+none of them needs a curated sample image: a uniform frame and a couple of marked
+pixels state what each one does, which is what the integration suite builds today.
+The two file-backed nodes — `Image Source` and `Save Image` — are the ones that
 name a file, so they are the nodes a working directory is resolved for (5.4): each
 declares a required `path` parameter, the save node additionally declares the
 `overwrite` boolean that defaults to off, and the path names a file relative to the
 folder that holds the document (ADR-0012). The remaining rows are the catalog this
 design aims at rather than a list of what exists, and each arrives with the curated
-regression images its own entry requires.
+regression images its own entry requires. That is also what the operations whose
+result depends on real image content — adaptive threshold, Canny, contours, and
+template matching above all — are waiting for.
 
-Every migrated node receives output-oriented regression tests against curated
-sample images. Migration moves algorithm intent and behavior, not the old
-GraphX controls, Aries view models, or serialization format.
+Every migrated node receives output-oriented regression tests, and a node whose result
+depends on real image content receives them against curated sample images. Migration
+moves algorithm intent and behavior, not the old GraphX controls, Aries view models,
+or serialization format.
 
 ## 9. Configuration, diagnostics, and security
 
