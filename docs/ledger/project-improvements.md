@@ -254,13 +254,14 @@
 
 ### PL-2026-020 - Remove inactive PluginSdk coupling from the application host
 
-- **Status:** Open
+- **Status:** Implemented
 - **Priority:** P2
 - **Recorded on:** 2026-09-19
 - **Scope:** The direct `VisionWeave.App -> VisionWeave.PluginSdk` project reference and the boundary that will eventually host plugin discovery.
 - **Observation:** `VisionWeave.App.csproj` directly references `VisionWeave.PluginSdk`, but no production App source or App test currently imports or uses a PluginSdk type. The current composition root registers the built-in OpenCV definition provider directly. Keeping an unused compile-time reference broadens the host dependency surface and makes it unclear whether the host already has a plugin-loading responsibility.
 - **Decision or next step:** Remove the direct App-to-PluginSdk reference while no plugin capability is consumed. Reintroduce it only in the issue that defines plugin discovery, loading, lifecycle, failure isolation, and provider registration; that issue must use the existing `INodeDefinitionProvider` contribution path rather than create a parallel catalog path. Verify the App build, architecture tests, and plugin-sdk tests after removal.
-- **Evidence:** `src/VisionWeave.App/VisionWeave.App.csproj`, `src/VisionWeave.App/Composition/VisionWeaveServices.cs`, `src/VisionWeave.PluginSdk/`, `tests/VisionWeave.ArchitectureTests/Dependencies/AssemblyDependencyTests.cs`.
+- **Update (2026-09-19):** The reference is gone; `VisionWeave.PluginSdk` stays in the solution and in the architecture test that pins its own reference set. Nothing else changed with it: the composition root still registers `OpenCvNodeDefinitionProvider` through the catalog, so `INodeDefinitionProvider` remains the only contribution path, and no App source, App test, or App build output other than the previous `deps.json` ever named a PluginSdk type. The detailed design's plugin paragraph now says that the host does not reference the SDK while nothing loads a plugin, which is the state the code is in.
+- **Evidence:** `src/VisionWeave.App/VisionWeave.App.csproj`, `src/VisionWeave.App/Composition/VisionWeaveServices.cs`, `src/VisionWeave.PluginSdk/`, `tests/VisionWeave.ArchitectureTests/Dependencies/AssemblyDependencyTests.cs`, `docs/design/visionweave-detailed-design.md` (section 3 and the plugin section), [#33](https://github.com/xin-pu/VisionWeave/issues/33).
 - **Owner:** VisionWeave maintainers.
 - **Review again:** Before a plugin discovery mechanism, a plugin settings screen, or a runtime executor plugin is introduced.
 
