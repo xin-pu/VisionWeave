@@ -125,35 +125,53 @@ public sealed class WorkflowRunner
         }
 
         Task all = Task.WhenAll(running.Select(item => item.Work));
-        Task grace = WaitForCancellationGraceAsync(cancellationToken);
+        using var stopGraceWait = new CancellationTokenSource();
+        Task grace = WaitForCancellationGraceAsync(cancellationToken, stopGraceWait.Token);
 
-        if (ReferenceEquals(await Task.WhenAny(all, grace).ConfigureAwait(false), all))
-        {
-            await all.ConfigureAwait(false);
-            return !cancellationToken.IsCancellationRequested;
-        }
-
-        foreach (NodeWork work in running.Where(item => !item.Work.IsCompleted))
-        {
-            context.Quarantine(work.NodeId);
-        }
-
-        context.WasCancelled = true;
-        return false;
-    }
-
-    private async Task WaitForCancellationGraceAsync(CancellationToken cancellationToken)
-    {
         try
         {
-            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
+            if (ReferenceEquals(await Task.WhenAny(all, grace).ConfigureAwait(false), all))
+            {
+                await all.ConfigureAwait(false);
+                return !cancellationToken.IsCancellationRequested;
+            }
+
+            foreach (NodeWork work in running.Where(item => !item.Work.IsCompleted))
+            {
+                context.Quarantine(work.NodeId);
+            }
+
+            context.WasCancelled = true;
+            return false;
         }
-        catch (OperationCanceledException)
+        finally
         {
-            // The grace period only starts once cancellation has been observed.
+            stopGraceWait.Cancel();
+
+            try
+            {
+                await grace.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (stopGraceWait.IsCancellationRequested)
+            {
+                // A completed level has no use for its pending cancellation wait.
+            }
+        }
+    }
+
+    private async Task WaitForCancellationGraceAsync(
+        CancellationToken cancellationToken,
+        CancellationToken stopWaitingToken)
+    {
+        Task cancellation = Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        Task stopped = Task.Delay(Timeout.InfiniteTimeSpan, stopWaitingToken);
+
+        if (!ReferenceEquals(await Task.WhenAny(cancellation, stopped).ConfigureAwait(false), cancellation))
+        {
+            return;
         }
 
-        await Task.Delay(_options.CancellationGracePeriod, CancellationToken.None).ConfigureAwait(false);
+        await Task.Delay(_options.CancellationGracePeriod, stopWaitingToken).ConfigureAwait(false);
     }
 
     private async Task RunNodeTrackedAsync(Guid nodeId, RunState context, CancellationToken cancellationToken)
@@ -265,6 +283,7 @@ public sealed class WorkflowRunner
                 return;
 
             case NodeExecutionStatus.Cancelled:
+                ReleaseUnpublishedOutputs(result.Outputs);
                 context.SetCancelled(
                     nodeId,
                     DiagnosticCodes.NodeExecutionCancelled,
@@ -273,6 +292,7 @@ public sealed class WorkflowRunner
                 return;
 
             default:
+                ReleaseUnpublishedOutputs(result.Outputs);
                 context.Fail(
                     nodeId,
                     diagnostics.Count > 0 ? null : DiagnosticCodes.NodeExecutionFailed,
@@ -285,6 +305,9 @@ public sealed class WorkflowRunner
                 return;
         }
     }
+
+    private static void ReleaseUnpublishedOutputs(IReadOnlyDictionary<string, PortValue> outputs)
+        => RunState.ReleaseOrphaned(outputs.Values.OfType<ImageFrameValue>().Select(value => value.Lease));
 
     /// <summary>
     /// Publishes the outputs of a node that succeeded and then lets the observer

@@ -2,6 +2,7 @@
 using VisionWeave.Application.Execution;
 using VisionWeave.Application.Tests.Support;
 using VisionWeave.Contracts.Diagnostics;
+using VisionWeave.Contracts.Execution;
 using VisionWeave.Contracts.Values;
 using VisionWeave.Domain.Workflows;
 
@@ -58,6 +59,52 @@ public sealed class WorkflowRunnerResourceTests : RunnerTestBase
         frames.Lease.IsDisposed.ShouldBeTrue();
         ledger.Created.ShouldBe(1);
         ledger.Released.ShouldBe(1);
+        ledger.Outstanding.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Run_failed_executor_result_releases_unpublished_frame_output()
+    {
+        WorkflowDocument document = WorkflowDocument.Create("workflow");
+        document.AddNode(TestNodes.SourceType, 1, new CanvasPosition(0, 0));
+        LeaseLedger ledger = NewLedger();
+        var frames = new FrameSource(ledger);
+
+        StubResolver executors = new StubResolver()
+            .Add(TestNodes.SourceExecutorTypeId, (_, _) => Task.FromResult(new NodeExecutionResult
+            {
+                Status = NodeExecutionStatus.Failed,
+                Outputs = frames.Produce(),
+            }));
+
+        WorkflowRunSummary summary = await Runner(executors, ledger, Options())
+            .RunAsync(Plan(document), CancellationToken.None);
+
+        summary.Status.ShouldBe(WorkflowRunStatus.Failed);
+        frames.Lease.IsDisposed.ShouldBeTrue();
+        ledger.Outstanding.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Run_cancelled_executor_result_releases_unpublished_frame_output()
+    {
+        WorkflowDocument document = WorkflowDocument.Create("workflow");
+        document.AddNode(TestNodes.SourceType, 1, new CanvasPosition(0, 0));
+        LeaseLedger ledger = NewLedger();
+        var frames = new FrameSource(ledger);
+
+        StubResolver executors = new StubResolver()
+            .Add(TestNodes.SourceExecutorTypeId, (_, _) => Task.FromResult(new NodeExecutionResult
+            {
+                Status = NodeExecutionStatus.Cancelled,
+                Outputs = frames.Produce(),
+            }));
+
+        WorkflowRunSummary summary = await Runner(executors, ledger, Options())
+            .RunAsync(Plan(document), CancellationToken.None);
+
+        summary.Status.ShouldBe(WorkflowRunStatus.Cancelled);
+        frames.Lease.IsDisposed.ShouldBeTrue();
         ledger.Outstanding.ShouldBe(0);
     }
 
