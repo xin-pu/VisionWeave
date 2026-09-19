@@ -431,3 +431,5 @@ FodyWeavers.xsd
 # Review reports (never committed, workspace-only artifacts)
 docs/*评审报告*.md
 docs/*审查报告*.md
+
+.zcode/

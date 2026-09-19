@@ -181,3 +181,15 @@
 - **Evidence:** `src/VisionWeave.Contracts/Diagnostics/NodeDiagnostic.cs`, `src/VisionWeave.Contracts/Diagnostics/DiagnosticTarget.cs`, `src/VisionWeave.Contracts/Diagnostics/PortTarget.cs`, `src/VisionWeave.Contracts/Diagnostics/ParameterTarget.cs`, `src/VisionWeave.Contracts/Diagnostics/ConnectionTarget.cs`, `src/VisionWeave.Application/Validation/WorkflowValidator.cs` (`ValidateParameters`, `ValidateConnections`, `ValidateRequiredInputs`, `ValidatePorts`, `ValidateConnection`), `src/VisionWeave.Application/Validation/ValidationProjection.cs`, `tests/VisionWeave.Application.Tests/Validation/DiagnosticAttributionTests.cs`, `tests/VisionWeave.Application.Tests/Validation/DiagnosticTargetQueryTests.cs`, `tests/VisionWeave.Persistence.Tests/Workflows/WorkflowDocumentRoundTripTests.cs`, `docs/adr/0010-diagnostic-targets.md`, `docs/design/visionweave-detailed-design.md` (sections 4.3 and 6.2).
 - **Owner:** VisionWeave maintainers.
 - **Review again:** When the canvas or the inspector binds a port, a parameter, or a connection to its validation state, or when a marker needs an element the target cannot name.
+
+### PL-2026-015 - Keep autosave failures inside the editor-session diagnostic boundary
+
+- **Status:** Open
+- **Priority:** P1
+- **Recorded on:** 2026-09-19
+- **Scope:** File-system failure handling for `EditorSession.TryAutosave` and the result contract exposed to a future autosave scheduler.
+- **Observation:** `EditorSession` documents that every session transition reports diagnostics rather than throwing, but `TryAutosave` delegates directly to `WorkflowSession.TryAutosave`. That call writes a working copy through `WorkflowDocumentWriter.SaveWorkingCopy`, which can throw for a locked file, permission change, unavailable volume, invalid path, or an unsupported persisted value. The current method returns only `bool`, so it cannot preserve an expected failure as a `NodeDiagnostic`; a future timer or background autosave command could therefore fault outside the asynchronous UI error boundary.
+- **Decision or next step:** Replace the boolean-only autosave outcome with a diagnostic-bearing result that distinguishes “not applicable” from “written” and “refused or failed”. Translate expected persistence/path failures to `VW-FILE-001`, preserve the exception for structured logging only, and test each failure path alongside the existing successful working-copy test. Wire an interval scheduler only after this result is safe to consume.
+- **Evidence:** `src/VisionWeave.App/Sessions/EditorSession.cs` (`TryAutosave`), `src/VisionWeave.Persistence/Workflows/WorkflowSession.cs` (`TryAutosave`), `src/VisionWeave.Persistence/Workflows/WorkflowDocumentWriter.cs` (`SaveWorkingCopy`), `tests/VisionWeave.App.Tests/Sessions/EditorSessionTests.cs`.
+- **Owner:** VisionWeave maintainers.
+- **Review again:** Before enabling timer-driven autosave or exposing autosave state in the editor shell.
