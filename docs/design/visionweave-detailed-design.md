@@ -202,8 +202,17 @@ on the order or the multiplicity of the identifiers it was given. `Matches`
 tells the caller whether the projection still describes the current revision; a
 layout-only move changes no revision, so a node move does not invalidate it,
 while a semantic edit does, and a superseded projection is replaced rather than
-queried. Port-level and connection-level attribution is not available yet,
-because a diagnostic carries only its node instance identifier.
+queried. Port-level and connection-level attribution is available through the
+diagnostic target: a diagnostic that is narrower than its node names the port, the
+parameter, or the connection it describes with identifiers the document already
+carries, so the projection answers `DiagnosticsForPort`, `DiagnosticsForParameter`,
+and `DiagnosticsForConnection` without parsing a message. A port or a parameter
+reports its own conditions preceded by the conditions its node reports about
+itself, because a node-level failure is what makes its members unknowable, while a
+connection belongs to two nodes and inherits neither. A condition the projection
+cannot attribute more narrowly stays visible at the node or document scope it
+names, and a query for an element it never saw answers with the nearest broader
+scope instead of a badge that describes something the document no longer holds.
 
 The host reports its own conditions the same way: a setting outside the range the
 runtime can honor is `VW-CONFIG-001`, and the application refuses to start rather
@@ -333,9 +342,12 @@ and optional preview bitmap. It has no OpenCV `Mat` property.
 
 `PortViewModel` exposes display text, declared data type, connector anchor,
 connection state, direction, and validation state. `WorkflowConnectionViewModel`
-binds source/target anchors and owns only visual connection state. A port's own
-validation state needs the attribution tracked as PL-2026-013; until it exists,
-a port presents the severity of the node that owns it.
+binds source/target anchors and owns only visual connection state. A port reads its
+own validation state from `ValidationProjection.SeverityOfPort`, which reports the
+conditions of that port together with the conditions its node reports about itself,
+so a port is not marked by a failure of a parameter the node declares. A connection
+reads `SeverityOfConnection` instead, so a wire the validator rejected is marked
+itself rather than through either endpoint.
 
 The view model maps property-change actions into application commands:
 
@@ -608,6 +620,10 @@ Implementation starts only after these records exist and link back here:
 | [ADR-0004](../adr/0004-workflow-document-and-format.md) | `WorkflowDocument` versus executable snapshot, `.vwflow` schema, definition versions and migrations, unknown-node placeholders, resource references, and forward-version policy. | Accepted |
 | [ADR-0005](../adr/0005-native-resource-ownership.md) | Lease state machine, reservations, executor resource scope, cache ownership, preview fence, cancellation quarantine, and lease-ledger tests. | Accepted |
 | [ADR-0006](../adr/0006-editor-and-ui-commit-protocol.md) | Nodify and WPF UI scope, UI intent/rollback protocol, undo granularity, and the deferred automatic-layout and subgraph capabilities. | Accepted |
+| [ADR-0007](../adr/0007-host-composition-and-configuration.md) | Host composition root, the dependency-injection, configuration, and logging stack, startup validation, and the boundary that keeps those packages out of the core assemblies. | Accepted |
+| [ADR-0008](../adr/0008-async-ui-command-boundary.md) | The single asynchronous command and error boundary: expected failures as diagnostics, cancellation as an outcome, one presenter for user-facing messages, and the message-box exception at startup. | Accepted |
+| [ADR-0009](../adr/0009-editor-session-orchestration.md) | The host-layer editing session that composes the document session, the command history, the selection, and the validation projection, and the transitions it owns. | Accepted |
+| [ADR-0010](../adr/0010-diagnostic-targets.md) | The closed hierarchy of diagnostic targets narrower than a node, how the validator attributes them, and how the projection answers per port, parameter, and connection. | Accepted |
 | [docs/ledger/standards-deviations.md](../ledger/standards-deviations.md) | Each approved exception to the adopted standards, or an explicit "none" baseline. | No deviations |
 
 ## 13. Alternatives considered

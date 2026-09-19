@@ -101,7 +101,9 @@ public sealed class WorkflowValidator
                 DiagnosticCodes.InvalidGraph,
                 DiagnosticSeverity.Error,
                 $"Connection '{connection.ConnectionId}' refers to a node instance that is not in the document.",
-                null));
+                null,
+                null,
+                new ConnectionTarget(connection.ConnectionId)));
             return new ValidationResult(diagnostics);
         }
 
@@ -111,7 +113,9 @@ public sealed class WorkflowValidator
                 DiagnosticCodes.InvalidGraph,
                 DiagnosticSeverity.Error,
                 $"Node instance '{connection.SourceNodeId}' is connected to itself.",
-                connection.SourceNodeId));
+                connection.SourceNodeId,
+                null,
+                new ConnectionTarget(connection.ConnectionId)));
             return new ValidationResult(diagnostics);
         }
 
@@ -145,7 +149,9 @@ public sealed class WorkflowValidator
                 DiagnosticCodes.InvalidGraph,
                 DiagnosticSeverity.Error,
                 $"The connection from node instance '{connection.SourceNodeId}' to node instance '{connection.TargetNodeId}' closes a cycle: {cycle}.",
-                connection.SourceNodeId));
+                connection.SourceNodeId,
+                null,
+                new ConnectionTarget(connection.ConnectionId)));
         }
 
         return new ValidationResult(diagnostics);
@@ -201,7 +207,9 @@ public sealed class WorkflowValidator
                     DiagnosticCodes.UnknownParameter,
                     DiagnosticSeverity.Error,
                     $"Node instance '{node.InstanceId}' saves parameter '{saved.Key}', which node type '{definition.TypeId}' version {definition.TypeVersion} does not declare.",
-                    node.InstanceId));
+                    node.InstanceId,
+                    null,
+                    new ParameterTarget(node.InstanceId, saved.Key)));
                 continue;
             }
 
@@ -229,7 +237,9 @@ public sealed class WorkflowValidator
                     DiagnosticCodes.MissingRequiredParameter,
                     DiagnosticSeverity.Error,
                     $"Parameter '{declared.Name}' of node instance '{node.InstanceId}' is required, but the document supplies no value and the definition declares no default.",
-                    node.InstanceId));
+                    node.InstanceId,
+                    null,
+                    new ParameterTarget(node.InstanceId, declared.Name)));
             }
         }
     }
@@ -269,7 +279,9 @@ public sealed class WorkflowValidator
                         DiagnosticCodes.ParameterOptionNotDeclared,
                         DiagnosticSeverity.Error,
                         $"Parameter '{declared.Name}' of node instance '{node.InstanceId}' is '{option}', which is not one of the declared options: {string.Join(", ", options)}.",
-                        node.InstanceId));
+                        node.InstanceId,
+                        null,
+                        new ParameterTarget(node.InstanceId, declared.Name)));
                 }
 
                 break;
@@ -322,7 +334,9 @@ public sealed class WorkflowValidator
             DiagnosticCodes.ParameterOutOfRange,
             DiagnosticSeverity.Error,
             $"Parameter '{declared.Name}' of node instance '{node.InstanceId}' is {Format(value)}, which is outside the declared range {DescribeRange(declared)}.",
-            node.InstanceId));
+            node.InstanceId,
+            null,
+            new ParameterTarget(node.InstanceId, declared.Name)));
     }
 
     private static void RejectKind(
@@ -334,7 +348,9 @@ public sealed class WorkflowValidator
             DiagnosticCodes.InvalidParameterValue,
             DiagnosticSeverity.Error,
             $"Parameter '{declared.Name}' of node instance '{node.InstanceId}' accepts only {expected}.",
-            node.InstanceId));
+            node.InstanceId,
+            null,
+            new ParameterTarget(node.InstanceId, declared.Name)));
 
     private static bool TryReadNumber(object value, out double number)
     {
@@ -387,7 +403,9 @@ public sealed class WorkflowValidator
                     DiagnosticCodes.InvalidGraph,
                     DiagnosticSeverity.Error,
                     $"Connection '{connection.ConnectionId}' refers to a node instance that is not in the document.",
-                    null));
+                    null,
+                    null,
+                    new ConnectionTarget(connection.ConnectionId)));
                 continue;
             }
 
@@ -399,7 +417,9 @@ public sealed class WorkflowValidator
                     DiagnosticCodes.InvalidGraph,
                     DiagnosticSeverity.Error,
                     $"Node instance '{connection.SourceNodeId}' is connected to itself.",
-                    connection.SourceNodeId));
+                    connection.SourceNodeId,
+                    null,
+                    new ConnectionTarget(connection.ConnectionId)));
                 continue;
             }
 
@@ -443,7 +463,9 @@ public sealed class WorkflowValidator
                     DiagnosticCodes.InvalidGraph,
                     DiagnosticSeverity.Error,
                     $"Input port '{port.Id}' of node instance '{node.InstanceId}' is required, but nothing is connected to it.",
-                    node.InstanceId));
+                    node.InstanceId,
+                    null,
+                    new PortTarget(node.InstanceId, port.Id)));
             }
         }
     }
@@ -473,7 +495,9 @@ public sealed class WorkflowValidator
                 DiagnosticCodes.UnknownPort,
                 DiagnosticSeverity.Error,
                 $"Node instance '{source.InstanceId}' has no output port '{connection.SourcePortId}' in version {source.TypeVersion}.",
-                source.InstanceId));
+                source.InstanceId,
+                null,
+                new PortTarget(source.InstanceId, connection.SourcePortId)));
         }
 
         if (targetPort is null)
@@ -482,7 +506,9 @@ public sealed class WorkflowValidator
                 DiagnosticCodes.UnknownPort,
                 DiagnosticSeverity.Error,
                 $"Node instance '{target.InstanceId}' has no input port '{connection.TargetPortId}' in version {target.TypeVersion}.",
-                target.InstanceId));
+                target.InstanceId,
+                null,
+                new PortTarget(target.InstanceId, connection.TargetPortId)));
         }
 
         if (sourcePort is not null && sourcePort.Direction != PortDirection.Output)
@@ -491,7 +517,9 @@ public sealed class WorkflowValidator
                 DiagnosticCodes.IncompatiblePort,
                 DiagnosticSeverity.Error,
                 $"Node instance '{source.InstanceId}' port '{sourcePort.Id}' is an input port and cannot be a connection source.",
-                source.InstanceId));
+                source.InstanceId,
+                null,
+                new PortTarget(source.InstanceId, sourcePort.Id)));
         }
 
         if (targetPort is not null && targetPort.Direction != PortDirection.Input)
@@ -500,7 +528,9 @@ public sealed class WorkflowValidator
                 DiagnosticCodes.IncompatiblePort,
                 DiagnosticSeverity.Error,
                 $"Node instance '{target.InstanceId}' port '{targetPort.Id}' is an output port and cannot be a connection target.",
-                target.InstanceId));
+                target.InstanceId,
+                null,
+                new PortTarget(target.InstanceId, targetPort.Id)));
         }
 
         if (sourcePort is not null && targetPort is not null
@@ -510,7 +540,9 @@ public sealed class WorkflowValidator
                 DiagnosticCodes.IncompatiblePort,
                 DiagnosticSeverity.Error,
                 $"Port '{sourcePort.Id}' carries '{sourcePort.TypeId}' but port '{targetPort.Id}' of the same connection accepts '{targetPort.TypeId}'.",
-                target.InstanceId));
+                target.InstanceId,
+                null,
+                new ConnectionTarget(connection.ConnectionId)));
         }
 
         if (targetPort is null)
@@ -528,7 +560,9 @@ public sealed class WorkflowValidator
                 DiagnosticCodes.IncompatiblePort,
                 DiagnosticSeverity.Error,
                 $"Input port '{targetPort.Id}' of node instance '{target.InstanceId}' accepts a single connection, but {count} are connected to it.",
-                target.InstanceId));
+                target.InstanceId,
+                null,
+                new PortTarget(target.InstanceId, targetPort.Id)));
         }
     }
 

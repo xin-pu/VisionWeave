@@ -13,7 +13,9 @@ it would add noise without changing a current decision.
   with [ADR-0009](adr/0009-editor-session-orchestration.md) for the editing
   session the shell presents,
   [ADR-0008](adr/0008-async-ui-command-boundary.md) for the shell's command and
-  error boundary, and
+  error boundary,
+  [ADR-0010](adr/0010-diagnostic-targets.md) for what a diagnostic is attributed
+  to, and
   [ADR-0007](adr/0007-host-composition-and-configuration.md) for the current
   application-host direction.
 - [Project ledgers](ledger/README.md) — improvements, risks, and standards
