@@ -176,8 +176,7 @@ public sealed class WorkflowRunnerTests : RunnerTestBase
         StubResolver executors = new StubResolver()
             .Add(TestNodes.SourceExecutorTypeId, sourceFrames.Executor)
             .Add(TestNodes.BlurExecutorTypeId, (_, _) => Task.FromResult(NodeExecutionResult.Failure(
-                new NodeDiagnostic("TEST-BLUR-001", DiagnosticSeverity.Error, "The blur failed."),
-                TimeSpan.FromMilliseconds(1))))
+                new NodeDiagnostic("TEST-BLUR-001", DiagnosticSeverity.Error, "The blur failed."))))
             .Add(TestNodes.CountExecutorTypeId, countExecutor);
 
         WorkflowRunSummary summary = await Runner(executors, ledger, Options())

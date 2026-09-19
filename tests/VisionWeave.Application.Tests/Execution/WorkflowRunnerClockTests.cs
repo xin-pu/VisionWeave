@@ -159,10 +159,10 @@ public sealed class WorkflowRunnerClockTests : RunnerTestBase
 
         StubResolver executors = new StubResolver().Add(TestNodes.SourceExecutorTypeId, (_, _) =>
         {
-            // A node that reports no duration of its own is measured by the run,
-            // so the clock alone decides what both of them report having taken.
+            // The run measures the node on the clock it was given, so the clock
+            // alone decides what both the run and the node report having taken.
             clock.Advance(TimeSpan.FromSeconds(2));
-            return Task.FromResult(NodeExecutionResult.Success(sourceFrames.Produce(), TimeSpan.Zero));
+            return Task.FromResult(NodeExecutionResult.Success(sourceFrames.Produce()));
         });
 
         WorkflowRunSummary summary = await Runner(executors, ledger, timeProvider: clock)
@@ -174,6 +174,33 @@ public sealed class WorkflowRunnerClockTests : RunnerTestBase
             .Duration.ShouldBe(TimeSpan.FromSeconds(2));
         ledger.Outstanding.ShouldBe(0);
         ledger.ReservationsOutstanding.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task A_node_that_answered_with_a_failure_is_measured_by_the_run()
+    {
+        WorkflowDocument document = WorkflowDocument.Create("workflow");
+        NodeInstance source = document.AddNode(TestNodes.SourceType, 1, new CanvasPosition(0, 0));
+
+        var clock = new TestClock(Start);
+        LeaseLedger ledger = NewLedger();
+
+        StubResolver executors = new StubResolver().Add(TestNodes.SourceExecutorTypeId, (_, _) =>
+        {
+            // The executor answered, so the run has a completed execution to
+            // describe and measures it on the clock it was given.
+            clock.Advance(TimeSpan.FromSeconds(3));
+            return Task.FromResult(NodeExecutionResult.Failure(
+                new NodeDiagnostic("TEST-SOURCE-001", DiagnosticSeverity.Error, "The source failed.")));
+        });
+
+        WorkflowRunSummary summary = await Runner(executors, ledger, Options(), timeProvider: clock)
+            .RunAsync(Plan(document), CancellationToken.None);
+
+        summary.Status.ShouldBe(WorkflowRunStatus.Failed);
+        summary.Nodes.Single(node => node.NodeInstanceId == source.InstanceId)
+            .Duration.ShouldBe(TimeSpan.FromSeconds(3));
+        ledger.Outstanding.ShouldBe(0);
     }
 
     [Fact]

@@ -90,5 +90,5 @@ public abstract class RunnerTestBase
     /// <param name="outputs">The produced outputs.</param>
     /// <returns>The result.</returns>
     protected static NodeExecutionResult Succeeded(IReadOnlyDictionary<string, PortValue> outputs)
-        => NodeExecutionResult.Success(outputs, TimeSpan.FromMilliseconds(1));
+        => NodeExecutionResult.Success(outputs);
 }

@@ -282,7 +282,6 @@ public sealed class WorkflowRunner
         RunState context,
         CancellationToken cancellationToken)
     {
-        TimeSpan duration = result.Duration > TimeSpan.Zero ? result.Duration : elapsed;
         IReadOnlyList<NodeDiagnostic> diagnostics = context.NormalizeDiagnostics(nodeId, result);
 
         switch (result.Status)
@@ -296,11 +295,11 @@ public sealed class WorkflowRunner
                     out NodeDiagnostic? violation))
                 {
                     ReleaseUnpublishedOutputs(result.Outputs, inputs);
-                    context.Fail(nodeId, null, null, null, duration, [.. diagnostics, violation!]);
+                    context.Fail(nodeId, null, null, null, elapsed, [.. diagnostics, violation!]);
                     return;
                 }
 
-                await PublishAndObserveAsync(nodeId, result, duration, diagnostics, context, cancellationToken)
+                await PublishAndObserveAsync(nodeId, result, elapsed, diagnostics, context, cancellationToken)
                     .ConfigureAwait(false);
                 return;
 
@@ -322,7 +321,7 @@ public sealed class WorkflowRunner
                         ? null
                         : $"Node instance '{nodeId}' reported a failure without a diagnostic.",
                     null,
-                    duration,
+                    elapsed,
                     diagnostics);
                 return;
         }

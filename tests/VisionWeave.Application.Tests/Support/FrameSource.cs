@@ -63,7 +63,7 @@ internal sealed class FrameSource
     /// source was created for.
     /// </summary>
     internal Func<NodeExecutionRequest, CancellationToken, Task<NodeExecutionResult>> Executor
-        => (_, _) => Task.FromResult(NodeExecutionResult.Success(Produce(), TimeSpan.FromMilliseconds(1)));
+        => (_, _) => Task.FromResult(NodeExecutionResult.Success(Produce()));
 
     /// <summary>
     /// Allocates one frame and returns the outputs that publish it.

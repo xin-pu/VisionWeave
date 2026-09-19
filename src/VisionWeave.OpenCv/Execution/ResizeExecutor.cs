@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using OpenCvSharp;
+﻿using OpenCvSharp;
 using VisionWeave.Contracts.Diagnostics;
 using VisionWeave.Contracts.Execution;
 using VisionWeave.Contracts.Nodes;
@@ -36,11 +35,9 @@ public sealed class ResizeExecutor : INodeExecutor
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        Stopwatch stopwatch = Stopwatch.StartNew();
-
         if (!FrameInput.TryRead(request, out MatFrameLease input, out NodeDiagnostic? failure))
         {
-            return Task.FromResult(NodeExecutionResult.Failure(failure!, stopwatch.Elapsed));
+            return Task.FromResult(NodeExecutionResult.Failure(failure!));
         }
 
         int width = request.Parameters.GetInt32(OpenCvNodeIds.WidthParameter);
@@ -53,13 +50,12 @@ public sealed class ResizeExecutor : INodeExecutor
                     request,
                     $"Parameters '{OpenCvNodeIds.WidthParameter}' and '{OpenCvNodeIds.HeightParameter}' must be between " +
                     $"{OpenCvParameterBounds.MinDimension} and {OpenCvParameterBounds.MaxDimension}, " +
-                    $"but they are {width} and {height}."),
-                stopwatch.Elapsed));
+                    $"but they are {width} and {height}.")));
         }
 
         if (!TryReadInterpolation(request, out InterpolationFlags interpolation, out NodeDiagnostic? interpolationFailure))
         {
-            return Task.FromResult(NodeExecutionResult.Failure(interpolationFailure!, stopwatch.Elapsed));
+            return Task.FromResult(NodeExecutionResult.Failure(interpolationFailure!));
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -75,14 +71,12 @@ public sealed class ResizeExecutor : INodeExecutor
 
             MatFrameLease produced = MatFrameLease.Create(output, _ledger);
             transferred = true;
-            stopwatch.Stop();
 
             return Task.FromResult(NodeExecutionResult.Success(
                 new Dictionary<string, PortValue>(StringComparer.Ordinal)
                 {
                     [OpenCvNodeIds.ResizedPortId] = new ImageFrameValue(produced),
-                },
-                stopwatch.Elapsed));
+                }));
         }
         finally
         {
