@@ -2,8 +2,13 @@
 
 ## Status
 
-- **Status:** Proposed; the repository skeleton is approved, while execution,
-  port-value, and persistence contracts still require their listed ADRs.
+- **Status:** Proposed; the repository skeleton is approved, and the foundation
+  slice is implemented locally on `feat/foundation`: the ADR-0001 dependency
+  boundaries, the port, document, ownership, and editor decisions of ADR-0003
+  to ADR-0006, and a runnable path from a workflow document to native frames.
+  Those ADRs stay Proposed until the maintainer accepts them after review. The
+  editor, `.vwflow` persistence, and the remaining node families are not
+  implemented.
 - **Owner:** VisionWeave maintainers.
 - **Scope:** New WPF desktop application. This document does not prescribe an
   in-place migration of the legacy Aries solution.

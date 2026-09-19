@@ -1,4 +1,4 @@
-﻿# Project Improvements Ledger
+# Project Improvements Ledger
 
 ## Statuses
 
@@ -13,6 +13,7 @@
 - **Scope:** Port values, executable snapshots, native resource ownership, and `.vwflow` persistence.
 - **Observation:** The initial skeleton could enforce assembly boundaries, but implementation would have been premature before the design-review P0 items had durable decisions.
 - **Decision or next step:** ADR-0003 to ADR-0006 record those decisions and are implemented on the foundation branch. Their status stays Proposed until the maintainer accepts them after review.
+- **Update (2026-09-19):** The foundation slice is implemented locally on `feat/foundation` and is green on the four gates: build, 123 tests across the four test projects, `dotnet format --verify-no-changes`, and `scripts/Test-ProjectDocuments.ps1`. Nothing is pushed to origin, and the branch awaits the review that precedes the merge to `master`.
 - **Evidence:** `docs/adr/0003-port-value-types.md`, `docs/adr/0004-workflow-document-and-format.md`, `docs/adr/0005-native-resource-ownership.md`, `docs/adr/0006-editor-and-ui-commit-protocol.md`.
 - **Owner:** VisionWeave maintainers.
 - **Review again:** When the maintainer accepts or amends the ADRs after review.
