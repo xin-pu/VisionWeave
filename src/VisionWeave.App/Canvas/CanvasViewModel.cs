@@ -174,14 +174,18 @@ internal sealed partial class CanvasViewModel : ObservableObject
     /// Direction, type, multiplicity, and cycle rules stay the validator's, so a
     /// pair that cannot be joined is passed on and refused there.
     /// </summary>
-    /// <param name="connection">The two ports Nodify reports, or anything else.</param>
+    /// <param name="connection">
+    /// The two ports Nodify reports, or anything else. The editor reports them as a
+    /// pair, not as the <c>System.Tuple</c> its own documentation names, so the pair
+    /// is read as a tuple.
+    /// </param>
     [RelayCommand]
     private void Connect(object? connection)
     {
         if (!IsEditable
-            || connection is not Tuple<object, object> pair
-            || pair.Item1 is not PortViewModel first
-            || pair.Item2 is not PortViewModel second)
+            || connection is not (object firstConnector, object secondConnector)
+            || firstConnector is not PortViewModel first
+            || secondConnector is not PortViewModel second)
         {
             // A pending connection is a visual until two ports are named, so
             // anything else is not a gesture the document has an opinion about.

@@ -151,12 +151,30 @@ public sealed class CanvasIntentTests
     [Fact]
     public void Connect_of_something_that_is_not_two_ports_is_not_a_gesture()
     {
-        _canvas.ConnectCommand.Execute(Tuple.Create<object, object>("a port", "another port"));
+        _canvas.ConnectCommand.Execute(((object)"a port", (object)"another port"));
 
         _session.Document.Connections.ShouldBeEmpty();
         _session.CanUndo.ShouldBeFalse();
 
         // Nothing was observed, so the status area still says what it said before.
+        _status.Condition.ShouldBe(ShellStatus.NoConditionText);
+        _status.ConditionSeverity.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Connect_of_a_drag_that_reached_no_port_is_not_a_gesture()
+    {
+        Guid blur = Add(OpenCvNodeIds.GaussianBlurTypeId, 0, 0);
+        long revision = _session.Document.Revision;
+
+        // A drag let go over the empty surface names only where it started, which the
+        // editor reports as a pair whose second half is nothing. There is no second
+        // port to join, so the document is never asked and nothing is reported.
+        _canvas.ConnectCommand.Execute(((object)Port(blur, OpenCvNodeIds.BlurredPortId), (object?)null));
+
+        _session.Document.Connections.ShouldBeEmpty();
+        _session.Document.Revision.ShouldBe(revision);
+        _canvas.Connectors.ShouldBeEmpty();
         _status.Condition.ShouldBe(ShellStatus.NoConditionText);
         _status.ConditionSeverity.ShouldBeNull();
     }
@@ -345,6 +363,13 @@ public sealed class CanvasIntentTests
     private WorkflowNodeViewModel Node(Guid instanceId)
         => _canvas.Nodes.Single(node => node.InstanceId == instanceId);
 
-    private static Tuple<object, object> Dragged(PortViewModel from, PortViewModel to)
-        => Tuple.Create<object, object>(from, to);
+    /// <summary>
+    /// The pair the editor reports when a drag joins two ports: the two connector data
+    /// contexts, in the order the drag visited them. It is a value tuple, which is what
+    /// the editor hands the command rather than the type its documentation names.
+    /// </summary>
+    /// <param name="from">The port the drag started at.</param>
+    /// <param name="to">The port the drag reached.</param>
+    /// <returns>The pair, as the command receives it.</returns>
+    private static (object From, object To) Dragged(PortViewModel from, PortViewModel to) => (from, to);
 }
