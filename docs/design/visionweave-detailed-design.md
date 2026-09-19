@@ -6,9 +6,9 @@
   slice is implemented locally on `feat/foundation`: the ADR-0001 dependency
   boundaries, the port, document, ownership, and editor decisions of ADR-0003
   to ADR-0006, and a runnable path from a workflow document to native frames.
-  Those ADRs stay Proposed until the maintainer accepts them after review. The
-  editor, `.vwflow` persistence, and the remaining node families are not
-  implemented.
+  The maintainer accepted those ADRs on 2026-09-19 after the review remediation
+  of issues #1 and #2. The editor, `.vwflow` persistence, and the remaining node
+  families are not implemented.
 - **Owner:** VisionWeave maintainers.
 - **Scope:** New WPF desktop application. This document does not prescribe an
   in-place migration of the legacy Aries solution.
@@ -492,10 +492,10 @@ Implementation starts only after these records exist and link back here:
 | --- | --- | --- |
 | [ADR-0001](../adr/0001-directed-project-dependencies.md) | Contracts, Domain, Application, OpenCv, Persistence, PluginSdk, and App reference rules. | Accepted |
 | [ADR-0002](../adr/0002-initial-framework-dependencies.md) | WPF UI, Nodify, OpenCvSharp, and test package selection; license, target framework, and audit posture. | Accepted |
-| [ADR-0003](../adr/0003-port-value-types.md) | Port type identity, contract value representations, compatibility table, multiplicity, and the deferred batch/collection flow. | Proposed |
-| [ADR-0004](../adr/0004-workflow-document-and-format.md) | `WorkflowDocument` versus executable snapshot, `.vwflow` schema, definition versions and migrations, unknown-node placeholders, resource references, and forward-version policy. | Proposed |
-| [ADR-0005](../adr/0005-native-resource-ownership.md) | Lease state machine, reservations, executor resource scope, cache ownership, preview fence, cancellation quarantine, and lease-ledger tests. | Proposed |
-| [ADR-0006](../adr/0006-editor-and-ui-commit-protocol.md) | Nodify and WPF UI scope, UI intent/rollback protocol, undo granularity, and the deferred automatic-layout and subgraph capabilities. | Proposed |
+| [ADR-0003](../adr/0003-port-value-types.md) | Port type identity, contract value representations, compatibility table, multiplicity, and the deferred batch/collection flow. | Accepted |
+| [ADR-0004](../adr/0004-workflow-document-and-format.md) | `WorkflowDocument` versus executable snapshot, `.vwflow` schema, definition versions and migrations, unknown-node placeholders, resource references, and forward-version policy. | Accepted |
+| [ADR-0005](../adr/0005-native-resource-ownership.md) | Lease state machine, reservations, executor resource scope, cache ownership, preview fence, cancellation quarantine, and lease-ledger tests. | Accepted |
+| [ADR-0006](../adr/0006-editor-and-ui-commit-protocol.md) | Nodify and WPF UI scope, UI intent/rollback protocol, undo granularity, and the deferred automatic-layout and subgraph capabilities. | Accepted |
 | [docs/ledger/standards-deviations.md](../ledger/standards-deviations.md) | Each approved exception to the adopted standards, or an explicit "none" baseline. | No deviations |
 
 ## 13. Alternatives considered

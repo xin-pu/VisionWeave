@@ -1,6 +1,6 @@
 # ADR-0004 Workflow document, executable snapshot, and `.vwflow`
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-19
 - **Decision owners:** VisionWeave maintainers
 

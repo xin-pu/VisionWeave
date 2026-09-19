@@ -8,15 +8,16 @@
 
 ### PL-2026-001 - Close execution and persistence contract decisions
 
-- **Status:** Monitoring
+- **Status:** Implemented
 - **Recorded on:** 2026-09-18
 - **Scope:** Port values, executable snapshots, native resource ownership, and `.vwflow` persistence.
 - **Observation:** The initial skeleton could enforce assembly boundaries, but implementation would have been premature before the design-review P0 items had durable decisions.
-- **Decision or next step:** ADR-0003 to ADR-0006 record those decisions and are implemented on the foundation branch. Their status stays Proposed until the maintainer accepts them after review.
+- **Decision or next step:** ADR-0003 to ADR-0006 record those decisions and are implemented on the foundation branch. The maintainer accepted them on 2026-09-19.
 - **Update (2026-09-19):** The foundation slice is implemented on `feat/foundation`. Review remediation branches [#1](https://github.com/xin-pu/VisionWeave/issues/1) and [#2](https://github.com/xin-pu/VisionWeave/issues/2) are pushed and closed; the foundation ref itself still awaits review before it is merged to `master`. The corresponding full Release suites passed with 125 and 124 tests respectively, together with format verification.
+- **Update (2026-09-19):** With the ADRs accepted, the foundation fast-forwarded into `master` locally, which stays unpushed until the maintainer asks for it. The `.vwflow` persistence half of this scope is not implemented and is tracked separately as PL-2026-007.
 - **Evidence:** `docs/adr/0003-port-value-types.md`, `docs/adr/0004-workflow-document-and-format.md`, `docs/adr/0005-native-resource-ownership.md`, `docs/adr/0006-editor-and-ui-commit-protocol.md`.
 - **Owner:** VisionWeave maintainers.
-- **Review again:** When the maintainer accepts or amends the ADRs after review.
+- **Review again:** No further review for these decisions; reopen only if a port value, snapshot, or ownership rule changes, and follow `.vwflow` persistence through PL-2026-007.
 
 ### PL-2026-002 - Add reproducible hosted CI
 
