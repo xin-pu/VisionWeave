@@ -1,4 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using VisionWeave.App.Commands;
+using VisionWeave.App.Notifications;
 using VisionWeave.Application.Definitions;
 using VisionWeave.Application.Validation;
 using VisionWeave.Contracts.Nodes;
@@ -37,6 +39,13 @@ internal static class VisionWeaveServices
             provider.GetServices<INodeDefinitionProvider>()));
 
         services.AddSingleton<WorkflowValidator>();
+
+        // The shell's command and error boundary: one place runs an asynchronous
+        // operation, one place shows the failure it reports, and one log records
+        // the failure the operation did not anticipate.
+        services.AddSingleton<IUserNotificationPresenter, MessageBoxNotificationPresenter>();
+        services.AddSingleton<AsyncCommandBoundary>();
+        services.AddSingleton<IDocumentLoader, DocumentLoader>();
 
         return services;
     }

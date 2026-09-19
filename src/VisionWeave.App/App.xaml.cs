@@ -1,6 +1,7 @@
 ﻿using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using VisionWeave.App.Commands;
 using VisionWeave.App.Composition;
 using VisionWeave.App.ViewModels;
 using VisionWeave.Application.Definitions;
@@ -52,7 +53,7 @@ public partial class App : System.Windows.Application
             session.Document.Id,
             catalog.Definitions.Count);
 
-        MainWindow shell = new(new MainWindowViewModel(session, catalog));
+        MainWindow shell = new(new MainWindowViewModel(session, catalog, OpenDocumentCommand()));
         MainWindow = shell;
         shell.Show();
     }
@@ -62,6 +63,14 @@ public partial class App : System.Windows.Application
         _services?.Dispose();
         base.OnExit(e);
     }
+
+    /// <summary>
+    /// Creates the command the shell opens documents with.
+    /// </summary>
+    private OpenDocumentCommand OpenDocumentCommand()
+        => new(
+            _services!.GetRequiredService<AsyncCommandBoundary>(),
+            _services!.GetRequiredService<IDocumentLoader>());
 
     private static void LogSettings(ILogger logger, VisionWeaveSettings settings)
     {

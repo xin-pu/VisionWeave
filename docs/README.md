@@ -10,8 +10,10 @@ it would add noise without changing a current decision.
 - [Design documents](design/README.md) — delivery plans, UI readiness, and
   detailed product design.
 - `adr/` — accepted architecture decision records and their rationale; start
-  with [ADR-0007](adr/0007-host-composition-and-configuration.md) for the
-  current application-host direction.
+  with [ADR-0008](adr/0008-async-ui-command-boundary.md) for the shell's command
+  and error boundary and
+  [ADR-0007](adr/0007-host-composition-and-configuration.md) for the current
+  application-host direction.
 - [Project ledgers](ledger/README.md) — improvements, risks, and standards
   deviations.
 - [Development standards reference](standards-reference.md) — the pinned

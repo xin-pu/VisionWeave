@@ -93,4 +93,7 @@ public static class DiagnosticCodes
 
     /// <summary>A configured setting is absent, out of range, or unsupported by this build.</summary>
     public const string InvalidSetting = "VW-CONFIG-001";
+
+    /// <summary>A command failed in a way its operation did not anticipate; the failure was logged once.</summary>
+    public const string UnexpectedCommandFailure = "VW-UI-001";
 }

@@ -137,4 +137,5 @@ facts are demonstrably true:
 - [Detailed design](visionweave-detailed-design.md)
 - [ADR-0006: editor and UI commit protocol](../adr/0006-editor-and-ui-commit-protocol.md)
 - [ADR-0007: host composition, configuration, and logging stack](../adr/0007-host-composition-and-configuration.md)
+- [ADR-0008: async command and error boundary](../adr/0008-async-ui-command-boundary.md)
 - [Project improvements ledger](../ledger/project-improvements.md)
