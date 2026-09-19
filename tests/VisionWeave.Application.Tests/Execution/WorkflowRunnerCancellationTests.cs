@@ -52,6 +52,11 @@ public sealed class WorkflowRunnerCancellationTests : RunnerTestBase
         summary.QuarantinedNodeIds.ShouldBeEmpty();
         summary.HasCode(DiagnosticCodes.NodeExecutionCancelled).ShouldBeTrue();
 
+        // A node that stopped before it produced a result reports no duration, so a
+        // cancelled node is not read as one that took a while to stop.
+        summary.Nodes.Single(node => node.NodeInstanceId == blur.InstanceId)
+            .Duration.ShouldBe(TimeSpan.Zero);
+
         sourceFrames.Lease.IsDisposed.ShouldBeTrue();
         sourceFrames.Lease.OutstandingReservationsAtRelease.ShouldBe(0);
         ledger.Created.ShouldBe(1);
