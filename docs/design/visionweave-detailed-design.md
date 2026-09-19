@@ -847,11 +847,20 @@ Morphology, Contours, Draw, and Inspect.
 
 The catalog is filled in batches rather than at once. The first build shipped
 `Image Source` and `Save Image` in Input/Output, and `Gaussian Blur` and `Resize` as
-the Filter and Transform pair that proves the pipeline. The Aries migration then added
-the common single-image operations: `Colour Conversion` and `Crop` in Transform,
-`Median Blur` in Filter, and `Threshold` in Threshold. Those four go first because
-none of them needs a curated sample image: a uniform frame and a couple of marked
-pixels state what each one does, which is what the integration suite builds today.
+the Filter and Transform pair that proves the pipeline. The Aries migration then
+added the common single-image operations in two batches. The first took `Colour
+Conversion` and `Crop` in Transform, `Median Blur` in Filter, and `Threshold` in
+Threshold. The second took the smoothing and pyramid nodes: `Blur` and `Bilateral
+Filter` in Filter, `Adaptive Threshold` in Threshold, and `Pyramid Down` and
+`Pyramid Up` in Transform. Both batches were chosen the same way: each node says
+what it does on a frame the test writes itself, a uniform field or a step with a
+couple of marked pixels in it, so none of them needs a curated sample image to be
+regression-tested. What the batches leave out names its reason in the issue that
+migrated them — the derivative and edge nodes are a change of their own because they
+share the question of which depth a signed result is reported in, and `Filter2D`,
+`Normalize`, the point scaling node, and the channel nodes wait on a kernel
+representation, on a decision about masks and depths, on a consumer for signed
+frames, and on multi-port nodes respectively.
 The two file-backed nodes — `Image Source` and `Save Image` — are the ones that
 name a file, so they are the nodes a working directory is resolved for (5.4): each
 declares a required `path` parameter, the save node additionally declares the
@@ -859,8 +868,8 @@ declares a required `path` parameter, the save node additionally declares the
 folder that holds the document (ADR-0012). The remaining rows are the catalog this
 design aims at rather than a list of what exists, and each arrives with the curated
 regression images its own entry requires. That is also what the operations whose
-result depends on real image content — adaptive threshold, Canny, contours, and
-template matching above all — are waiting for.
+result depends on real image content — Canny, contours, and template matching above
+all — are waiting for.
 
 Every migrated node receives output-oriented regression tests, and a node whose result
 depends on real image content receives them against curated sample images. Migration

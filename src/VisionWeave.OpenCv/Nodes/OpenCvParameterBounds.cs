@@ -7,17 +7,20 @@
 /// </summary>
 public static class OpenCvParameterBounds
 {
-    /// <summary>The smallest Gaussian kernel dimension. A kernel is odd, so 1 disables smoothing.</summary>
+    /// <summary>The smallest kernel dimension a smoothing node accepts. One passes the frame through unchanged.</summary>
     public const int MinKernelSize = 1;
 
-    /// <summary>The greatest Gaussian kernel dimension the node accepts.</summary>
+    /// <summary>The greatest kernel dimension a smoothing node accepts.</summary>
     public const int MaxKernelSize = 99;
 
-    /// <summary>The smallest Gaussian sigma. Zero lets OpenCV derive it from the kernel.</summary>
+    /// <summary>The smallest sigma a smoothing node accepts. Zero lets OpenCV choose one.</summary>
     public const double MinSigma = 0d;
 
     /// <summary>The greatest Gaussian sigma the node accepts.</summary>
     public const double MaxSigma = 100d;
+
+    /// <summary>The greatest bilateral sigma, which is the whole range of an 8-bit intensity.</summary>
+    public const double MaxBilateralSigma = 255d;
 
     /// <summary>The smallest frame dimension the resize node produces.</summary>
     public const int MinDimension = 1;
@@ -28,6 +31,9 @@ public static class OpenCvParameterBounds
     /// <summary>The smallest median kernel dimension. A median of one pixel would smooth nothing.</summary>
     public const int MinMedianKernelSize = 3;
 
+    /// <summary>The smallest neighbourhood an adaptive threshold can compare a pixel against.</summary>
+    public const int MinBlockSize = 3;
+
     /// <summary>The smallest accepted rectangle coordinate.</summary>
     public const int MinOrigin = 0;
 
@@ -36,4 +42,10 @@ public static class OpenCvParameterBounds
 
     /// <summary>The greatest accepted threshold, which is also the brightest 8-bit pixel.</summary>
     public const double MaxLevel = 255d;
+
+    /// <summary>The smallest offset an adaptive threshold subtracts from the local average.</summary>
+    public const double MinConstant = -MaxLevel;
+
+    /// <summary>The greatest offset an adaptive threshold subtracts from the local average.</summary>
+    public const double MaxConstant = MaxLevel;
 }

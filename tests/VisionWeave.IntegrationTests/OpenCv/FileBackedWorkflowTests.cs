@@ -5,6 +5,7 @@ using VisionWeave.Application.Execution;
 using VisionWeave.Contracts.Diagnostics;
 using VisionWeave.Contracts.Execution;
 using VisionWeave.Contracts.Nodes;
+using VisionWeave.Contracts.Values;
 using VisionWeave.Domain.Workflows;
 using VisionWeave.IntegrationTests.Support;
 using VisionWeave.OpenCv.Nodes;
@@ -149,6 +150,39 @@ public sealed class FileBackedWorkflowTests
     }
 
     [Fact]
+    public async Task Run_of_the_filter_nodes_writes_what_they_produced_and_releases_every_lease()
+    {
+        using var directory = new TemporaryDirectory();
+        WritePlate(directory.File("plate.png"), width: 32, height: 24, value: 120);
+        WorkflowDocument document = BuildFilterWorkflow();
+        _ = Save(document, directory);
+
+        LeaseLedger ledger = new();
+        var observer = new ConvertingOutputObserver();
+
+        WorkflowRunSummary summary = await RunAsync(document, ledger, directory, observer);
+
+        summary.Status.ShouldBe(WorkflowRunStatus.Succeeded);
+        summary.Diagnostics.ShouldBeEmpty();
+
+        // The plate holds one value, so each step is decidable by hand: a box blur
+        // of a flat frame is that frame, and halving it keeps every pixel. What the
+        // run wrote is therefore the plate's value at half its size.
+        using Mat written = Cv2.ImRead(directory.File("smoothed.png"), ImreadModes.Grayscale);
+        written.Cols.ShouldBe(16);
+        written.Rows.ShouldBe(12);
+        written.At<byte>(0, 0).ShouldBe((byte)120);
+
+        observer.Previews.Count.ShouldBe(3);
+        observer.Previews[^1].PixelFormat.ShouldBe(FramePixelFormat.Bgr24);
+
+        ledger.Created.ShouldBe(3);
+        ledger.Released.ShouldBe(3);
+        ledger.Outstanding.ShouldBe(0);
+        ledger.ReservationsOutstanding.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task Run_again_leaves_the_output_alone_until_the_document_allows_replacement()
     {
         using var directory = new TemporaryDirectory();
@@ -228,6 +262,29 @@ public sealed class FileBackedWorkflowTests
         document.AddConnection(resize.InstanceId, OpenCvNodeIds.ResizedPortId, save.InstanceId, OpenCvNodeIds.ImagePortId);
 
         return (document, source, resize, save);
+    }
+
+    /// <summary>
+    /// Builds the workflow of the migrated filtering nodes: read a plate, smooth it
+    /// with a box blur, halve it with a pyramid, and write the result.
+    /// </summary>
+    private static WorkflowDocument BuildFilterWorkflow()
+    {
+        WorkflowDocument document = WorkflowDocument.Create("smoothed");
+        NodeInstance source = document.AddNode(new NodeTypeId(OpenCvNodeIds.ImageSourceTypeId), 1, new CanvasPosition(0, 0));
+        NodeInstance blur = document.AddNode(new NodeTypeId(OpenCvNodeIds.BlurTypeId), 1, new CanvasPosition(200, 0));
+        NodeInstance pyramid = document.AddNode(new NodeTypeId(OpenCvNodeIds.PyrDownTypeId), 1, new CanvasPosition(400, 0));
+        NodeInstance save = document.AddNode(new NodeTypeId(OpenCvNodeIds.SaveImageTypeId), 1, new CanvasPosition(600, 0));
+
+        document.SetNodeParameter(source.InstanceId, OpenCvNodeIds.PathParameter, "plate.png");
+        document.SetNodeParameter(blur.InstanceId, OpenCvNodeIds.KernelSizeParameter, 3);
+        document.SetNodeParameter(save.InstanceId, OpenCvNodeIds.PathParameter, "smoothed.png");
+
+        document.AddConnection(source.InstanceId, OpenCvNodeIds.ImagePortId, blur.InstanceId, OpenCvNodeIds.ImagePortId);
+        document.AddConnection(blur.InstanceId, OpenCvNodeIds.BlurredPortId, pyramid.InstanceId, OpenCvNodeIds.ImagePortId);
+        document.AddConnection(pyramid.InstanceId, OpenCvNodeIds.ReducedPortId, save.InstanceId, OpenCvNodeIds.ImagePortId);
+
+        return document;
     }
 
     /// <summary>
