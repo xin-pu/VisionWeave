@@ -19,6 +19,14 @@ function Require-Path {
     }
 }
 
+function Get-DocumentText {
+    param([string]$Path)
+
+    # A Windows checkout rewrites tracked text to CRLF, which no anchored
+    # pattern below accounts for, so every document is read normalized to LF.
+    return (Get-Content -LiteralPath $Path -Raw) -replace "`r`n", "`n"
+}
+
 function Get-EntryBlocks {
     param([string]$Content, [string]$HeadingPattern)
 
@@ -41,7 +49,7 @@ foreach ($directory in @('docs/design', 'docs/ledger', 'docs/adr')) {
     Require-Path (Join-Path $RepositoryRoot $directory) 'Container'
 }
 
-$standardsReference = Get-Content -LiteralPath (Join-Path $RepositoryRoot 'docs/standards-reference.md') -Raw
+$standardsReference = Get-DocumentText (Join-Path $RepositoryRoot 'docs/standards-reference.md')
 if ($standardsReference -match 'REPLACE_WITH_COMMIT_SHA|YYYY-MM-DD') {
     throw 'docs/standards-reference.md still contains adoption placeholders.'
 }
@@ -57,7 +65,7 @@ if ($standardsReference -notmatch '(?m)^- \*\*Last reviewed:\*\*[ \t]+`?\d{4}-\d
 
 $deviationsPath = Join-Path $RepositoryRoot 'docs/ledger/standards-deviations.md'
 if (Test-Path -LiteralPath $deviationsPath) {
-    $deviations = Get-Content -LiteralPath $deviationsPath -Raw
+    $deviations = Get-DocumentText $deviationsPath
     foreach ($entry in (Get-EntryBlocks -Content $deviations -HeadingPattern 'SD-\d{4}-\d{3}\s+')) {
         Require-Fields -Entry $entry.Value -Fields @('Shared rule', 'Deviation', 'Rationale', 'Risk and mitigation', 'Owner', 'Approved by', 'Approved on', 'Review again', 'Resolution') -Description 'Standards deviation entry'
         if (($entry.Value) -notmatch '\*\*Resolution:\*\*\s+(Open|Retired|Promoted to shared knowledge base)\.') {
@@ -67,7 +75,7 @@ if (Test-Path -LiteralPath $deviationsPath) {
 }
 
 Get-ChildItem -LiteralPath (Join-Path $RepositoryRoot 'docs/ledger') -Filter '*.md' -File | Where-Object { $_.Name -ne 'standards-deviations.md' } | ForEach-Object {
-    $ledger = Get-Content -LiteralPath $_.FullName -Raw
+    $ledger = Get-DocumentText $_.FullName
     foreach ($entry in (Get-EntryBlocks -Content $ledger -HeadingPattern 'PL-\d{4}-\d{3}\s+')) {
         Require-Fields -Entry $entry.Value -Fields @('Status', 'Recorded on', 'Scope', 'Observation', 'Decision or next step', 'Evidence', 'Owner', 'Review again') -Description 'Project ledger entry'
         if (($entry.Value) -notmatch '\*\*Status:\*\*\s+(Open|Monitoring|Implemented|Deferred|Closed)') {
@@ -77,7 +85,7 @@ Get-ChildItem -LiteralPath (Join-Path $RepositoryRoot 'docs/ledger') -Filter '*.
 }
 
 Get-ChildItem -LiteralPath (Join-Path $RepositoryRoot 'docs/adr') -Filter '*.md' -File | Where-Object { $_.Name -ne '0000-template.md' } | ForEach-Object {
-    $adr = Get-Content -LiteralPath $_.FullName -Raw
+    $adr = Get-DocumentText $_.FullName
     if ($adr -notmatch '(?m)^# ADR-\d+\s+') {
         throw "ADR must begin with a numbered title: $($_.FullName)"
     }
@@ -92,7 +100,7 @@ Get-ChildItem -LiteralPath (Join-Path $RepositoryRoot 'docs/adr') -Filter '*.md'
 Get-ChildItem -LiteralPath (Join-Path $RepositoryRoot 'docs') -Filter '*.md' -File -Recurse | ForEach-Object {
     $documentPath = $_.FullName
     $documentRoot = Split-Path -Parent $documentPath
-    $content = Get-Content -LiteralPath $documentPath -Raw
+    $content = Get-DocumentText $documentPath
     foreach ($match in [regex]::Matches($content, '\[[^\]]+\]\(([^)]+)\)')) {
         $target = $match.Groups[1].Value.Trim()
         if ($target -match '^(https?:|mailto:|#)' -or $target -match '^<') {
