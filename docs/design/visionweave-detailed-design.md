@@ -274,6 +274,16 @@ safe cleanup. The default editing policy is to cancel the active run on a
 semantic edit (parameters, nodes, or connections), while pure layout edits do
 not cancel it.
 
+**The run's clock is the one it is given.** A run measures the cancellation grace
+period and the durations it reports on the `TimeProvider` the host supplies, not
+on the machine clock, so one clock decides both when the runtime stops waiting
+for a node that is ignoring cancellation and what the run reports having taken.
+The host hands the runtime the same clock it hands the editing session, so the
+waits, the reported durations, and the coalescing window of a parameter edit all
+count the same time. A test reaches a grace expiry, and the moment a completed
+level gives up its pending wait, by moving that clock rather than by sleeping
+through it.
+
 Cache keys include node type ID and version, canonical validated parameters,
 all input value identities, and each declared resource fingerprint. Nodes with
 external side effects opt out of caching. Cache entries own independent leases
@@ -899,7 +909,7 @@ trusted code; sandboxing is a future feature, not an implied security boundary.
 | Tier | Proof |
 | --- | --- |
 | Domain unit tests | Port compatibility, multiplicity, cycle detection, stable diagnostics, graph changes. |
-| Application unit tests | Topological order, dirty-subgraph selection, cancellation, branch blocking, document command history, undo grouping, refused edits, settings validation, selection-safe validation projection. |
+| Application unit tests | Topological order, dirty-subgraph selection, cancellation, a grace period and a late executor reached by moving the clock the run was given, the durations a run reports, branch blocking, document command history, undo grouping, refused edits, settings validation, selection-safe validation projection. |
 | OpenCV integration tests | Expected pixels / geometry for each migrated node, disposal and cache behavior, preview limit validation. |
 | Persistence integration tests | Save/load round trip, malformed document rejection, migrations, missing-node placeholders, autosave policy validation. |
 | Architecture tests | Dependency direction, no WPF/OpenCV/host stack reference in Domain, and no host stack reference in any core assembly. |
@@ -909,6 +919,12 @@ trusted code; sandboxing is a future feature, not an implied security boundary.
 Tests use xUnit and Shouldly. Test names use the form
 `Member_condition_expected_result`, e.g.
 `ConnectPorts_incompatible_image_and_contours_returns_port_diagnostic`.
+
+Runtime tests are deterministic about time as well as about order: the runner is
+given a clock the test moves by hand, so a cancellation grace period expires, a
+completed level is shown to have taken its wait off the clock again, and a
+quarantined executor that finishes late is awaited without a real delay anywhere
+in the test.
 
 The shell's markup is linked into `VisionWeave.App.Tests` as data, so regions,
 styles, and bindings are checked against the files the application ships without

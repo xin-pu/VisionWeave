@@ -84,7 +84,8 @@ internal static class VisionWeaveServices
             provider.GetRequiredService<INodeExecutorResolver>(),
             provider.GetRequiredService<ILeaseLedger>(),
             provider.GetRequiredService<ExecutionOptions>(),
-            provider.GetRequiredService<IExecutionOutputObserver>()));
+            provider.GetRequiredService<IExecutionOutputObserver>(),
+            timeProvider: provider.GetRequiredService<TimeProvider>()));
 
         // The managed preview a run publishes. Frames are converted where the run
         // executes and shown on the thread the window's bindings belong to, which is

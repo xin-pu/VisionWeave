@@ -122,15 +122,16 @@
 
 ### PL-2026-010 - Make runtime time and cancellation tests deterministic
 
-- **Status:** Monitoring
+- **Status:** Implemented
 - **Priority:** P2
 - **Recorded on:** 2026-09-19
 - **Scope:** Cancellation grace periods, preview fences, and quarantine paths in the application runtime.
 - **Observation:** Current behavior is covered by short real-time delays. The corrected per-level grace wait is now cancelled on normal completion, but its absence cannot be asserted directly, and timing-sensitive tests can become flaky under host load.
 - **Decision or next step:** Introduce a narrow, application-owned time/wait abstraction or `TimeProvider` seam for runner waits. Use it to assert normal-completion cleanup, grace expiry, and late executor completion without wall-clock sleeps; keep executor contracts free of test-only clock dependencies.
-- **Evidence:** `src/VisionWeave.Application/Execution/WorkflowRunner.cs`, `tests/VisionWeave.Application.Tests/Execution/WorkflowRunnerCancellationTests.cs`, [#1](https://github.com/xin-pu/VisionWeave/issues/1).
+- **Update (2026-09-19):** The seam is `TimeProvider`, which is the one the rest of the application already takes: `WorkflowDocument`, `DocumentCommandHistory`, and `EditorSession` each carry one, and the host registers `TimeProvider.System` as a singleton. `WorkflowRunner` now takes an optional `TimeProvider` after its other arguments — the system clock when none is given, so no existing caller changed behaviour — and reads the cancellation grace period from it, and it reports the run's and each node's duration from the same clock instead of from a `Stopwatch`, with a duration a node reported itself still preferred. The composition root and the design-time sample pass the registered clock, so the waits, the reported durations, and the coalescing window of a parameter edit count the same time. `TestClock` in the application test support gained timers: it fires them only when a test advances it and never on its own, it counts the timers that are still armed, and it completes a task when the runtime arms the next one, so a test can tell that a wait exists before moving the clock past it. `SignalledLedger` wraps the ledger the run is given and completes a task when the last lease and reservation are released, which is what lets a test await a late executor instead of polling for it. The quarantine test that used to wait on a real 50 ms grace period now reaches the expiry on the clock — 4 seconds leave the run still waiting, the fifth quarantines the node — and the suite's cancellation tests are down to about 80 ms with no delay of their own. An executor still receives only the cancellation token its request already carries: no contract gained a clock.
+- **Evidence:** `src/VisionWeave.Application/Execution/WorkflowRunner.cs`, `src/VisionWeave.App/Composition/VisionWeaveServices.cs`, `src/VisionWeave.App/Design/ShellDesignData.cs`, `tests/VisionWeave.Application.Tests/Support/TestClock.cs`, `tests/VisionWeave.Application.Tests/Support/SignalledLedger.cs`, `tests/VisionWeave.Application.Tests/Execution/WorkflowRunnerClockTests.cs`, `tests/VisionWeave.Application.Tests/Execution/WorkflowRunnerCancellationTests.cs`, `docs/adr/0005-native-resource-ownership.md` (decision 7), [#1](https://github.com/xin-pu/VisionWeave/issues/1), [#30](https://github.com/xin-pu/VisionWeave/issues/30).
 - **Owner:** VisionWeave maintainers.
-- **Review again:** Before extending quarantine behavior to plugins or adding more timing-dependent execution features.
+- **Review again:** Before extending quarantine behavior to plugins, before adding another timing-dependent execution feature, or before any other wait in the runtime needs a period a test must reach.
 
 ### PL-2026-011 - Model resource references and typed port schema snapshots
 
