@@ -13,5 +13,6 @@
     <Project Path="tests/VisionWeave.ArchitectureTests/VisionWeave.ArchitectureTests.csproj" />
     <Project Path="tests/VisionWeave.Domain.Tests/VisionWeave.Domain.Tests.csproj" />
     <Project Path="tests/VisionWeave.IntegrationTests/VisionWeave.IntegrationTests.csproj" />
+    <Project Path="tests/VisionWeave.Persistence.Tests/VisionWeave.Persistence.Tests.csproj" />
   </Folder>
 </Solution>

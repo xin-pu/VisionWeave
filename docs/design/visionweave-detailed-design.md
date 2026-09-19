@@ -392,6 +392,21 @@ snapshot; its raw JSON and connections remain intact so it can be restored when
 the plugin returns. A document newer than the supported schema opens read-only
 without destructive rewrite.
 
+The implemented version 1 writer stores `schemaVersion`, `documentId`, `name`,
+`createdUtc`, `modifiedUtc`, `revision`, the optional `appVersion`,
+`requiredPlugins`, `nodes`, `connections`, and every field the build does not
+model. A node entry records `id`, `typeId`, `typeVersion`, `parameters`,
+`layout`, and `extensionData`, plus `label` and `enabled` when they differ from
+their defaults; a connection records its own `id`. A file is read when it
+declares `documentId`, `name`, `createdUtc`, and `revision`; otherwise it
+reports `VW-FILE-001` and yields no document. A schema version this build
+cannot migrate reports `VW-FILE-002` and opens read-only, and an entry or field
+that cannot be represented is skipped with `VW-FILE-003` rather than failing
+the load. Reading never changes the stored revision or modification instant,
+because a load is not an edit. The `resources` list and each node's
+`portSchemaSnapshot` are preserved verbatim but are not modeled yet, which
+PL-2026-011 tracks.
+
 Migrations are explicit `IWorkflowMigration` implementations keyed by source
 schema version. They are forward-only, idempotent, preserve unknown extension
 data, and have round-trip/migration tests. The loader never silently drops an
