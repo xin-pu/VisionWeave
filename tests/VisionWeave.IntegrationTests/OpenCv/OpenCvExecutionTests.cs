@@ -46,6 +46,30 @@ public sealed class OpenCvExecutionTests
     }
 
     [Fact]
+    public async Task Run_nodes_without_saved_parameters_run_on_declared_defaults()
+    {
+        WorkflowDocument document = WorkflowDocument.Create("native");
+        NodeInstance source = document.AddNode(NativeWorkflow.SourceType, 1, new CanvasPosition(0, 0));
+        NodeInstance blur = NativeWorkflow.AddOpenCvNode(document, OpenCvNodeIds.GaussianBlurTypeId, 200, 0);
+        NodeInstance resize = NativeWorkflow.AddOpenCvNode(document, OpenCvNodeIds.ResizeTypeId, 400, 0);
+        document.AddConnection(source.InstanceId, OpenCvNodeIds.ImagePortId, blur.InstanceId, OpenCvNodeIds.ImagePortId);
+        document.AddConnection(blur.InstanceId, OpenCvNodeIds.BlurredPortId, resize.InstanceId, OpenCvNodeIds.ImagePortId);
+
+        LeaseLedger ledger = new();
+        var sourceFrames = new NativeFrameSource(ledger);
+
+        WorkflowRunSummary summary = await RunAsync(document, ledger, sourceFrames);
+
+        summary.Status.ShouldBe(WorkflowRunStatus.Succeeded);
+        summary.Nodes.ShouldAllBe(node => node.State == NodeRunState.Succeeded);
+        summary.Diagnostics.ShouldBeEmpty();
+        ledger.Created.ShouldBe(3);
+        ledger.Released.ShouldBe(3);
+        ledger.Outstanding.ShouldBe(0);
+        ledger.ReservationsOutstanding.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task Run_with_an_invalid_kernel_fails_the_blur_and_still_releases_the_source_frame()
     {
         WorkflowDocument document = WorkflowDocument.Create("native");

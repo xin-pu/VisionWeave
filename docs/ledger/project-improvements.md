@@ -1,4 +1,4 @@
-# Project Improvements Ledger
+﻿# Project Improvements Ledger
 
 ## Statuses
 
@@ -60,3 +60,14 @@
 - **Evidence:** `src/VisionWeave.OpenCv/Nodes/OpenCvNodeDefinitionProvider.cs`, `tests/VisionWeave.IntegrationTests/Support/NativeWorkflow.cs`, `docs/design/visionweave-detailed-design.md` (section 8).
 - **Owner:** VisionWeave maintainers.
 - **Review again:** Before the first-release node catalog is frozen.
+
+### PL-2026-006 - Parameter values are not validated at the definition boundary
+
+- **Status:** Open
+- **Recorded on:** 2026-09-19
+- **Scope:** Definition-boundary validation of node parameter values: kind, bounds, options, unknown names, and required values.
+- **Observation:** The snapshot now merges each declared `ParameterDefinition.DefaultValue` under the values a document saved, so a node placed without an explicit value reaches the executor with its default. Nothing validates the saved values themselves: a text value where an integer is declared, a number outside `Minimum`/`Maximum`, an option outside `Options`, or a name the definition does not declare all travel through the snapshot unchanged, and an executor re-checks only the values it happens to read. A required parameter that also declares no default is absent from the snapshot, so `NodeParameterSet.GetInt32` throws `KeyNotFoundException` and the run reports it as `VW-EXEC-001` instead of refusing the document up front. `ParameterDefinition.IsRequired`, `Minimum`, `Maximum`, and `Options` are therefore schema data the editor can show but the build does not enforce.
+- **Decision or next step:** Validate parameter values where the definition is resolved — in the snapshot factory or a dedicated validator — with diagnostics for a kind mismatch, an out-of-range value, an unknown parameter name, and a missing required value, so an unrunnable document is refused before a snapshot exists. Every OpenCV definition starts from a declared default today, which is why the shipped catalog runs as placed; keep it that way until this validation lands.
+- **Evidence:** `src/VisionWeave.Application/Execution/WorkflowSnapshotFactory.cs`, `src/VisionWeave.Contracts/Nodes/ParameterDefinition.cs`, `tests/VisionWeave.Application.Tests/Execution/WorkflowSnapshotFactoryTests.cs` (`Build_parameter_without_a_default_stays_absent`), `tests/VisionWeave.IntegrationTests/OpenCv/OpenCvNodeCatalogTests.cs`.
+- **Owner:** VisionWeave maintainers.
+- **Review again:** Before the editor writes parameter values into a document, and before a path parameter enters the catalog.

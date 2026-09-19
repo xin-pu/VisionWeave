@@ -66,9 +66,35 @@ public sealed class WorkflowSnapshotFactory
             yield return new SnapshotNode(
                 node.InstanceId,
                 definition!,
-                new NodeParameterSet(node.Parameters),
+                ResolveParameters(node, definition!),
                 node.IsEnabled);
         }
+    }
+
+    /// <summary>
+    /// Builds the parameter set an executor reads: the declared defaults first,
+    /// then the values the document saved on top of them. A parameter the
+    /// document omits therefore reaches the executor with its declared default
+    /// instead of being absent.
+    /// </summary>
+    private static NodeParameterSet ResolveParameters(NodeInstance node, NodeDefinition definition)
+    {
+        var values = new Dictionary<string, object?>(StringComparer.Ordinal);
+
+        foreach (ParameterDefinition parameter in definition.Parameters)
+        {
+            if (parameter.DefaultValue is not null)
+            {
+                values[parameter.Name] = parameter.DefaultValue;
+            }
+        }
+
+        foreach (KeyValuePair<string, object?> saved in node.Parameters)
+        {
+            values[saved.Key] = saved.Value;
+        }
+
+        return new NodeParameterSet(values);
     }
 
     private static IEnumerable<SnapshotEdge> CaptureEdges(WorkflowDocument document)

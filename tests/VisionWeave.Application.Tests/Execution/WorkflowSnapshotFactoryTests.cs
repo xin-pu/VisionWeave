@@ -2,6 +2,7 @@
 using VisionWeave.Application.Execution;
 using VisionWeave.Application.Tests.Support;
 using VisionWeave.Contracts.Diagnostics;
+using VisionWeave.Contracts.Nodes;
 using VisionWeave.Domain.Workflows;
 
 namespace VisionWeave.Application.Tests.Execution;
@@ -47,6 +48,40 @@ public sealed class WorkflowSnapshotFactoryTests
         node.Definition.TypeVersion.ShouldBe(1);
         node.Parameters.GetInt32("kernelSize").ShouldBe(5);
         node.IsEnabled.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Build_omitted_parameter_applies_the_declared_default()
+    {
+        WorkflowDocument document = WorkflowDocument.Create("workflow");
+        NodeInstance source = document.AddNode(TestNodes.SourceType, 1, new CanvasPosition(0, 0));
+        NodeInstance blur = document.AddNode(TestNodes.BlurType, 1, new CanvasPosition(200, 0));
+        document.AddConnection(source.InstanceId, "image", blur.InstanceId, "image");
+
+        WorkflowSnapshot snapshot = _factory.Build(document).Snapshot!;
+
+        snapshot.GetNode(blur.InstanceId).Parameters.Contains("kernelSize").ShouldBeTrue();
+        snapshot.GetNode(blur.InstanceId).Parameters.GetInt32("kernelSize").ShouldBe(3);
+    }
+
+    [Fact]
+    public void Build_parameter_without_a_default_stays_absent()
+    {
+        NodeDefinition withoutDefault = TestNodes.Blur() with
+        {
+            Parameters = [new ParameterDefinition("kernelSize", ParameterKind.Integer, true, "Kernel size", 1, 31)],
+        };
+
+        var factory = new WorkflowSnapshotFactory(TestNodes.Catalog(TestNodes.Source(), withoutDefault));
+
+        WorkflowDocument document = WorkflowDocument.Create("workflow");
+        NodeInstance source = document.AddNode(TestNodes.SourceType, 1, new CanvasPosition(0, 0));
+        NodeInstance blur = document.AddNode(TestNodes.BlurType, 1, new CanvasPosition(200, 0));
+        document.AddConnection(source.InstanceId, "image", blur.InstanceId, "image");
+
+        WorkflowSnapshot snapshot = factory.Build(document).Snapshot!;
+
+        snapshot.GetNode(blur.InstanceId).Parameters.Contains("kernelSize").ShouldBeFalse();
     }
 
     [Fact]
