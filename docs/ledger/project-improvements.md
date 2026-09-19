@@ -223,3 +223,15 @@
 - **Evidence:** `src/VisionWeave.Persistence/Workflows/WorkflowDocumentReader.cs`, `docs/adr/0004-workflow-document-and-format.md` (decisions 3, 4, 5, and 9), `docs/design/visionweave-detailed-design.md` (section 7).
 - **Owner:** VisionWeave maintainers.
 - **Review again:** When a second schema version is proposed, when a stored document needs a field moved or renamed, or before this build accepts a newer document as editable rather than read-only.
+
+### PL-2026-019 - Bind future file nodes to stable workflow resources
+
+- **Status:** Open
+- **Priority:** P2
+- **Recorded on:** 2026-09-19
+- **Scope:** The relationship between the typed document `resources` collection and future nodes that consume a persisted file resource.
+- **Observation:** PL-2026-011 and ADR-0011 make `resources` typed document data, while the first file-image workflow deliberately uses a required relative `Path` parameter on Image Source and Save Image under ADR-0012. This is appropriate for the MVP, but it leaves the resource collection without a consumer and gives a future resource picker no stable node-to-resource binding. A file path or list position is not a durable resource identity: paths can be relocated and several entries can name the same location, while positions change when the list is reordered.
+- **Decision or next step:** Do not expand the first runnable workflow's scope. Before adding a resource browser, file picker backed by document resources, resource digest validation, cache keys, or multiple-node resource reuse, introduce a persisted stable resource identifier and a parameter or contract that refers to that identifier. Decide migration and forward-compatibility behavior explicitly at that time; do not invent identifiers for preserved unknown entries without a migration decision.
+- **Evidence:** `src/VisionWeave.Contracts/Workflows/ResourceReference.cs`, `src/VisionWeave.Contracts/Workflows/FileResourceReference.cs`, `src/VisionWeave.Domain/Workflows/WorkflowDocument.cs` (`Resources`), `src/VisionWeave.OpenCv/Nodes/OpenCvNodeDefinitionProvider.cs` (`Path` parameters), `docs/adr/0011-resource-references-and-port-schema-snapshots.md`, `docs/adr/0012-file-access-and-the-working-directory.md`.
+- **Owner:** VisionWeave maintainers.
+- **Review again:** Before implementing a resource editor or picker, resource integrity validation, result caching keyed by input resources, or a node that reuses an existing document resource.
