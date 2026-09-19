@@ -62,6 +62,15 @@ public static class OpenCvNodeIds
     /// <summary>The node type that reports the edges of a frame.</summary>
     public const string CannyTypeId = "visionweave.opencv.canny";
 
+    /// <summary>The node type that thins bright regions by a structuring element.</summary>
+    public const string ErodeTypeId = "visionweave.opencv.erode";
+
+    /// <summary>The node type that thickens bright regions by a structuring element.</summary>
+    public const string DilateTypeId = "visionweave.opencv.dilate";
+
+    /// <summary>The node type that opens, closes, or outlines bright regions.</summary>
+    public const string MorphologyExTypeId = "visionweave.opencv.morphology-ex";
+
     /// <summary>The executor registration of the Gaussian blur node.</summary>
     public const string GaussianBlurExecutorTypeId = "visionweave.opencv.executor.gaussian-blur";
 
@@ -113,6 +122,15 @@ public static class OpenCvNodeIds
     /// <summary>The executor registration of the Canny node.</summary>
     public const string CannyExecutorTypeId = "visionweave.opencv.executor.canny";
 
+    /// <summary>The executor registration of the erode node.</summary>
+    public const string ErodeExecutorTypeId = "visionweave.opencv.executor.erode";
+
+    /// <summary>The executor registration of the dilate node.</summary>
+    public const string DilateExecutorTypeId = "visionweave.opencv.executor.dilate";
+
+    /// <summary>The executor registration of the morphology ex node.</summary>
+    public const string MorphologyExExecutorTypeId = "visionweave.opencv.executor.morphology-ex";
+
     /// <summary>The identifier of a node's image port, whether it receives one or publishes one.</summary>
     public const string ImagePortId = "image";
 
@@ -142,6 +160,15 @@ public static class OpenCvNodeIds
 
     /// <summary>The identifier of the edge map the Canny node publishes.</summary>
     public const string EdgesPortId = "edges";
+
+    /// <summary>The identifier of the image the erode node publishes.</summary>
+    public const string ErodedPortId = "eroded";
+
+    /// <summary>The identifier of the image the dilate node publishes.</summary>
+    public const string DilatedPortId = "dilated";
+
+    /// <summary>The identifier of the image the morphology ex node publishes.</summary>
+    public const string MorphedPortId = "morphed";
 
     /// <summary>The Gaussian kernel size parameter.</summary>
     public const string KernelSizeParameter = "kernelSize";
@@ -221,6 +248,15 @@ public static class OpenCvNodeIds
     /// <summary>The switch that lets the Canny node measure the gradient more accurately.</summary>
     public const string L2GradientParameter = "l2gradient";
 
+    /// <summary>The shape of the structuring element a morphology node works with.</summary>
+    public const string KernelShapeParameter = "kernelShape";
+
+    /// <summary>The number of times a morphology node applies its structuring element.</summary>
+    public const string IterationsParameter = "iterations";
+
+    /// <summary>The morphological operation the morphology ex node applies.</summary>
+    public const string OperationParameter = "operation";
+
     /// <summary>The nearest-neighbour interpolation option.</summary>
     public const string InterpolationNearest = "nearest";
 
@@ -265,6 +301,33 @@ public static class OpenCvNodeIds
 
     /// <summary>The option that compares a pixel with the weighted average of its neighbourhood.</summary>
     public const string AdaptiveMethodGaussian = "gaussian";
+
+    /// <summary>The option that builds a structuring element that is a filled rectangle.</summary>
+    public const string KernelShapeRect = "rect";
+
+    /// <summary>The option that builds a structuring element that is a filled ellipse.</summary>
+    public const string KernelShapeEllipse = "ellipse";
+
+    /// <summary>The option that builds a structuring element that is a plus sign.</summary>
+    public const string KernelShapeCross = "cross";
+
+    /// <summary>The operation that erodes and then dilates, which removes what is smaller than the kernel.</summary>
+    public const string MorphologyOpen = "open";
+
+    /// <summary>The operation that dilates and then erodes, which fills what is smaller than the kernel.</summary>
+    public const string MorphologyClose = "close";
+
+    /// <summary>The operation that reports the difference between the dilated and the eroded frame.</summary>
+    public const string MorphologyGradient = "gradient";
+
+    /// <summary>The operation that reports what the opening removed.</summary>
+    public const string MorphologyTopHat = "top-hat";
+
+    /// <summary>The operation that reports what the closing filled.</summary>
+    public const string MorphologyBlackHat = "black-hat";
+
+    /// <summary>The category of nodes that reshape a frame by a structuring element.</summary>
+    public const string MorphologyCategory = "Morphology";
 
     /// <summary>The category of nodes that bring images into a workflow or write them out of it.</summary>
     public const string InputOutputCategory = "Input/Output";
@@ -322,5 +385,23 @@ public static class OpenCvNodeIds
     [
         ThresholdBinary,
         ThresholdBinaryInverted,
+    ];
+
+    /// <summary>The shapes of structuring element a morphology node accepts, in the order the editor shows them.</summary>
+    public static IReadOnlyList<string> KernelShapeOptions { get; } =
+    [
+        KernelShapeRect,
+        KernelShapeEllipse,
+        KernelShapeCross,
+    ];
+
+    /// <summary>The operations the morphology ex node accepts, in the order the editor shows them.</summary>
+    public static IReadOnlyList<string> MorphologyOperationOptions { get; } =
+    [
+        MorphologyOpen,
+        MorphologyClose,
+        MorphologyGradient,
+        MorphologyTopHat,
+        MorphologyBlackHat,
     ];
 }

@@ -41,6 +41,9 @@ public static class OpenCvExecutors
             [OpenCvNodeIds.ScharrExecutorTypeId] = new ScharrExecutor(ledger),
             [OpenCvNodeIds.LaplacianExecutorTypeId] = new LaplacianExecutor(ledger),
             [OpenCvNodeIds.CannyExecutorTypeId] = new CannyExecutor(ledger),
+            [OpenCvNodeIds.ErodeExecutorTypeId] = new ErodeExecutor(ledger),
+            [OpenCvNodeIds.DilateExecutorTypeId] = new DilateExecutor(ledger),
+            [OpenCvNodeIds.MorphologyExExecutorTypeId] = new MorphologyExExecutor(ledger),
         }.ToFrozenDictionary(StringComparer.Ordinal);
     }
 }

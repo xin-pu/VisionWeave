@@ -117,7 +117,7 @@ public sealed class LaplacianExecutorTests
     {
         LeaseLedger ledger = new();
         var scope = new TestResourceScope();
-        MatFrameLease input = MatFrameLease.Create(StepFrame.AcrossColumns(40), ledger);
+        MatFrameLease input = MatFrameLease.Create(FeatureFrame.AcrossColumns(40), ledger);
 
         NodeExecutionResult result = await new LaplacianExecutor(ledger).ExecuteAsync(
             Request(scope, input, kernelSize: OpenCvParameterBounds.MinKernelSize),
@@ -179,7 +179,7 @@ public sealed class LaplacianExecutorTests
     {
         LeaseLedger ledger = new();
         var scope = new TestResourceScope();
-        MatFrameLease input = MatFrameLease.Create(StepFrame.AcrossColumns(20), ledger);
+        MatFrameLease input = MatFrameLease.Create(FeatureFrame.AcrossColumns(20), ledger);
 
         NodeExecutionResult result = await new LaplacianExecutor(ledger).ExecuteAsync(
             Request(scope, input, kernelSize),
@@ -198,7 +198,7 @@ public sealed class LaplacianExecutorTests
     {
         LeaseLedger ledger = new();
         var scope = new TestResourceScope();
-        MatFrameLease input = MatFrameLease.Create(StepFrame.AcrossColumns(20), ledger);
+        MatFrameLease input = MatFrameLease.Create(FeatureFrame.AcrossColumns(20), ledger);
 
         NodeExecutionResult result = await new LaplacianExecutor(ledger).ExecuteAsync(
             Request(scope, input, scale: scale),
@@ -232,7 +232,7 @@ public sealed class LaplacianExecutorTests
     {
         LeaseLedger ledger = new();
         var scope = new TestResourceScope();
-        MatFrameLease input = MatFrameLease.Create(StepFrame.AcrossColumns(20), ledger);
+        MatFrameLease input = MatFrameLease.Create(FeatureFrame.AcrossColumns(20), ledger);
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
 

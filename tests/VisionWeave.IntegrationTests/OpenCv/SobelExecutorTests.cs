@@ -22,7 +22,7 @@ public sealed class SobelExecutorTests
     {
         LeaseLedger ledger = new();
         var scope = new TestResourceScope();
-        MatFrameLease input = MatFrameLease.Create(StepFrame.AcrossColumns(10), ledger);
+        MatFrameLease input = MatFrameLease.Create(FeatureFrame.AcrossColumns(10), ledger);
 
         NodeExecutionResult result = await new SobelExecutor(ledger).ExecuteAsync(
             Request(scope, input),
@@ -66,7 +66,7 @@ public sealed class SobelExecutorTests
     {
         LeaseLedger ledger = new();
         var scope = new TestResourceScope();
-        MatFrameLease input = MatFrameLease.Create(StepFrame.AcrossColumns(10), ledger);
+        MatFrameLease input = MatFrameLease.Create(FeatureFrame.AcrossColumns(10), ledger);
 
         NodeExecutionResult result = await new SobelExecutor(ledger).ExecuteAsync(
             Request(scope, input, scale: 2d),
@@ -91,7 +91,7 @@ public sealed class SobelExecutorTests
     {
         LeaseLedger ledger = new();
         var scope = new TestResourceScope();
-        MatFrameLease input = MatFrameLease.Create(StepFrame.DownRows(10), ledger);
+        MatFrameLease input = MatFrameLease.Create(FeatureFrame.DownRows(10), ledger);
 
         NodeExecutionResult result = await new SobelExecutor(ledger).ExecuteAsync(
             ExecutorTestRequest.For(
@@ -132,7 +132,7 @@ public sealed class SobelExecutorTests
     {
         LeaseLedger ledger = new();
         var scope = new TestResourceScope();
-        MatFrameLease input = MatFrameLease.Create(StepFrame.AcrossColumns(10), ledger);
+        MatFrameLease input = MatFrameLease.Create(FeatureFrame.AcrossColumns(10), ledger);
 
         NodeExecutionResult result = await new SobelExecutor(ledger).ExecuteAsync(
             ExecutorTestRequest.For(
@@ -163,7 +163,7 @@ public sealed class SobelExecutorTests
     {
         LeaseLedger ledger = new();
         var scope = new TestResourceScope();
-        MatFrameLease input = MatFrameLease.Create(StepFrame.AcrossColumns(10), ledger);
+        MatFrameLease input = MatFrameLease.Create(FeatureFrame.AcrossColumns(10), ledger);
 
         NodeExecutionResult result = await new SobelExecutor(ledger).ExecuteAsync(
             Request(scope, input, kernelSize: kernelSize),
@@ -197,7 +197,7 @@ public sealed class SobelExecutorTests
     {
         LeaseLedger ledger = new();
         var scope = new TestResourceScope();
-        MatFrameLease input = MatFrameLease.Create(StepFrame.AcrossColumns(10), ledger);
+        MatFrameLease input = MatFrameLease.Create(FeatureFrame.AcrossColumns(10), ledger);
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
 

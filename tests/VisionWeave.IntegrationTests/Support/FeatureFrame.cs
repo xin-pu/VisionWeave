@@ -4,11 +4,12 @@ namespace VisionWeave.IntegrationTests.Support;
 
 /// <summary>
 /// Builds the smallest frames that hold a feature: a step between two flat regions,
-/// across the columns or down the rows. A node that reads a neighbourhood has to be
-/// tested against a frame with something in it, and a step is the simplest thing a
-/// test can state the result of by hand.
+/// across the columns or down the rows, a single brighter pixel in a flat frame, and
+/// a single darker one. A node that reads a neighbourhood has to be tested against a
+/// frame with something in it, and these are the features a test can state the result
+/// of by hand.
 /// </summary>
-internal static class StepFrame
+internal static class FeatureFrame
 {
     private const int DefaultSize = 8;
 
@@ -32,6 +33,28 @@ internal static class StepFrame
     internal static Mat DownRows(byte bright, byte dark = 0, int size = DefaultSize)
         => Stepped(bright, dark, size, reachesDown: true);
 
+    /// <summary>
+    /// Builds a flat frame with one brighter pixel in the middle, which is the
+    /// smallest thing a neighbourhood operator can add to or take away.
+    /// </summary>
+    /// <param name="value">The value of the pixel.</param>
+    /// <param name="field">The value of the frame around it.</param>
+    /// <param name="size">The width and height of the frame, which is square.</param>
+    /// <returns>The frame, which the caller owns.</returns>
+    internal static Mat Spike(byte value, byte field = 0, int size = DefaultSize)
+        => WithCentrePixel(value, field, size);
+
+    /// <summary>
+    /// Builds a flat frame with one darker pixel in the middle, which is the smallest
+    /// gap an operator can fill in.
+    /// </summary>
+    /// <param name="value">The value of the pixel.</param>
+    /// <param name="field">The value of the frame around it.</param>
+    /// <param name="size">The width and height of the frame, which is square.</param>
+    /// <returns>The frame, which the caller owns.</returns>
+    internal static Mat Hole(byte value, byte field = 255, int size = DefaultSize)
+        => WithCentrePixel(value, field, size);
+
     private static Mat Stepped(byte bright, byte dark, int size, bool reachesDown)
     {
         var mat = new Mat(size, size, MatType.CV_8UC1, Scalar.All(dark));
@@ -44,6 +67,14 @@ internal static class StepFrame
             : new Rect(half, 0, size - half, size);
 
         Cv2.Rectangle(mat, brighter, Scalar.All(bright), thickness: -1);
+
+        return mat;
+    }
+
+    private static Mat WithCentrePixel(byte value, byte field, int size)
+    {
+        var mat = new Mat(size, size, MatType.CV_8UC1, Scalar.All(field));
+        mat.Set(size / 2, size / 2, value);
 
         return mat;
     }

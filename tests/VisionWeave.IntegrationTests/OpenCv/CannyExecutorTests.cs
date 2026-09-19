@@ -23,7 +23,7 @@ public sealed class CannyExecutorTests
     {
         LeaseLedger ledger = new();
         var scope = new TestResourceScope();
-        MatFrameLease input = MatFrameLease.Create(StepFrame.AcrossColumns(50), ledger);
+        MatFrameLease input = MatFrameLease.Create(FeatureFrame.AcrossColumns(50), ledger);
 
         NodeExecutionResult result = await new CannyExecutor(ledger).ExecuteAsync(
             Request(scope, input),
@@ -97,7 +97,7 @@ public sealed class CannyExecutorTests
     {
         LeaseLedger ledger = new();
         var scope = new TestResourceScope();
-        MatFrameLease input = MatFrameLease.Create(StepFrame.AcrossColumns(25), ledger);
+        MatFrameLease input = MatFrameLease.Create(FeatureFrame.AcrossColumns(25), ledger);
 
         NodeExecutionResult result = await new CannyExecutor(ledger).ExecuteAsync(
             Request(scope, input),
@@ -128,7 +128,7 @@ public sealed class CannyExecutorTests
     {
         LeaseLedger ledger = new();
         var scope = new TestResourceScope();
-        MatFrameLease input = MatFrameLease.Create(StepFrame.AcrossColumns(50), ledger);
+        MatFrameLease input = MatFrameLease.Create(FeatureFrame.AcrossColumns(50), ledger);
 
         NodeExecutionResult result = await new CannyExecutor(ledger).ExecuteAsync(
             Request(scope, input, thresholdLow, thresholdHigh),
@@ -153,7 +153,7 @@ public sealed class CannyExecutorTests
     {
         LeaseLedger ledger = new();
         var scope = new TestResourceScope();
-        MatFrameLease input = MatFrameLease.Create(StepFrame.AcrossColumns(50), ledger);
+        MatFrameLease input = MatFrameLease.Create(FeatureFrame.AcrossColumns(50), ledger);
 
         NodeExecutionResult result = await new CannyExecutor(ledger).ExecuteAsync(
             Request(scope, input, thresholdLow, thresholdHigh),
@@ -172,7 +172,7 @@ public sealed class CannyExecutorTests
     {
         LeaseLedger ledger = new();
         var scope = new TestResourceScope();
-        MatFrameLease input = MatFrameLease.Create(StepFrame.AcrossColumns(50), ledger);
+        MatFrameLease input = MatFrameLease.Create(FeatureFrame.AcrossColumns(50), ledger);
 
         NodeExecutionResult result = await new CannyExecutor(ledger).ExecuteAsync(
             Request(scope, input, apertureSize: apertureSize),
@@ -206,7 +206,7 @@ public sealed class CannyExecutorTests
     {
         LeaseLedger ledger = new();
         var scope = new TestResourceScope();
-        MatFrameLease input = MatFrameLease.Create(StepFrame.AcrossColumns(50), ledger);
+        MatFrameLease input = MatFrameLease.Create(FeatureFrame.AcrossColumns(50), ledger);
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
 

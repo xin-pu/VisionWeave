@@ -15,9 +15,10 @@ namespace VisionWeave.OpenCv.Nodes;
 /// the Aries migration added the common operations around them: colour conversion,
 /// crop, and the pyramids under Transform, a box blur and a bilateral filter beside
 /// the two the first build shipped, a threshold that measures each pixel against its
-/// own neighbourhood as well as one that compares it with a number, and the four
-/// nodes that find an edge: the two gradient measurements, the curvature, and the
-/// edge map that follows from a gradient.
+/// own neighbourhood as well as one that compares it with a number, the four nodes
+/// that find an edge — the two gradient measurements, the curvature, and the edge map
+/// that follows from a gradient — and the three that reshape what a threshold left
+/// behind, which are the first nodes in the Morphology category.
 /// </para>
 /// </summary>
 public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
@@ -41,6 +42,9 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
         CreateScharr(),
         CreateLaplacian(),
         CreateCanny(),
+        CreateErode(),
+        CreateDilate(),
+        CreateMorphologyEx(),
     ];
 
     /// <inheritdoc />
@@ -775,4 +779,138 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
                     DefaultValue: false),
             ],
             OpenCvNodeIds.CannyExecutorTypeId);
+
+    private static NodeDefinition CreateErode()
+        => new(
+            new NodeTypeId(OpenCvNodeIds.ErodeTypeId),
+            TypeVersion: 1,
+            DisplayName: "Erode",
+            OpenCvNodeIds.MorphologyCategory,
+            [
+                new PortDefinition(
+                    OpenCvNodeIds.ImagePortId,
+                    PortDirection.Input,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Image"),
+                new PortDefinition(
+                    OpenCvNodeIds.ErodedPortId,
+                    PortDirection.Output,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Eroded"),
+            ],
+            [
+                CreateKernelShapeParameter(),
+                new ParameterDefinition(
+                    OpenCvNodeIds.KernelSizeParameter,
+                    ParameterKind.Integer,
+                    IsRequired: true,
+                    DisplayName: "Kernel size",
+                    Minimum: OpenCvParameterBounds.MinKernelSize,
+                    Maximum: OpenCvParameterBounds.MaxKernelSize,
+                    DefaultValue: 3),
+                CreateIterationsParameter(),
+            ],
+            OpenCvNodeIds.ErodeExecutorTypeId);
+
+    private static NodeDefinition CreateDilate()
+        => new(
+            new NodeTypeId(OpenCvNodeIds.DilateTypeId),
+            TypeVersion: 1,
+            DisplayName: "Dilate",
+            OpenCvNodeIds.MorphologyCategory,
+            [
+                new PortDefinition(
+                    OpenCvNodeIds.ImagePortId,
+                    PortDirection.Input,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Image"),
+                new PortDefinition(
+                    OpenCvNodeIds.DilatedPortId,
+                    PortDirection.Output,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Dilated"),
+            ],
+            [
+                CreateKernelShapeParameter(),
+                new ParameterDefinition(
+                    OpenCvNodeIds.KernelSizeParameter,
+                    ParameterKind.Integer,
+                    IsRequired: true,
+                    DisplayName: "Kernel size",
+                    Minimum: OpenCvParameterBounds.MinKernelSize,
+                    Maximum: OpenCvParameterBounds.MaxKernelSize,
+                    DefaultValue: 3),
+                CreateIterationsParameter(),
+            ],
+            OpenCvNodeIds.DilateExecutorTypeId);
+
+    private static NodeDefinition CreateMorphologyEx()
+        => new(
+            new NodeTypeId(OpenCvNodeIds.MorphologyExTypeId),
+            TypeVersion: 1,
+            DisplayName: "Morphology Ex",
+            OpenCvNodeIds.MorphologyCategory,
+            [
+                new PortDefinition(
+                    OpenCvNodeIds.ImagePortId,
+                    PortDirection.Input,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Image"),
+                new PortDefinition(
+                    OpenCvNodeIds.MorphedPortId,
+                    PortDirection.Output,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Morphed"),
+            ],
+            [
+                new ParameterDefinition(
+                    OpenCvNodeIds.OperationParameter,
+                    ParameterKind.Option,
+                    IsRequired: true,
+                    DisplayName: "Operation",
+                    Options: OpenCvNodeIds.MorphologyOperationOptions,
+                    DefaultValue: OpenCvNodeIds.MorphologyOpen),
+                CreateKernelShapeParameter(),
+                new ParameterDefinition(
+                    OpenCvNodeIds.KernelSizeParameter,
+                    ParameterKind.Integer,
+                    IsRequired: true,
+                    DisplayName: "Kernel size",
+                    Minimum: OpenCvParameterBounds.MinKernelSize,
+                    Maximum: OpenCvParameterBounds.MaxKernelSize,
+                    DefaultValue: 3),
+                CreateIterationsParameter(),
+            ],
+            OpenCvNodeIds.MorphologyExExecutorTypeId);
+
+    private static ParameterDefinition CreateKernelShapeParameter()
+        => new(
+            OpenCvNodeIds.KernelShapeParameter,
+            ParameterKind.Option,
+            IsRequired: true,
+            DisplayName: "Kernel shape",
+            Options: OpenCvNodeIds.KernelShapeOptions,
+            DefaultValue: OpenCvNodeIds.KernelShapeRect);
+
+    private static ParameterDefinition CreateIterationsParameter()
+        => new(
+            OpenCvNodeIds.IterationsParameter,
+            ParameterKind.Integer,
+            IsRequired: true,
+            DisplayName: "Iterations",
+            Minimum: OpenCvParameterBounds.MinIterations,
+            Maximum: OpenCvParameterBounds.MaxIterations,
+            DefaultValue: 1);
 }

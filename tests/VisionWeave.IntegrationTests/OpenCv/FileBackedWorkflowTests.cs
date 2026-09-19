@@ -220,6 +220,45 @@ public sealed class FileBackedWorkflowTests
     }
 
     [Fact]
+    public async Task Run_of_the_morphology_nodes_writes_what_they_produced_and_releases_every_lease()
+    {
+        using var directory = new TemporaryDirectory();
+        WriteSplitPlate(directory.File("plate.png"), width: 32, height: 24, dark: 40, bright: 200);
+        WorkflowDocument document = BuildMorphologyWorkflow();
+        _ = Save(document, directory);
+
+        LeaseLedger ledger = new();
+        var observer = new ConvertingOutputObserver();
+
+        WorkflowRunSummary summary = await RunAsync(document, ledger, directory, observer);
+
+        summary.Status.ShouldBe(WorkflowRunStatus.Succeeded);
+        summary.Diagnostics.ShouldBeEmpty();
+
+        // The node runs with the element a placed node starts with — a three by three
+        // square, applied once — so the plate gives up one column at the split: column
+        // sixteen is the first column of the bright half, and the darkest pixel of its
+        // element is the dark value beside it, which is therefore what it is written
+        // as. Every column further right has a whole bright element around it and keeps
+        // the bright value, including the last one, whose border repeats the frame.
+        using Mat written = Cv2.ImRead(directory.File("thinned.png"), ImreadModes.Grayscale);
+        written.Cols.ShouldBe(32);
+        written.Rows.ShouldBe(24);
+        written.At<byte>(0, 15).ShouldBe((byte)40);
+        written.At<byte>(0, 16).ShouldBe((byte)40);
+        written.At<byte>(0, 17).ShouldBe((byte)200);
+        written.At<byte>(23, 31).ShouldBe((byte)200);
+
+        observer.Previews.Count.ShouldBe(2);
+        observer.Previews[^1].PixelFormat.ShouldBe(FramePixelFormat.Bgr24);
+
+        ledger.Created.ShouldBe(2);
+        ledger.Released.ShouldBe(2);
+        ledger.Outstanding.ShouldBe(0);
+        ledger.ReservationsOutstanding.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task Run_again_leaves_the_output_alone_until_the_document_allows_replacement()
     {
         using var directory = new TemporaryDirectory();
@@ -340,6 +379,26 @@ public sealed class FileBackedWorkflowTests
 
         document.AddConnection(source.InstanceId, OpenCvNodeIds.ImagePortId, canny.InstanceId, OpenCvNodeIds.ImagePortId);
         document.AddConnection(canny.InstanceId, OpenCvNodeIds.EdgesPortId, save.InstanceId, OpenCvNodeIds.ImagePortId);
+
+        return document;
+    }
+
+    /// <summary>
+    /// Builds the workflow of the migrated morphology nodes: read a plate, thin it by
+    /// the structuring element a placed node starts with, and write the result.
+    /// </summary>
+    private static WorkflowDocument BuildMorphologyWorkflow()
+    {
+        WorkflowDocument document = WorkflowDocument.Create("thinned");
+        NodeInstance source = document.AddNode(new NodeTypeId(OpenCvNodeIds.ImageSourceTypeId), 1, new CanvasPosition(0, 0));
+        NodeInstance erode = document.AddNode(new NodeTypeId(OpenCvNodeIds.ErodeTypeId), 1, new CanvasPosition(200, 0));
+        NodeInstance save = document.AddNode(new NodeTypeId(OpenCvNodeIds.SaveImageTypeId), 1, new CanvasPosition(400, 0));
+
+        document.SetNodeParameter(source.InstanceId, OpenCvNodeIds.PathParameter, "plate.png");
+        document.SetNodeParameter(save.InstanceId, OpenCvNodeIds.PathParameter, "thinned.png");
+
+        document.AddConnection(source.InstanceId, OpenCvNodeIds.ImagePortId, erode.InstanceId, OpenCvNodeIds.ImagePortId);
+        document.AddConnection(erode.InstanceId, OpenCvNodeIds.ErodedPortId, save.InstanceId, OpenCvNodeIds.ImagePortId);
 
         return document;
     }
