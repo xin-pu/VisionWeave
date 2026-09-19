@@ -53,14 +53,16 @@ public abstract class RunnerTestBase
     /// <param name="options">The run limits.</param>
     /// <param name="observer">The preview observer, when the test attaches one.</param>
     /// <param name="inputs">The source of values produced outside the plan.</param>
+    /// <param name="timeProvider">The clock the run waits and measures on.</param>
     /// <returns>The runner.</returns>
     protected static WorkflowRunner Runner(
         INodeExecutorResolver executors,
         ILeaseLedger ledger,
         ExecutionOptions? options = null,
         IExecutionOutputObserver? observer = null,
-        IExecutionInputSource? inputs = null)
-        => new(executors, ledger, options, observer, inputs);
+        IExecutionInputSource? inputs = null,
+        TimeProvider? timeProvider = null)
+        => new(executors, ledger, options, observer, inputs, timeProvider);
 
     /// <summary>
     /// Creates run limits that do not depend on the machine running the test.

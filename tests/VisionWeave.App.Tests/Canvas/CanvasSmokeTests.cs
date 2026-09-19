@@ -599,7 +599,7 @@ public sealed class CanvasSmokeTests
 
         shell.Status.RunOutcome.ShouldBe(ShellStatus.RunningText);
 
-        Settle(shell, () => shell.Status.RunOutcome == ShellStatus.RanText);
+        SettleRun(shell, ShellStatus.RanText);
         Lay(window);
 
         // What the run wrote is the image the document names, at the size the transform
@@ -656,7 +656,7 @@ public sealed class CanvasSmokeTests
         Settle(shell, () => shell.Preview.PreviewTitle == "Image Source");
 
         cancel.Command.Execute(null);
-        Settle(shell, () => shell.Status.RunOutcome == ShellStatus.StoppedText);
+        SettleRun(shell, ShellStatus.StoppedText);
         Lay(window);
 
         executors.Hold = false;
@@ -801,6 +801,20 @@ public sealed class CanvasSmokeTests
 
         until().ShouldBeTrue("the flow the shell started did not finish in time.");
     }
+
+    /// <summary>
+    /// Waits for a run the shell started to be over. The readout is written from the
+    /// thread the run executes on, so it reports the outcome before the command that
+    /// started the run has finished: the command being idle again is what says the
+    /// gesture is done and the state it reports may be asserted.
+    /// </summary>
+    /// <param name="shell">The shell whose run to wait for.</param>
+    /// <param name="outcome">The outcome the readout must report.</param>
+    private static void SettleRun(Shell shell, string outcome)
+        => Settle(
+            shell,
+            () => !shell.ViewModel.RunWorkflow.Command.IsRunning
+                && shell.Status.RunOutcome == outcome);
 
     /// <summary>
     /// Lets the window lay out and apply the bindings it was just asked to draw, so a

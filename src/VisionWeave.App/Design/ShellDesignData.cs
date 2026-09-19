@@ -95,6 +95,7 @@ public static class ShellDesignData
         PreviewViewModel preview)
     {
         var ledger = new LeaseLedger();
+        TimeProvider clock = TimeProvider.System;
 
         return new RunWorkflowCommand(
             boundary,
@@ -108,7 +109,8 @@ public static class ShellDesignData
                 new RunPreviewObserver(
                     FramePreviewConverter.Default,
                     catalog,
-                    new ShellRunPreviewPresenter(preview, Dispatcher.CurrentDispatcher))),
+                    new ShellRunPreviewPresenter(preview, Dispatcher.CurrentDispatcher)),
+                timeProvider: clock),
             status);
     }
 

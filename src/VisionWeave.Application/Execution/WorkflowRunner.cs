@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using VisionWeave.Contracts.Diagnostics;
+﻿using VisionWeave.Contracts.Diagnostics;
 using VisionWeave.Contracts.Execution;
 using VisionWeave.Contracts.Values;
 
@@ -18,6 +17,7 @@ public sealed class WorkflowRunner
     private readonly ExecutionOptions _options;
     private readonly IExecutionOutputObserver? _observer;
     private readonly IExecutionInputSource? _inputs;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>
     /// Initializes the runner.
@@ -27,12 +27,14 @@ public sealed class WorkflowRunner
     /// <param name="options">The limits of the run.</param>
     /// <param name="observer">The observer that renders previews, when there is one.</param>
     /// <param name="inputs">The source of values produced outside this plan, such as a cache.</param>
+    /// <param name="timeProvider">The clock the run waits and measures on.</param>
     public WorkflowRunner(
         INodeExecutorResolver executors,
         ILeaseLedger ledger,
         ExecutionOptions? options = null,
         IExecutionOutputObserver? observer = null,
-        IExecutionInputSource? inputs = null)
+        IExecutionInputSource? inputs = null,
+        TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(executors);
         ArgumentNullException.ThrowIfNull(ledger);
@@ -42,6 +44,7 @@ public sealed class WorkflowRunner
         _options = options ?? ExecutionOptions.Default;
         _observer = observer;
         _inputs = inputs;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     /// <summary>
@@ -55,7 +58,8 @@ public sealed class WorkflowRunner
         ArgumentNullException.ThrowIfNull(plan);
 
         var context = new RunState(plan, Guid.NewGuid(), _ledger, _options, _inputs);
-        Stopwatch stopwatch = Stopwatch.StartNew();
+        long startedAt = _timeProvider.GetTimestamp();
+        TimeSpan duration = TimeSpan.Zero;
 
         try
         {
@@ -82,7 +86,7 @@ public sealed class WorkflowRunner
         }
         finally
         {
-            stopwatch.Stop();
+            duration = _timeProvider.GetElapsedTime(startedAt);
             context.Stop();
         }
 
@@ -91,7 +95,7 @@ public sealed class WorkflowRunner
             OperationId = context.OperationId,
             DocumentId = plan.Snapshot.DocumentId,
             Revision = plan.Snapshot.Revision,
-            Duration = stopwatch.Elapsed,
+            Duration = duration,
             Nodes = context.CollectReports(),
             Diagnostics = context.CollectDiagnostics(cancellationToken, _ledger),
             WasCancelled = context.WasCancelled,
@@ -176,7 +180,7 @@ public sealed class WorkflowRunner
             return;
         }
 
-        await Task.Delay(_options.CancellationGracePeriod, stopWaitingToken).ConfigureAwait(false);
+        await Task.Delay(_options.CancellationGracePeriod, _timeProvider, stopWaitingToken).ConfigureAwait(false);
     }
 
     private async Task RunNodeTrackedAsync(Guid nodeId, RunState context, CancellationToken cancellationToken)
@@ -243,17 +247,17 @@ public sealed class WorkflowRunner
             Environment = context.Plan.Environment,
         };
 
-        Stopwatch stopwatch = Stopwatch.StartNew();
+        long startedAt = _timeProvider.GetTimestamp();
+        TimeSpan elapsed = TimeSpan.Zero;
 
         try
         {
             NodeExecutionResult result = await executor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
-            stopwatch.Stop();
-            await CompleteNodeAsync(nodeId, result, binding.Values!, stopwatch.Elapsed, context, cancellationToken).ConfigureAwait(false);
+            elapsed = _timeProvider.GetElapsedTime(startedAt);
+            await CompleteNodeAsync(nodeId, result, binding.Values!, elapsed, context, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            stopwatch.Stop();
             context.SetCancelled(
                 nodeId,
                 DiagnosticCodes.NodeExecutionCancelled,
@@ -262,7 +266,6 @@ public sealed class WorkflowRunner
         }
         catch (Exception exception)
         {
-            stopwatch.Stop();
             context.Fail(
                 nodeId,
                 DiagnosticCodes.NodeExecutionFailed,
