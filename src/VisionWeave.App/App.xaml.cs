@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using VisionWeave.App.Commands;
 using VisionWeave.App.Composition;
 using VisionWeave.App.Notifications;
+using VisionWeave.App.Preview;
 using VisionWeave.App.Sessions;
 using VisionWeave.App.ViewModels;
 using VisionWeave.Application.Definitions;
@@ -58,8 +59,9 @@ public partial class App : System.Windows.Application
 
         // The shell is composed here rather than resolved, because the view model is
         // built from objects the container already owns: the session, the catalog,
-        // the validator the canvas judges a wire with, the status area, and the
-        // commands that open and write a document in that session.
+        // the validator the canvas judges a wire with, the status area, the commands
+        // that open, write, and run a document in that session, and the managed
+        // preview a run publishes.
         AsyncCommandBoundary boundary = _services.GetRequiredService<AsyncCommandBoundary>();
         var openDocument = new OpenDocumentCommand(boundary, session, status);
         var fileChooser = _services.GetRequiredService<IWorkflowFileChooser>();
@@ -72,6 +74,8 @@ public partial class App : System.Windows.Application
                 _services.GetRequiredService<WorkflowValidator>(),
                 openDocument,
                 saveDocument,
+                _services.GetRequiredService<RunWorkflowCommand>(),
+                _services.GetRequiredService<PreviewViewModel>(),
                 fileChooser,
                 new ShellPromptViewModel(),
                 status),

@@ -6,28 +6,11 @@
 /// </summary>
 internal sealed class TemporaryWorkflowFile : IDisposable
 {
-    private readonly string _directory;
+    private readonly TemporaryDirectory _directory = new();
 
-    internal TemporaryWorkflowFile(string name)
-    {
-        _directory = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"visionweave-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(_directory);
-        Path = System.IO.Path.Combine(_directory, name);
-    }
+    internal TemporaryWorkflowFile(string name) => Path = _directory.File(name);
 
     internal string Path { get; }
 
-    public void Dispose()
-    {
-        try
-        {
-            Directory.Delete(_directory, recursive: true);
-        }
-        catch (IOException)
-        {
-        }
-        catch (UnauthorizedAccessException)
-        {
-        }
-    }
+    public void Dispose() => _directory.Dispose();
 }

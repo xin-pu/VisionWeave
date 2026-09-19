@@ -17,13 +17,25 @@ public static class OpenCvNodeIds
     /// <summary>The resize node type.</summary>
     public const string ResizeTypeId = "visionweave.opencv.resize";
 
+    /// <summary>The node type that reads an image from a file.</summary>
+    public const string ImageSourceTypeId = "visionweave.opencv.image-source";
+
+    /// <summary>The node type that writes an image to a file.</summary>
+    public const string SaveImageTypeId = "visionweave.opencv.save-image";
+
     /// <summary>The executor registration of the Gaussian blur node.</summary>
     public const string GaussianBlurExecutorTypeId = "visionweave.opencv.executor.gaussian-blur";
 
     /// <summary>The executor registration of the resize node.</summary>
     public const string ResizeExecutorTypeId = "visionweave.opencv.executor.resize";
 
-    /// <summary>The identifier of the image input port of a transform node.</summary>
+    /// <summary>The executor registration of the image source node.</summary>
+    public const string ImageSourceExecutorTypeId = "visionweave.opencv.executor.image-source";
+
+    /// <summary>The executor registration of the save image node.</summary>
+    public const string SaveImageExecutorTypeId = "visionweave.opencv.executor.save-image";
+
+    /// <summary>The identifier of a node's image port, whether it receives one or publishes one.</summary>
     public const string ImagePortId = "image";
 
     /// <summary>The identifier of the smoothed image the Gaussian blur node publishes.</summary>
@@ -47,6 +59,12 @@ public static class OpenCvNodeIds
     /// <summary>The interpolation parameter of the resize node.</summary>
     public const string InterpolationParameter = "interpolation";
 
+    /// <summary>The parameter that names the file a node reads or writes.</summary>
+    public const string PathParameter = "path";
+
+    /// <summary>The parameter that lets a node replace a file that already exists.</summary>
+    public const string OverwriteParameter = "overwrite";
+
     /// <summary>The nearest-neighbour interpolation option.</summary>
     public const string InterpolationNearest = "nearest";
 
@@ -58,6 +76,9 @@ public static class OpenCvNodeIds
 
     /// <summary>The pixel-area interpolation option.</summary>
     public const string InterpolationArea = "area";
+
+    /// <summary>The category of nodes that bring images into a workflow or write them out of it.</summary>
+    public const string InputOutputCategory = "Input/Output";
 
     /// <summary>The category of nodes that change the geometry of a frame.</summary>
     public const string TransformCategory = "Transform";

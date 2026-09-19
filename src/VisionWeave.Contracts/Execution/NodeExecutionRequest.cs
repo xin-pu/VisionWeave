@@ -30,4 +30,11 @@ public sealed record NodeExecutionRequest
 
     /// <summary>Gets the scope that owns the resources the executor creates.</summary>
     public required IExecutionResourceScope Resources { get; init; }
+
+    /// <summary>
+    /// Gets the non-secret environment this run gives every node, which is where a
+    /// node that reads or writes a file resolves its path. A request without a
+    /// working directory runs a node that touches no file and refuses one that does.
+    /// </summary>
+    public NodeExecutionEnvironment Environment { get; init; } = NodeExecutionEnvironment.Default;
 }

@@ -5,13 +5,15 @@ using System.Xml.Linq;
 using Shouldly;
 using VisionWeave.App;
 using VisionWeave.App.Canvas;
+using VisionWeave.App.Commands;
 using VisionWeave.App.Inspector;
+using VisionWeave.App.Preview;
 using VisionWeave.App.ViewModels;
 
 namespace VisionWeave.App.Tests.Markup;
 
 /// <summary>
-/// Holds the shell's markup to what the direction documents: five named regions,
+/// Holds the shell's markup to what the direction documents: six named regions,
 /// semantic brush names instead of colours, the framework theme merged ahead of the
 /// shell's dictionaries, keyboard focus on the one action the shell offers, the
 /// region a snackbar is drawn in, and design-time content. The markup is read as
@@ -25,15 +27,17 @@ public sealed class ShellMarkupTests
         "TopBarRegion",
         "NodeCatalogueRegion",
         "CanvasRegion",
+        "PreviewRegion",
         "InspectorRegion",
         "StatusRegion",
     ];
 
     /// <summary>
     /// The objects the shell's markup binds against: the window's view model, the
-    /// regions it presents — the status area, the inspector, and the prompt — the
-    /// records the catalogue is drawn from, and the types the canvas and inspector
-    /// templates take as their data context.
+    /// regions it presents — the status area, the inspector, the preview, and the
+    /// prompt — the command the run actions share, the records the catalogue is
+    /// drawn from, and the types the canvas and inspector templates take as their
+    /// data context.
     /// </summary>
     private static readonly Type[] BindingRoots =
     [
@@ -43,6 +47,8 @@ public sealed class ShellMarkupTests
         typeof(ParameterEditorViewModel),
         typeof(DiagnosticEntryViewModel),
         typeof(ShellPromptViewModel),
+        typeof(RunWorkflowCommand),
+        typeof(PreviewViewModel),
         typeof(ShellCatalogueGroup),
         typeof(ShellCatalogueEntry),
         typeof(WorkflowNodeViewModel),
@@ -51,7 +57,7 @@ public sealed class ShellMarkupTests
     ];
 
     [Fact]
-    public void The_shell_declares_the_five_documented_regions()
+    public void The_shell_declares_the_six_documented_regions()
     {
         string[] regions = [.. NamedElements("MainWindow.xaml")
             .Where(name => name.EndsWith("Region", StringComparison.Ordinal))];
@@ -161,10 +167,11 @@ public sealed class ShellMarkupTests
                 element => (string)element.Attribute("Key")!,
                 element => ((string?)element.Attribute("Modifiers"), (string?)element.Attribute("Command")));
 
-        // The window's own shortcuts: opening a file, writing it, and the two history
-        // steps every editor offers.
+        // The window's own shortcuts: opening a file, writing it, running it, and the
+        // two history steps every editor offers.
         shortcuts["O"].ShouldBe(("Control", "{Binding OpenCommand}"));
         shortcuts["S"].ShouldBe(("Control", "{Binding SaveCommand}"));
+        shortcuts["R"].ShouldBe(("Control", "{Binding RunWorkflow.Command}"));
         shortcuts["Z"].ShouldBe(("Control", "{Binding Canvas.UndoCommand}"));
         shortcuts["Y"].ShouldBe(("Control", "{Binding Canvas.RedoCommand}"));
 
@@ -267,6 +274,62 @@ public sealed class ShellMarkupTests
             notice.ShouldContain("{Binding IsReadOnly}");
             notice.ShouldContain("Collapsed");
         }
+    }
+
+    [Fact]
+    public void The_header_runs_the_document_and_stops_the_run()
+    {
+        XElement topBar = Region("TopBarRegion");
+        string[] commands =
+        [
+            .. topBar
+                .Descendants()
+                .Where(element => element.Name.LocalName == "Button")
+                .Select(element => AttributeText(element, "Command")),
+        ];
+
+        // Running and stopping are one object seen through two commands: the Run
+        // action's own command is disabled while a run executes, and the Cancel
+        // action's is enabled exactly while there is a run to stop.
+        commands.ShouldContain("{Binding OpenCommand}");
+        commands.ShouldContain("{Binding SaveCommand}");
+        commands.ShouldContain("{Binding RunWorkflow.Command}");
+        commands.ShouldContain("{Binding RunWorkflow.CancelCommand}");
+
+        // What the last run did is reported where the document commands are, because
+        // it is a fact about the document rather than about one region of it.
+        Texts(topBar).ShouldContain("{Binding Status.RunOutcome}");
+    }
+
+    [Fact]
+    public void The_preview_region_draws_the_newest_image_a_run_published()
+    {
+        XElement preview = Region("PreviewRegion");
+
+        // The preview belongs to the work surface: it is drawn inside the canvas
+        // region and below the editor, so a document keeps the room it is edited in.
+        Region("CanvasRegion")
+            .Descendants()
+            .ShouldContain(element => (string?)element.Attribute(Xaml + "Name") == "PreviewRegion");
+
+        Texts(preview).ShouldContain("{Binding Preview.PreviewTitle}");
+        Texts(preview).ShouldContain("{Binding Preview.PreviewDetail}");
+        Texts(preview).ShouldContain("{Binding Preview.PreviewNotice}");
+
+        XElement image = preview
+            .Descendants()
+            .Single(element => element.Name.LocalName == "Image");
+
+        AttributeText(image, "Source").ShouldBe("{Binding Preview.Image}");
+
+        // The notice is the one part of the region that is a state rather than a
+        // value, so it is the part that shows and hides with the state behind it.
+        XElement notice = preview
+            .Descendants()
+            .Single(element => (string?)element.Attribute("Text") == "{Binding Preview.PreviewNotice}");
+
+        notice.ToString().ShouldContain("{Binding Preview.HasPreview}");
+        notice.ToString().ShouldContain("Collapsed");
     }
 
     [Fact]

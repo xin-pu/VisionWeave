@@ -71,6 +71,11 @@ public sealed class WorkflowRunner
 
                 if (!await CompleteLevelAsync(running, context, cancellationToken).ConfigureAwait(false))
                 {
+                    // The level stopped because the run was cancelled, whether the
+                    // nodes noticed it while running or finished just as it arrived.
+                    // A run that stops for that reason reports itself as cancelled
+                    // even when every node it managed to start succeeded.
+                    context.WasCancelled = true;
                     break;
                 }
             }
@@ -235,6 +240,7 @@ public sealed class WorkflowRunner
             Parameters = planned.Node.Parameters,
             Inputs = binding.Values!,
             Resources = scope,
+            Environment = context.Plan.Environment,
         };
 
         Stopwatch stopwatch = Stopwatch.StartNew();

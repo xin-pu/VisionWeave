@@ -4,23 +4,33 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Nodify;
+using OpenCvSharp;
 using Shouldly;
 using VisionWeave.App.Canvas;
 using VisionWeave.App.Commands;
+using VisionWeave.App.Composition;
 using VisionWeave.App.Inspector;
 using VisionWeave.App.Notifications;
+using VisionWeave.App.Preview;
 using VisionWeave.App.Sessions;
 using VisionWeave.App.Tests.Support;
 using VisionWeave.App.ViewModels;
 using VisionWeave.Application.Definitions;
 using VisionWeave.Application.Editing;
+using VisionWeave.Application.Execution;
 using VisionWeave.Application.Validation;
 using VisionWeave.Contracts.Diagnostics;
 using VisionWeave.Contracts.Nodes;
 using VisionWeave.Domain.Workflows;
 using VisionWeave.OpenCv.Nodes;
+using VisionWeave.OpenCv.Preview;
+
+// OpenCvSharp declares a window of its own, and this file names one to read the image
+// the run wrote, so the window the shell draws is reached through an alias.
+using Window = System.Windows.Window;
 
 namespace VisionWeave.App.Tests.Canvas;
 
@@ -29,10 +39,11 @@ namespace VisionWeave.App.Tests.Canvas;
 /// bindings, and Nodify's containers and connectors, rather than the view models
 /// they are bound to. One test walks every flow the shell promises — placing,
 /// connecting, selecting, deleting, and rewinding a workflow; editing a parameter,
-/// reading the condition it earned, saving, and opening the file again; and then
-/// opening a document this build must not write back — because the window is built
-/// here under one <see cref="System.Windows.Application"/> for the process, which is
-/// what WPF allows. Each step asserts on the elements a user would be looking at.
+/// reading the condition it earned, saving, and opening the file again; running a
+/// stored workflow over a real image and seeing what it produced — because the
+/// window is built here under one <see cref="System.Windows.Application"/> for the
+/// process, which is what WPF allows. Each step asserts on the elements a user would
+/// be looking at.
 /// </summary>
 public sealed class CanvasSmokeTests
 {
@@ -60,18 +71,43 @@ public sealed class CanvasSmokeTests
             var boundaryLog = new RecordingLogger<AsyncCommandBoundary>();
             var boundary = new AsyncCommandBoundary(new RecordingNotificationPresenter(), boundaryLog);
             var openDocument = new OpenDocumentCommand(boundary, session, status);
+
+            // The preview is drawn through the presentation the application composes:
+            // frames are converted where the run executes and shown on this thread. The
+            // executors are the ones the shell resolves, with the resize node turned
+            // into one that waits, so the flow can stop a run while a node is running.
+            var preview = new PreviewViewModel(session);
+            var ledger = new LeaseLedger();
+            var executors = new RunHold(new ExecutorRegistry(ledger));
+            var runWorkflow = new RunWorkflowCommand(
+                boundary,
+                session,
+                new WorkflowSnapshotFactory(catalog),
+                new ExecutionPlanBuilder(),
+                new WorkflowRunner(
+                    executors,
+                    ledger,
+                    ExecutionOptions.Default,
+                    new RunPreviewObserver(
+                        FramePreviewConverter.Default,
+                        catalog,
+                        new ShellRunPreviewPresenter(preview, Dispatcher.CurrentDispatcher))),
+                status);
+
             var viewModel = new MainWindowViewModel(
                 session,
                 catalog,
                 new WorkflowValidator(catalog),
                 openDocument,
                 new SaveDocumentCommand(boundary, session, status, chooser),
+                runWorkflow,
+                preview,
                 chooser,
                 new ShellPromptViewModel(),
                 status);
             var window = new MainWindow(viewModel, new SnackbarNotificationPresenter(snackbar));
             CanvasViewModel canvas = viewModel.Canvas;
-            Shell shell = new(window, viewModel, session, canvas, status, snackbar, chooser);
+            Shell shell = new(window, viewModel, session, canvas, status, snackbar, chooser, preview, ledger);
 
             using TemporaryWorkflowDirectory directory = new();
 
@@ -81,6 +117,7 @@ public sealed class CanvasSmokeTests
             PlaceConnectSelectDeleteAndRewind(shell);
             EditDiagnoseSaveAndReopen(shell, directory, boundaryLog);
             BlockEditsToAnUnsupportedDocument(shell, directory);
+            RunTheWorkflowAndShowItsPreview(shell, directory, executors);
 
             window.Close();
         });
@@ -96,6 +133,8 @@ public sealed class CanvasSmokeTests
     /// <param name="Status">The durable state the status area reports.</param>
     /// <param name="Snackbar">What the shell announced while a flow ran.</param>
     /// <param name="Chooser">The file dialog, answered by a flow instead of by a user.</param>
+    /// <param name="Preview">The managed preview the run publishes through.</param>
+    /// <param name="Ledger">The ledger every frame the shell's run creates is reported to.</param>
     private sealed record Shell(
         Window Window,
         MainWindowViewModel ViewModel,
@@ -103,7 +142,9 @@ public sealed class CanvasSmokeTests
         CanvasViewModel Canvas,
         ShellStatus Status,
         RecordingSnackbarService Snackbar,
-        StubFileChooser Chooser);
+        StubFileChooser Chooser,
+        PreviewViewModel Preview,
+        LeaseLedger Ledger);
 
     /// <summary>
     /// Places, connects, selects, deletes, and rewinds a workflow, and reads what the
@@ -478,6 +519,164 @@ public sealed class CanvasSmokeTests
         shell.Canvas.Nodes.ShouldHaveSingleItem();
         shell.Canvas.Connectors.ShouldBeEmpty();
     }
+
+    /// <summary>
+    /// Runs a workflow over a real image — placed and wired by the gestures the canvas
+    /// offers, its document written beside that image, the run started from the header —
+    /// and then stops a run while a node is executing.
+    /// </summary>
+    private static void RunTheWorkflowAndShowItsPreview(
+        Shell shell,
+        TemporaryWorkflowDirectory directory,
+        RunHold executors)
+    {
+        Window window = shell.Window;
+        CanvasViewModel canvas = shell.Canvas;
+        EditorSession session = shell.Session;
+
+        // The image sits beside the document, because that is the folder the run
+        // resolves the workflow's file names against.
+        using var plate = new Mat(24, 32, MatType.CV_8UC3, Scalar.All(120));
+        Cv2.ImWrite(directory.PathOf("plate.png"), plate).ShouldBeTrue();
+
+        session.New("A workflow to run");
+        Lay(window);
+
+        shell.ViewModel.IsReadOnly.ShouldBeFalse();
+        Notice(shell, "CanvasRegion").Visibility.ShouldBe(Visibility.Collapsed);
+        canvas.IsEmpty.ShouldBeTrue();
+
+        // Nothing has run in this document, so the region says what it is waiting for.
+        TextBlock waiting = Descendants<TextBlock>(Named<Border>(window, "PreviewRegion"))
+            .Single(block => block.Text == PreviewViewModel.NoPreviewText);
+
+        waiting.Text.ShouldBe(PreviewViewModel.NoPreviewText);
+        waiting.Visibility.ShouldBe(Visibility.Visible);
+
+        Button entry = Button(window, OpenCvNodeIds.ImageSourceTypeId);
+        entry.Command.ShouldBeSameAs(canvas.AddNodeCommand);
+        entry.Command.Execute(entry.CommandParameter);
+        Lay(window);
+
+        Button(window, OpenCvNodeIds.ResizeTypeId).Command.Execute(OpenCvNodeIds.ResizeTypeId);
+        Lay(window);
+
+        Button(window, OpenCvNodeIds.SaveImageTypeId).Command.Execute(OpenCvNodeIds.SaveImageTypeId);
+        Lay(window);
+
+        WorkflowNodeViewModel image = canvas.Nodes.Single(node => node.DisplayName == "Image Source");
+        WorkflowNodeViewModel resize = canvas.Nodes.Single(node => node.DisplayName == "Resize");
+        WorkflowNodeViewModel save = canvas.Nodes.Single(node => node.DisplayName == "Save Image");
+
+        canvas.ConnectCommand.Execute(Dragged(image.Outputs.ShouldHaveSingleItem(), resize.Inputs.ShouldHaveSingleItem()));
+        canvas.ConnectCommand.Execute(Dragged(resize.Outputs.ShouldHaveSingleItem(), save.Inputs.ShouldHaveSingleItem()));
+        Lay(window);
+
+        canvas.Connectors.Count.ShouldBe(2);
+        Wires(window, canvas).Count.ShouldBe(2);
+
+        SetParameter(shell, image.InstanceId, OpenCvNodeIds.PathParameter, "plate.png");
+        SetParameter(shell, resize.InstanceId, OpenCvNodeIds.WidthParameter, 16);
+        SetParameter(shell, resize.InstanceId, OpenCvNodeIds.HeightParameter, 8);
+        SetParameter(shell, save.InstanceId, OpenCvNodeIds.PathParameter, "done.png");
+
+        // The document has to be on disk before it runs, because its own folder is what
+        // the run resolves those two file names against.
+        string documentPath = directory.PathOf("plate.vwflow");
+        shell.Chooser.AnswerSave(documentPath);
+        Button(window, "_Save").Command.Execute(null);
+        Settle(shell, () => session.Path == documentPath);
+        Lay(window);
+
+        session.IsDirty.ShouldBeFalse();
+        shell.Status.DocumentState.ShouldBe("Saved");
+
+        executors.Hold = false;
+
+        Button run = Button(window, "_Run");
+        run.Command.ShouldBeSameAs(shell.ViewModel.RunWorkflow.Command);
+        run.Command.Execute(null);
+
+        shell.Status.RunOutcome.ShouldBe(ShellStatus.RunningText);
+
+        Settle(shell, () => shell.Status.RunOutcome == ShellStatus.RanText);
+        Lay(window);
+
+        // What the run wrote is the image the document names, at the size the transform
+        // asked for, holding the pixels the source read.
+        using (Mat written = Cv2.ImRead(directory.PathOf("done.png"), ImreadModes.Color))
+        {
+            written.Empty().ShouldBeFalse("the run was asked to write an image beside the document.");
+            written.Cols.ShouldBe(16);
+            written.Rows.ShouldBe(8);
+            written.At<Vec3b>(0, 0).Item0.ShouldBe((byte)120);
+        }
+
+        shell.Status.Condition.ShouldBe(ShellStatus.NoConditionText);
+        shell.Preview.HasPreview.ShouldBeTrue();
+        shell.Preview.PreviewTitle.ShouldBe("Resize");
+        shell.Preview.PreviewDetail.ShouldBe("16 × 8 pixels, Bgr24");
+
+        Image drawn = Descendants<Image>(Named<Border>(window, "PreviewRegion")).ShouldHaveSingleItem();
+
+        // The region draws the preview's own image, and what it draws is a frozen copy:
+        // the window is redrawn on this thread long after the run gave the frame back.
+        drawn.GetBindingExpression(Image.SourceProperty).ShouldNotBeNull()
+            .ParentBinding.Path.Path.ShouldBe("Preview.Image");
+        drawn.Source.ShouldBeAssignableTo<BitmapSource>().PixelWidth.ShouldBe(16);
+        drawn.Source.ShouldBeAssignableTo<BitmapSource>().PixelHeight.ShouldBe(8);
+
+        shell.Preview.Image.ShouldNotBeNull();
+        shell.Preview.Image!.IsFrozen.ShouldBeTrue();
+        waiting.Visibility.ShouldBe(Visibility.Collapsed);
+
+        shell.Ledger.Created.ShouldBe(2);
+        shell.Ledger.Released.ShouldBe(2);
+        shell.Ledger.Outstanding.ShouldBe(0);
+        shell.Ledger.ReservationsOutstanding.ShouldBe(0);
+
+        // A run the user stops: the other file name is what shows a stopped run wrote
+        // nothing, and the hold is what makes the stop a moment this flow can act on.
+        SetParameter(shell, save.InstanceId, OpenCvNodeIds.PathParameter, "stopped.png");
+        executors.Hold = true;
+
+        Button cancel = Button(window, "_Cancel");
+        cancel.Command.ShouldBeSameAs(shell.ViewModel.RunWorkflow.CancelCommand);
+        cancel.Command.CanExecute(null).ShouldBeFalse("nothing is running yet.");
+
+        run.Command.Execute(null);
+        Settle(shell, () => executors.Started.IsCompleted);
+        Lay(window);
+
+        run.Command.CanExecute(null).ShouldBeFalse();
+        cancel.Command.CanExecute(null).ShouldBeTrue();
+
+        // The frame the source published before the run reached the held node is already
+        // on screen: a stop keeps what the run produced.
+        Settle(shell, () => shell.Preview.PreviewTitle == "Image Source");
+
+        cancel.Command.Execute(null);
+        Settle(shell, () => shell.Status.RunOutcome == ShellStatus.StoppedText);
+        Lay(window);
+
+        executors.Hold = false;
+
+        System.IO.File.Exists(directory.PathOf("stopped.png"))
+            .ShouldBeFalse("a run stopped before its last node must not have written that node's file.");
+        System.IO.File.Exists(directory.PathOf("done.png")).ShouldBeTrue();
+        shell.Status.Condition.ShouldBe(ShellStatus.NoConditionText);
+        shell.Preview.PreviewTitle.ShouldBe("Image Source");
+        run.Command.CanExecute(null).ShouldBeTrue();
+        cancel.Command.CanExecute(null).ShouldBeFalse();
+        shell.Ledger.Outstanding.ShouldBe(0);
+        shell.Ledger.ReservationsOutstanding.ShouldBe(0);
+    }
+
+    /// <summary>Gives a node a parameter value, which is the command a field's commit produces.</summary>
+    private static void SetParameter(Shell shell, Guid nodeInstanceId, string name, object? value)
+        => shell.Session
+            .Execute(new SetNodeParameterCommand(nodeInstanceId, name, value))
+            .IsAccepted.ShouldBeTrue($"{name} is a parameter the definition declares.");
 
     /// <summary>
     /// Selects the node with a given title, and only that node, the way a click on its

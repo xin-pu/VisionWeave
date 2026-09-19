@@ -4,6 +4,7 @@ using VisionWeave.App.Sessions;
 using VisionWeave.App.Tests.Support;
 using VisionWeave.App.ViewModels;
 using VisionWeave.Application.Editing;
+using VisionWeave.Application.Execution;
 using VisionWeave.Contracts.Diagnostics;
 using VisionWeave.Contracts.Nodes;
 using VisionWeave.Domain.Workflows;
@@ -12,9 +13,9 @@ namespace VisionWeave.App.Tests.ViewModels;
 
 /// <summary>
 /// Covers what the status area reports: the document it describes, the operation
-/// it is waiting for, and the newest condition — including the two cases the
-/// direction singles out, a cancellation that is an outcome rather than a failure
-/// and a severity that has to read without its colour.
+/// it is waiting for, the newest condition — including the two cases the direction
+/// singles out, a cancellation that is an outcome rather than a failure and a
+/// severity that has to read without its colour — and every way a run can end.
 /// </summary>
 public sealed class ShellStatusTests : IDisposable
 {
@@ -121,8 +122,87 @@ public sealed class ShellStatusTests : IDisposable
         status.ConditionSeverity.ShouldBeNull();
     }
 
+    [Fact]
+    public void A_run_in_progress_is_named_as_running()
+    {
+        ShellStatus status = new(TestSessions.Create());
+
+        status.BeginRun();
+
+        status.RunOutcome.ShouldBe(ShellStatus.RunningText);
+    }
+
+    [Fact]
+    public void A_run_that_produced_its_outputs_is_named_as_completed()
+    {
+        ShellStatus status = new(TestSessions.Create());
+        status.BeginRun();
+
+        status.ReportRun(Run());
+
+        status.RunOutcome.ShouldBe(ShellStatus.RanText);
+    }
+
+    [Fact]
+    public void A_run_a_node_failed_in_is_named_as_failed()
+    {
+        ShellStatus status = new(TestSessions.Create());
+        status.BeginRun();
+
+        status.ReportRun(Run(NodeRunState.Failed));
+
+        status.RunOutcome.ShouldBe(ShellStatus.RunFailedText);
+    }
+
+    [Fact]
+    public void A_run_the_user_stopped_is_named_as_stopped_and_leaves_the_condition_alone()
+    {
+        ShellStatus status = new(TestSessions.Create());
+        status.Report(Failed(DiagnosticCodes.UnreadableDocument));
+        status.BeginRun();
+
+        status.ReportRun(Run(cancelled: true));
+
+        // A stopped run returns what it produced rather than throwing, so the shell
+        // did finish the Run command — what the run did is the run's own readout, and
+        // a condition observed on the way out stays readable beside it.
+        status.RunOutcome.ShouldBe(ShellStatus.StoppedText);
+        status.BackgroundOperation.ShouldBe(ShellStatus.ReadyText);
+        status.Condition.ShouldContain(DiagnosticCodes.UnreadableDocument);
+    }
+
+    [Fact]
+    public void A_run_that_never_started_says_why()
+    {
+        ShellStatus status = new(TestSessions.Create());
+
+        status.ReportRunRefused("the workflow has not been saved yet");
+
+        status.RunOutcome.ShouldBe("Not run: the workflow has not been saved yet");
+    }
+
     /// <inheritdoc />
     public void Dispose() => _directory.Dispose();
+
+    /// <summary>
+    /// A run summary with one node in it, which is enough for the readout: the
+    /// outcome is derived from how the nodes ended and whether the run was stopped.
+    /// </summary>
+    /// <param name="state">How the one node ended.</param>
+    /// <param name="cancelled">Whether cancellation was requested during the run.</param>
+    /// <returns>The summary.</returns>
+    private static WorkflowRunSummary Run(NodeRunState state = NodeRunState.Succeeded, bool cancelled = false)
+        => new()
+        {
+            OperationId = Guid.NewGuid(),
+            DocumentId = Guid.NewGuid(),
+            Revision = 1,
+            Duration = TimeSpan.FromMilliseconds(12),
+            Nodes = [new NodeRunReport(Guid.NewGuid(), state, TimeSpan.FromMilliseconds(12), [])],
+            Diagnostics = [],
+            WasCancelled = cancelled,
+            QuarantinedNodeIds = [],
+        };
 
     private static CommandExecutionResult Failed(string code)
         => new(

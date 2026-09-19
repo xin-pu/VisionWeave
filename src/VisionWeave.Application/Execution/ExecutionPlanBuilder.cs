@@ -1,4 +1,5 @@
-﻿using VisionWeave.Contracts.Ports;
+﻿using VisionWeave.Contracts.Execution;
+using VisionWeave.Contracts.Ports;
 
 namespace VisionWeave.Application.Execution;
 
@@ -18,10 +19,17 @@ public sealed class ExecutionPlanBuilder
     /// The nodes whose own state changed, or <see langword="null"/> to run the
     /// whole snapshot.
     /// </param>
+    /// <param name="environment">
+    /// The environment the run executes in, such as the directory a file path is
+    /// resolved against, or <see langword="null"/> for a run that resolves none.
+    /// </param>
     /// <returns>The plan.</returns>
     /// <exception cref="KeyNotFoundException">A changed node is not in the snapshot.</exception>
     /// <exception cref="InvalidOperationException">The snapshot contains a cycle.</exception>
-    public ExecutionPlan Build(WorkflowSnapshot snapshot, IEnumerable<Guid>? changedNodeIds = null)
+    public ExecutionPlan Build(
+        WorkflowSnapshot snapshot,
+        IEnumerable<Guid>? changedNodeIds = null,
+        NodeExecutionEnvironment? environment = null)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
 
@@ -49,7 +57,10 @@ public sealed class ExecutionPlanBuilder
             snapshot,
             order.Select(id => new ExecutionPlanNode(snapshot.GetNode(id), [.. InputsOf(inputsByTarget, id)])),
             BuildLevels(order, levels),
-            scope.Where(unavailable.Contains).OrderBy(id => id));
+            scope.Where(unavailable.Contains).OrderBy(id => id))
+        {
+            Environment = environment ?? NodeExecutionEnvironment.Default,
+        };
     }
 
     private static HashSet<Guid> ResolveScope(

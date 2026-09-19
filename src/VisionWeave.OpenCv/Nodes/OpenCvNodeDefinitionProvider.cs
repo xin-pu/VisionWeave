@@ -8,16 +8,19 @@ namespace VisionWeave.OpenCv.Nodes;
 /// built-in nodes and a future plugin are registered through the same path and
 /// the composition root cannot treat one of them specially.
 /// <para>
-/// The first release contributes the two nodes that prove the pipeline without
-/// touching the file system: Gaussian blur, which consumes and produces a frame,
-/// and resize, which changes the frame geometry. Nodes that read or write files
-/// arrive with the path-parameter and export decisions.
+/// The first release contributes two pairs: the frames a file produces and
+/// consumes — an image source and a save image, which are the nodes that name a
+/// file and therefore the nodes a working directory is resolved for — and the two
+/// transforms that prove the pipeline without touching the file system, Gaussian
+/// blur and resize.
 /// </para>
 /// </summary>
 public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
 {
     private static readonly IReadOnlyList<NodeDefinition> Definitions =
     [
+        CreateImageSource(),
+        CreateSaveImage(),
         CreateGaussianBlur(),
         CreateResize(),
     ];
@@ -27,6 +30,64 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
 
     /// <inheritdoc />
     public IReadOnlyCollection<NodeDefinition> GetDefinitions() => [.. Definitions];
+
+    private static NodeDefinition CreateImageSource()
+        => new(
+            new NodeTypeId(OpenCvNodeIds.ImageSourceTypeId),
+            TypeVersion: 1,
+            DisplayName: "Image Source",
+            OpenCvNodeIds.InputOutputCategory,
+            [
+                new PortDefinition(
+                    OpenCvNodeIds.ImagePortId,
+                    PortDirection.Output,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Image"),
+            ],
+            [
+                // The path is required and has no default, so a definition that no
+                // file has been named for yet is a node that does not validate: a
+                // source that silently read some file nobody chose would be worse
+                // than one that asks.
+                new ParameterDefinition(
+                    OpenCvNodeIds.PathParameter,
+                    ParameterKind.Path,
+                    IsRequired: true,
+                    DisplayName: "File"),
+            ],
+            OpenCvNodeIds.ImageSourceExecutorTypeId);
+
+    private static NodeDefinition CreateSaveImage()
+        => new(
+            new NodeTypeId(OpenCvNodeIds.SaveImageTypeId),
+            TypeVersion: 1,
+            DisplayName: "Save Image",
+            OpenCvNodeIds.InputOutputCategory,
+            [
+                new PortDefinition(
+                    OpenCvNodeIds.ImagePortId,
+                    PortDirection.Input,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Image"),
+            ],
+            [
+                new ParameterDefinition(
+                    OpenCvNodeIds.PathParameter,
+                    ParameterKind.Path,
+                    IsRequired: true,
+                    DisplayName: "File"),
+                new ParameterDefinition(
+                    OpenCvNodeIds.OverwriteParameter,
+                    ParameterKind.Boolean,
+                    IsRequired: false,
+                    DisplayName: "Replace an existing file",
+                    DefaultValue: false),
+            ],
+            OpenCvNodeIds.SaveImageExecutorTypeId);
 
     private static NodeDefinition CreateGaussianBlur()
         => new(

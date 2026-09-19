@@ -54,14 +54,16 @@
 
 ### PL-2026-005 - File-backed input and output nodes
 
-- **Status:** Open
+- **Status:** Implemented
+- **Priority:** P1
 - **Recorded on:** 2026-09-19
 - **Scope:** The Input/Output node family of the first-release catalog: the image source and save-image nodes.
 - **Observation:** The OpenCV layer now ships Gaussian blur and resize, so a native frame can be produced, transformed, previewed, and released by a real run, but the catalog has no node that reads or writes a file. The tests therefore supply frames through a test-only source definition, and no user workflow can start from a real image yet.
 - **Decision or next step:** Add the file-backed source and save nodes together with the path-parameter kind and the work-directory rules the design defers, so that a saved workflow can be run end to end from the editor.
-- **Evidence:** `src/VisionWeave.OpenCv/Nodes/OpenCvNodeDefinitionProvider.cs`, `tests/VisionWeave.IntegrationTests/Support/NativeWorkflow.cs`, `docs/design/visionweave-detailed-design.md` (section 8).
+- **Update (2026-09-19):** The pair is delivered with the rules that make a path mean something, decided in ADR-0012. `ImageSourceExecutor` reads the file its required `path` parameter names as a color frame and publishes the read `Mat` as a lease it created and no longer owns; `SaveImageExecutor` is a sink that declares no output port, refuses a destination that already exists until the document's `overwrite` boolean is set, and writes through a temporary name in the destination folder so a failed or cancelled write never leaves a half-written image. A `Path` names a file relative to the folder that holds the document, the working directory travels with the run in `NodeExecutionEnvironment` rather than with the process, `WorkDirectoryPath.TryResolve` turns a declared path and that folder into an absolute path or a refusal without throwing, and a refused path fails the node that declared it with the diagnostic vocabulary the run already has. The shell runs such a document through `RunWorkflowCommand`, which refuses an unsaved document with `VW-FILE-004` because it has no folder to resolve against, refuses a document with validation errors, reports the outcome of a stopped run as an outcome rather than a fault, and draws the newest published image in the preview region through a frozen copy that outlives the frame. The composite — a real image read from the document's folder, resized, written beside it, previewed, and stopped while a node runs, with the lease ledger flat — is covered by the shell's own smoke test. An absolute path or a configured output directory stays deliberately out of scope per ADR-0012 decision 7 and is recorded as PL-2026-018.
+- **Evidence:** `src/VisionWeave.OpenCv/Nodes/OpenCvNodeDefinitionProvider.cs`, `src/VisionWeave.OpenCv/Execution/ImageSourceExecutor.cs`, `src/VisionWeave.OpenCv/Execution/SaveImageExecutor.cs`, `src/VisionWeave.Contracts/Files/WorkDirectoryPath.cs`, `src/VisionWeave.Contracts/Execution/NodeExecutionEnvironment.cs`, `src/VisionWeave.App/Commands/RunWorkflowCommand.cs`, `src/VisionWeave.App/Preview/`, `tests/VisionWeave.IntegrationTests/OpenCv/FileBackedWorkflowTests.cs`, `tests/VisionWeave.IntegrationTests/Files/WorkDirectoryPathTests.cs`, `tests/VisionWeave.App.Tests/Canvas/CanvasSmokeTests.cs`, `docs/adr/0012-file-access-and-the-working-directory.md`, [#28](https://github.com/xin-pu/VisionWeave/issues/28).
 - **Owner:** VisionWeave maintainers.
-- **Review again:** Before the first-release node catalog is frozen.
+- **Review again:** Before the first-release node catalog is frozen, or before a node reads a file that is not an image. A resource picker bound to the document's typed `resources` collection remains PL-2026-019, and a run that reaches outside the document's own folder remains PL-2026-018.
 
 ### PL-2026-006 - Parameter values are not validated at the definition boundary
 
@@ -223,3 +225,27 @@
 - **Evidence:** `src/VisionWeave.Persistence/Workflows/WorkflowDocumentReader.cs`, `docs/adr/0004-workflow-document-and-format.md` (decisions 3, 4, 5, and 9), `docs/design/visionweave-detailed-design.md` (section 7).
 - **Owner:** VisionWeave maintainers.
 - **Review again:** When a second schema version is proposed, when a stored document needs a field moved or renamed, or before this build accepts a newer document as editable rather than read-only.
+
+### PL-2026-018 - Let a workflow reach a file outside its own folder
+
+- **Status:** Open
+- **Priority:** P2
+- **Recorded on:** 2026-09-19
+- **Scope:** The file-system reach of one run beyond the folder that holds the document: a configured output directory, and an absolute path the user opts into explicitly.
+- **Observation:** ADR-0012 decision 3 accepts only a relative path that stays inside the working directory, so a node cannot name a file anywhere else — not even deliberately. That is what keeps a document portable and makes the file access of a run reviewable by reading the paths it stores, and it is also a real convenience given up: a workflow that must write into an output tree outside the folder it lives in cannot be expressed at all. No capability needs the reach today, which is why it was refused rather than designed: the save node names its own destination, and a second directory would exist only to move that destination somewhere the user did not write.
+- **Decision or next step:** Do not widen the path rule before a capability needs it. When one does — an output directory for a batch, a read of a shared plate that is not stored beside the document, or an explicit per-node absolute path — decide together what the document stores (a path, a directory, a resource identifier of PL-2026-019), what the shell asks the user, what the run may reach without asking, and how a refusal names the rule it broke. Whichever way that goes, the relative-path rule of ADR-0012 stays the default a document is written in.
+- **Evidence:** `docs/adr/0012-file-access-and-the-working-directory.md` (decision 3, decision 7, and the consequences), `src/VisionWeave.Contracts/Files/WorkDirectoryPath.cs`, `src/VisionWeave.OpenCv/Nodes/OpenCvNodeDefinitionProvider.cs` (`Path` parameters).
+- **Owner:** VisionWeave maintainers.
+- **Review again:** When a workflow needs a file outside its own folder, when an output-directory setting is proposed, or when the file picker of PL-2026-019 is designed.
+
+### PL-2026-019 - Bind future file nodes to stable workflow resources
+
+- **Status:** Open
+- **Priority:** P2
+- **Recorded on:** 2026-09-19
+- **Scope:** The relationship between the typed document `resources` collection and future nodes that consume a persisted file resource.
+- **Observation:** PL-2026-011 and ADR-0011 make `resources` typed document data, while the first file-image workflow deliberately uses a required relative `Path` parameter on Image Source and Save Image under ADR-0012. This is appropriate for the MVP, but it leaves the resource collection without a consumer and gives a future resource picker no stable node-to-resource binding. A file path or list position is not a durable resource identity: paths can be relocated and several entries can name the same location, while positions change when the list is reordered.
+- **Decision or next step:** Do not expand the first runnable workflow's scope. Before adding a resource browser, file picker backed by document resources, resource digest validation, cache keys, or multiple-node resource reuse, introduce a persisted stable resource identifier and a parameter or contract that refers to that identifier. Decide migration and forward-compatibility behavior explicitly at that time; do not invent identifiers for preserved unknown entries without a migration decision.
+- **Evidence:** `src/VisionWeave.Contracts/Workflows/ResourceReference.cs`, `src/VisionWeave.Contracts/Workflows/FileResourceReference.cs`, `src/VisionWeave.Domain/Workflows/WorkflowDocument.cs` (`Resources`), `src/VisionWeave.OpenCv/Nodes/OpenCvNodeDefinitionProvider.cs` (`Path` parameters), `docs/adr/0011-resource-references-and-port-schema-snapshots.md`, `docs/adr/0012-file-access-and-the-working-directory.md`.
+- **Owner:** VisionWeave maintainers.
+- **Review again:** Before implementing a resource editor or picker, resource integrity validation, result caching keyed by input resources, or a node that reuses an existing document resource.

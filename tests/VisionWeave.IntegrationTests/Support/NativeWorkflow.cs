@@ -8,9 +8,11 @@ namespace VisionWeave.IntegrationTests.Support;
 
 /// <summary>
 /// The node catalog a native execution test runs against: a source node that
-/// brings a frame into the workflow, plus the built-in OpenCV definitions. The
-/// source stays a test definition because the first release has no file-backed
-/// input node yet.
+/// brings a frame into the workflow without touching a file, plus the built-in
+/// OpenCV definitions. It stays a test definition because a test that is about the
+/// scheduler, a transform, or a lease wants a frame whose size and value the test
+/// states, while the file-backed workflow is covered by
+/// <c>FileBackedWorkflowTests</c> over the real catalog.
 /// </summary>
 internal static class NativeWorkflow
 {

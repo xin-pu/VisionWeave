@@ -308,6 +308,35 @@ asserts that native image leases return to zero after completion.
 This avoids use-after-dispose errors while preventing canvas previews from
 retaining full-size native images indefinitely.
 
+### 5.4 File-backed runs as built
+
+The first two file-backed nodes are the pair that makes a stored workflow runnable.
+`ImageSourceExecutor` reads the file its path names as a color frame and publishes
+the read `Mat` as a lease it created and no longer owns, so the runtime releases it
+once its consumers are done and a failed read disposes what it allocated.
+`SaveImageExecutor` is a sink: it declares no output port, writes the incoming frame
+under a temporary name in the destination folder and moves it onto the destination,
+so a failed or cancelled write never leaves a half-written image where a readable one
+was, and it refuses an existing destination until the document's `overwrite` is set
+(ADR-0012, decisions 6 and 8).
+
+The working directory of a run is the folder that holds the document being run, and it
+travels with the run: `NodeExecutionEnvironment` in `Contracts` is carried by the
+`ExecutionPlan` and handed to every executor in the request the node receives, so no
+executor reads a process-wide directory and two runs of two documents in one process
+resolve the same relative path differently on purpose. `WorkDirectoryPath.TryResolve`
+turns a declared path and that directory into an absolute path or a refusal, and every
+unusable input is a refusal rather than an exception: a rooted path, a blank path, a
+path that escapes the folder, a path that names a directory, an illegal character, and
+an over-long path all fail the node that declared them with the diagnostic vocabulary
+the run already has, which blocks the branch downstream of it.
+
+A run the user stops is an outcome rather than a fault. The runner records the levels
+it did not execute as cancelled, returns its summary, and releases every frame it held
+on the way out, so the shell can report the stop in the readout while keeping what the
+run had already produced — the nodes that completed are still reported, and the lease
+ledger returns to zero.
+
 ## 6. WPF node editor rendering
 
 ### 6.1 Responsibility boundary
@@ -422,14 +451,16 @@ zoom remain responsive with hundreds of nodes.
 
 ### 6.5 Shell foundation and semantic theme
 
-The first shell ships the five regions the visual direction documents and nothing
+The first shell ships the six regions the visual direction documents and nothing
 editable inside them: a top strip holding the application identity, the document
 commands, and the run state; a node catalogue that names what exists; the surface
-a document will be edited on; an inspector for the current selection; and a status
-area for durable state. Each region is named in the markup — `TopBarRegion`,
-`NodeCatalogueRegion`, `CanvasRegion`, `InspectorRegion`, `StatusRegion` — so a
-test can hold the layout to the documented architecture, and the canvas region
-presents the editor the projection package put there (6.6).
+a document will be edited on; an inspector for the current selection; a status
+area for durable state; and the managed preview under the canvas, which draws the
+newest image a run published (6.8). Each region is named in the markup —
+`TopBarRegion`, `NodeCatalogueRegion`, `CanvasRegion`, `PreviewRegion`,
+`InspectorRegion`, `StatusRegion` — so a test can hold the layout to the
+documented architecture, and the canvas region presents the editor the projection
+package put there (6.6).
 
 The shell carries no business rule in code-behind: the window initializes its
 markup, hands its view model to the data context, and attaches the region a
@@ -462,7 +493,11 @@ document order and refuses a reference to a key that is not yet declared.
 
 The status area reports what lasts: the document state (never saved, unsaved,
 saved), the operation the shell is running or the state it returned to, the last
-run outcome, and the newest condition with its stable code. The snackbar reports
+run outcome, and the newest condition with its stable code. The run outcome is a
+reading of its own rather than a second use of the background-operation field: it
+names the run as running, completed, failed, stopped at the user's request, or not
+run together with the reason, and it survives the operation that wrote it, because
+the shell reports the operation's completion afterwards. The snackbar reports
 what happens once: the `IUserNotificationPresenter` seam of ADR-0008 is now served
 by `SnackbarNotificationPresenter`, which shows the safe message and the stable
 code and never the diagnostic's exception. A cancelled operation is an outcome
@@ -470,9 +505,17 @@ rather than a failure: it reports "Stopped at your request", records no conditio
 and clears the one reported before it. Startup keeps its modal message box as the
 single documented exception.
 
+Running is two gestures, not one mode: the header offers Run and, beside it,
+Cancel, which is enabled exactly while a run executes and answers through the
+runtime's own cancellation. `Ctrl+R` runs the document the way `Ctrl+O` opens one,
+and a run that was refused — because the document was never saved, or because
+validation reports an error — says why where the outcomes are read instead of
+starting and failing a node per path (7).
+
 Keyboard focus uses the accent colour, which the theme test holds to the non-text
 contrast ratio against every surface the ring can be drawn on. `Ctrl+O` is bound
-to the same command as the shell's Open action.
+to the same command as the shell's Open action, and `Ctrl+R` to the same command
+as its Run action.
 
 The Open flow reaches the session through two seams rather than through dialog
 calls inside the view model: `IWorkflowFileChooser` asks for the file, with a
@@ -643,6 +686,41 @@ The catalogue is searchable by display name and by type identifier, because the
 identifier is what a document, a diagnostic, and a stored parameter name a node by. A
 search that matches nothing says so instead of showing an empty list.
 
+### 6.8 Run, cancel, and the managed preview as built
+
+`RunWorkflowCommand` is the shell's one path to a run, and everything it refuses is
+refused before a node starts: a document that has never been saved has no folder for
+its file paths to resolve against (ADR-0012) and is refused with `VW-FILE-004`, and a
+document the capture reports validation errors for is refused with those errors,
+because the inspector already shows the whole list at the node and the parameter each
+condition belongs to. The command owns two gestures: `Command`, the toolkit's
+asynchronous command whose own state disables a second run and whose cancellation is
+what Cancel trips, and `CancelCommand`, which is enabled exactly while a run executes
+and shares that state rather than tracking a flag of its own.
+
+The run itself executes on the thread pool — a file read, a filter, and a file write
+are blocking — and the boundary of ADR-0008 is the only path back to the shell, so a
+fault the run did not anticipate is reported once rather than escaping into a
+binding. The runtime's summary is translated into the run outcome described in 6.5,
+and what it leaves behind is reported as conditions with one deliberate omission: the
+cancellation of each node that never started is not repeated as a condition per node,
+because the run outcome already names the gesture.
+
+The preview is a seam rather than a call inside the command: `RunPreviewObserver`
+serves `IExecutionOutputObserver`, converts the first image output of a node while
+the runtime still owns the frame — the task it returns is the fence that keeps the
+lease alive — and hands a frozen copy to an `IRunPreviewPresenter`. Converts run
+where the run executes, so `IRunPreviewPresenter` decides where a preview may touch
+the bindings; the shell's implementation marshals to the window's dispatcher and
+waits, which keeps the run's completion ordered after the preview it produced.
+`PreviewViewModel` holds that copy, the node that published it, and its size and
+pixel layout, and it forgets all three when the document is replaced, because a
+preview of a document that is no longer open describes nothing. The region's note
+stands in for the image while nothing has run, so an empty frame never reads as a
+preview that failed to draw. The composite — a real image read from the document's
+folder, resized, written beside it, drawn in the region, and stopped while a node is
+executing — is covered by the shell's own smoke test (10).
+
 ## 7. Persistence and compatibility
 
 The `.vwflow` format is a versioned JSON document. It stores only portable
@@ -757,6 +835,16 @@ Morphology, Contours, Draw, and Inspect.
 | Find Contours / Area / Bounding Rect | Contour blocks | `Contours` is its own typed value. |
 | Draw Contours / Draw Rectangles | Draw blocks | Returns new image; never mutates input. |
 
+The first build ships four of them and the categories they belong to: `Image Source`
+and `Save Image` in Input/Output, and `Gaussian Blur` and `Resize` as the Filter and
+Transform pair that proves the pipeline. The two file-backed nodes are the ones that
+name a file, so they are the nodes a working directory is resolved for (5.4): each
+declares a required `path` parameter, the save node additionally declares the
+`overwrite` boolean that defaults to off, and the path names a file relative to the
+folder that holds the document (ADR-0012). The remaining rows are the catalog this
+design aims at rather than a list of what exists, and each arrives with the curated
+regression images its own entry requires.
+
 Every migrated node receives output-oriented regression tests against curated
 sample images. Migration moves algorithm intent and behavior, not the old
 GraphX controls, Aries view models, or serialization format.
@@ -815,8 +903,8 @@ trusted code; sandboxing is a future feature, not an implied security boundary.
 | OpenCV integration tests | Expected pixels / geometry for each migrated node, disposal and cache behavior, preview limit validation. |
 | Persistence integration tests | Save/load round trip, malformed document rejection, migrations, missing-node placeholders, autosave policy validation. |
 | Architecture tests | Dependency direction, no WPF/OpenCV/host stack reference in Domain, and no host stack reference in any core assembly. |
-| Shell tests | The five documented regions and their named elements, token values and brush aliases, contrast of text and of the focus ring, no colour literal outside the token dictionary, every bound path resolvable through a public member, every declared key used and declared before it is reached for, the canvas wiring of items, wires, commands, and shortcuts, the inspector's field per declared kind and the gesture that applies what was typed, prompt questions and their three answers, status transitions, and announcements by severity. |
-| UI smoke tests | The real window, drawn with the shipped theme: placing a node from the catalogue, connecting two ports, selecting, deleting, undo, redo, and the surface a refused connection leaves unchanged; editing a parameter, reading the condition a refused value earned, undoing and redoing one parameter edit as one unit, saving, opening the file again over unsaved changes and answering the prompt; and opening a document this build must not write back, which is shown read-only and changes nothing when a gesture reaches it. |
+| Shell tests | The six documented regions and their named elements, token values and brush aliases, contrast of text and of the focus ring, no colour literal outside the token dictionary, every bound path resolvable through a public member, every declared key used and declared before it is reached for, the canvas wiring of items, wires, commands, and shortcuts, the inspector's field per declared kind and the gesture that applies what was typed, prompt questions and their three answers, status transitions including the four ways a run can end, and announcements by severity. |
+| UI smoke tests | The real window, drawn with the shipped theme: placing a node from the catalogue, connecting two ports, selecting, deleting, undo, redo, and the surface a refused connection leaves unchanged; editing a parameter, reading the condition a refused value earned, undoing and redoing one parameter edit as one unit, saving, opening the file again over unsaved changes and answering the prompt; opening a document this build must not write back, which is shown read-only and changes nothing when a gesture reaches it; and running a saved workflow over a real image — three nodes placed and wired by the gestures the canvas offers, the output file read back from the document's own folder, the newest published image drawn in the preview region with the note that stood in for it gone, the counts of the ledger flat, and a run stopped while a node is executing, which keeps the preview the source had already published, writes nothing, reports no condition, and returns both gestures to the state they started in. |
 
 Tests use xUnit and Shouldly. Test names use the form
 `Member_condition_expected_result`, e.g.
@@ -832,7 +920,12 @@ as they are drawn rather than as they are declared. It is also the only place a
 document change can be checked against a binding's thread affinity: a window is a
 dispatcher object, so an open that announced its document from a worker thread would
 leave the surface showing the document it replaced, which is a failure no headless
-test can see.
+test can see. Running belongs there for the same reason: the frames a run converts
+are converted off the window's thread, and only a real window shows that the image
+it draws arrives through the dispatcher and outlives the frame it came from. The
+flow runs over a real image file written into the temporary document folder, reads
+the written output back, stops a run while a node is held open, and asserts the
+ledger is flat afterwards, which is what a leaked frame would not be.
 
 The composition root is covered by `VisionWeave.App.Tests`, which resolves every
 registered service headlessly and refuses to start on a rejected setting. The
@@ -888,6 +981,7 @@ Implementation starts only after these records exist and link back here:
 | [ADR-0009](../adr/0009-editor-session-orchestration.md) | The host-layer editing session that composes the document session, the command history, the selection, and the validation projection, and the transitions it owns. | Accepted |
 | [ADR-0010](../adr/0010-diagnostic-targets.md) | The closed hierarchy of diagnostic targets narrower than a node, how the validator attributes them, and how the projection answers per port, parameter, and connection. | Accepted |
 | [ADR-0011](../adr/0011-resource-references-and-port-schema-snapshots.md) | Resource references and remembered port schemas as typed contracts: what a document edit they are, what the constructors guarantee, and how the reader and writer treat an entry they cannot represent. | Accepted |
+| [ADR-0012](../adr/0012-file-access-and-the-working-directory.md) | What a node's `Path` parameter names, the working directory a run resolves it against, how much of the file system one run may reach, and how a save treats a file that is already there. | Accepted |
 | [docs/ledger/standards-deviations.md](../ledger/standards-deviations.md) | Each approved exception to the adopted standards, or an explicit "none" baseline. | No deviations |
 
 ## 13. Alternatives considered
