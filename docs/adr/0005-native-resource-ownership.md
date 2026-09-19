@@ -1,6 +1,6 @@
 # ADR-0005 Native image ownership and lease lifetime
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-19
 - **Decision owners:** VisionWeave maintainers
 

@@ -1,6 +1,6 @@
 # ADR-0003 Port value types and connection compatibility
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-19
 - **Decision owners:** VisionWeave maintainers
 

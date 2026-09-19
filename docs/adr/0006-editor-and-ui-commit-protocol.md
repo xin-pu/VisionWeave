@@ -1,6 +1,6 @@
 # ADR-0006 Editor scope and UI commit protocol
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-19
 - **Decision owners:** VisionWeave maintainers
 
