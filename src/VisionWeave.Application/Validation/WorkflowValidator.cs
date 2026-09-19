@@ -62,6 +62,81 @@ public sealed class WorkflowValidator
         return new ValidationResult(diagnostics);
     }
 
+    /// <summary>
+    /// Decides whether one candidate connection could be added to a document,
+    /// reporting only the diagnostics that the connection itself would introduce.
+    /// The document is not changed and the diagnostics it already earns are not
+    /// repeated, so an editor can judge a pending wire while the rest of the graph
+    /// is still incomplete. This is the one place the connection rules are decided;
+    /// no caller re-implements direction, type, multiplicity, or cycle checking.
+    /// </summary>
+    /// <param name="document">The document the connection would be added to.</param>
+    /// <param name="connection">The candidate connection.</param>
+    /// <returns>The diagnostics that adding the connection would introduce.</returns>
+    public ValidationResult ValidateConnection(WorkflowDocument document, WorkflowConnection connection)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        ArgumentNullException.ThrowIfNull(connection);
+
+        List<NodeDiagnostic> diagnostics = [];
+
+        if (!document.TryGetNode(connection.SourceNodeId, out NodeInstance? source)
+            || !document.TryGetNode(connection.TargetNodeId, out NodeInstance? target))
+        {
+            diagnostics.Add(new NodeDiagnostic(
+                DiagnosticCodes.InvalidGraph,
+                DiagnosticSeverity.Error,
+                $"Connection '{connection.ConnectionId}' refers to a node instance that is not in the document.",
+                null));
+            return new ValidationResult(diagnostics);
+        }
+
+        if (connection.SourceNodeId == connection.TargetNodeId)
+        {
+            diagnostics.Add(new NodeDiagnostic(
+                DiagnosticCodes.InvalidGraph,
+                DiagnosticSeverity.Error,
+                $"Node instance '{connection.SourceNodeId}' is connected to itself.",
+                connection.SourceNodeId));
+            return new ValidationResult(diagnostics);
+        }
+
+        // A definition this build cannot resolve already reported VW-NODE-001 as
+        // part of whole-document validation, so its ports are not judged here.
+        Dictionary<Guid, NodeDefinition> resolved = [];
+        foreach (NodeInstance node in document.Nodes)
+        {
+            if (_catalog.TryResolve(node.NodeTypeId, node.TypeVersion, out NodeDefinition? definition))
+            {
+                resolved[node.InstanceId] = definition!;
+            }
+        }
+
+        Dictionary<(Guid NodeId, string PortId), int> incoming = [];
+        foreach (WorkflowConnection existing in document.Connections)
+        {
+            if (existing.TargetNodeId == connection.TargetNodeId
+                && string.Equals(existing.TargetPortId, connection.TargetPortId, StringComparison.Ordinal))
+            {
+                var key = (existing.TargetNodeId, existing.TargetPortId);
+                incoming[key] = incoming.GetValueOrDefault(key) + 1;
+            }
+        }
+
+        ValidatePorts(connection, source!, target!, resolved, incoming, diagnostics);
+
+        if (TryDescribeCycle(document.Connections, connection, out string cycle))
+        {
+            diagnostics.Add(new NodeDiagnostic(
+                DiagnosticCodes.InvalidGraph,
+                DiagnosticSeverity.Error,
+                $"The connection from node instance '{connection.SourceNodeId}' to node instance '{connection.TargetNodeId}' closes a cycle: {cycle}.",
+                connection.SourceNodeId));
+        }
+
+        return new ValidationResult(diagnostics);
+    }
+
     private void ResolveNode(
         NodeInstance node,
         Dictionary<Guid, NodeDefinition> resolved,
@@ -503,6 +578,90 @@ public sealed class WorkflowValidator
 
     private static IReadOnlyList<Guid> ConsumersOf(IReadOnlyDictionary<Guid, List<Guid>> adjacency, Guid node)
         => adjacency.TryGetValue(node, out List<Guid>? consumers) ? consumers : [];
+
+    /// <summary>
+    /// Determines whether adding one connection to a graph would close a cycle, and
+    /// describes the cycle when it would. The candidate closes a cycle exactly when
+    /// its target already reaches its source, which is what the search looks for.
+    /// </summary>
+    /// <param name="connections">The connections already in the graph.</param>
+    /// <param name="candidate">The connection being considered.</param>
+    /// <param name="cycle">The cycle the candidate would close.</param>
+    /// <returns><see langword="true"/> when the candidate closes a cycle.</returns>
+    private static bool TryDescribeCycle(
+        IReadOnlyList<WorkflowConnection> connections,
+        WorkflowConnection candidate,
+        out string cycle)
+    {
+        Dictionary<Guid, List<Guid>> adjacency = [];
+
+        foreach (WorkflowConnection connection in connections)
+        {
+            AddEdge(adjacency, connection.SourceNodeId, connection.TargetNodeId);
+        }
+
+        AddEdge(adjacency, candidate.SourceNodeId, candidate.TargetNodeId);
+
+        Dictionary<Guid, Guid> parent = [];
+        Queue<Guid> pending = new();
+        parent[candidate.TargetNodeId] = candidate.TargetNodeId;
+        pending.Enqueue(candidate.TargetNodeId);
+
+        while (pending.Count > 0)
+        {
+            Guid node = pending.Dequeue();
+
+            if (node == candidate.SourceNodeId)
+            {
+                cycle = DescribeCandidateCycle(parent, candidate);
+                return true;
+            }
+
+            foreach (Guid consumer in ConsumersOf(adjacency, node))
+            {
+                if (parent.TryAdd(consumer, node))
+                {
+                    pending.Enqueue(consumer);
+                }
+            }
+        }
+
+        cycle = string.Empty;
+        return false;
+    }
+
+    private static void AddEdge(Dictionary<Guid, List<Guid>> adjacency, Guid source, Guid target)
+    {
+        if (!adjacency.TryGetValue(source, out List<Guid>? consumers))
+        {
+            consumers = [];
+            adjacency.Add(source, consumers);
+        }
+
+        consumers.Add(target);
+    }
+
+    /// <summary>
+    /// Builds the cycle text from the search parents: the chain runs from the
+    /// candidate's target back to its source, and the candidate edge closes it.
+    /// </summary>
+    private static string DescribeCandidateCycle(
+        IReadOnlyDictionary<Guid, Guid> parent,
+        WorkflowConnection candidate)
+    {
+        List<Guid> chain = [];
+        Guid node = candidate.SourceNodeId;
+
+        while (node != candidate.TargetNodeId)
+        {
+            chain.Add(node);
+            node = parent[node];
+        }
+
+        chain.Reverse();
+        List<Guid> cycle = [candidate.SourceNodeId, candidate.TargetNodeId, .. chain];
+        return string.Join(" -> ", cycle.Select(item => item.ToString()));
+    }
 
     private static string DescribeCycle(IReadOnlyList<Guid> path, Guid repeated)
     {

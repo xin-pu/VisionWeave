@@ -339,6 +339,135 @@ public sealed class WorkflowValidatorTests
         secondPass.Diagnostics.ShouldBe(firstPass.Diagnostics);
     }
 
+    [Fact]
+    public void ValidateConnection_legal_wire_reports_no_diagnostics()
+    {
+        WorkflowDocument document = WorkflowDocument.Create("workflow");
+        NodeInstance source = document.AddNode(TestNodes.SourceType, 1, new CanvasPosition(0, 0));
+        NodeInstance blur = document.AddNode(TestNodes.BlurType, 1, new CanvasPosition(200, 0));
+
+        ValidationResult result = _validator.ValidateConnection(
+            document,
+            new WorkflowConnection(Guid.NewGuid(), source.InstanceId, "image", blur.InstanceId, "image"));
+
+        result.IsValid.ShouldBeTrue();
+        result.Diagnostics.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ValidateConnection_incomplete_document_does_not_repeat_its_own_diagnostics()
+    {
+        WorkflowDocument document = WorkflowDocument.Create("workflow");
+        NodeInstance source = document.AddNode(TestNodes.SourceType, 1, new CanvasPosition(0, 0));
+        NodeInstance blur = document.AddNode(TestNodes.BlurType, 1, new CanvasPosition(200, 0));
+
+        // The blur node's required input is still unconnected, which the document
+        // validation reports; judging one wire must not report it again.
+        _validator.Validate(document).IsValid.ShouldBeFalse();
+
+        ValidationResult result = _validator.ValidateConnection(
+            document,
+            new WorkflowConnection(Guid.NewGuid(), source.InstanceId, "image", blur.InstanceId, "image"));
+
+        result.Diagnostics.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ValidateConnection_output_as_target_reports_the_port_diagnostic()
+    {
+        WorkflowDocument document = WorkflowDocument.Create("workflow");
+        NodeInstance source = document.AddNode(TestNodes.SourceType, 1, new CanvasPosition(0, 0));
+        NodeInstance blur = document.AddNode(TestNodes.BlurType, 1, new CanvasPosition(200, 0));
+
+        ValidationResult result = _validator.ValidateConnection(
+            document,
+            new WorkflowConnection(Guid.NewGuid(), source.InstanceId, "image", blur.InstanceId, "blurred"));
+
+        result.IsValid.ShouldBeFalse();
+        result.Errors.ShouldHaveSingleItem().Code.ShouldBe(DiagnosticCodes.IncompatiblePort);
+    }
+
+    [Fact]
+    public void ValidateConnection_second_wire_into_a_single_input_reports_the_port_diagnostic()
+    {
+        WorkflowDocument document = WorkflowDocument.Create("workflow");
+        NodeInstance first = document.AddNode(TestNodes.SourceType, 1, new CanvasPosition(0, 0));
+        NodeInstance second = document.AddNode(TestNodes.SourceType, 1, new CanvasPosition(0, 100));
+        NodeInstance blur = document.AddNode(TestNodes.BlurType, 1, new CanvasPosition(200, 0));
+        document.AddConnection(first.InstanceId, "image", blur.InstanceId, "image");
+
+        ValidationResult result = _validator.ValidateConnection(
+            document,
+            new WorkflowConnection(Guid.NewGuid(), second.InstanceId, "image", blur.InstanceId, "image"));
+
+        result.IsValid.ShouldBeFalse();
+        result.Errors.ShouldHaveSingleItem().Code.ShouldBe(DiagnosticCodes.IncompatiblePort);
+    }
+
+    [Fact]
+    public void ValidateConnection_wire_that_would_close_a_cycle_reports_the_path()
+    {
+        WorkflowDocument document = WorkflowDocument.Create("workflow");
+        NodeInstance first = document.AddNode(TestNodes.BlurType, 1, new CanvasPosition(0, 0));
+        NodeInstance second = document.AddNode(TestNodes.BlurType, 1, new CanvasPosition(200, 0));
+        document.AddConnection(first.InstanceId, "blurred", second.InstanceId, "image");
+
+        ValidationResult result = _validator.ValidateConnection(
+            document,
+            new WorkflowConnection(Guid.NewGuid(), second.InstanceId, "blurred", first.InstanceId, "image"));
+
+        result.IsValid.ShouldBeFalse();
+        NodeDiagnostic diagnostic = result.Errors.ShouldHaveSingleItem();
+        diagnostic.Code.ShouldBe(DiagnosticCodes.InvalidGraph);
+
+        // The path starts at the candidate's source and walks back to it.
+        diagnostic.Message.ShouldContain($"{second.InstanceId} -> {first.InstanceId} -> {second.InstanceId}");
+    }
+
+    [Fact]
+    public void ValidateConnection_self_connection_reports_the_graph_diagnostic()
+    {
+        WorkflowDocument document = WorkflowDocument.Create("workflow");
+        NodeInstance blur = document.AddNode(TestNodes.BlurType, 1, new CanvasPosition(0, 0));
+
+        ValidationResult result = _validator.ValidateConnection(
+            document,
+            new WorkflowConnection(Guid.NewGuid(), blur.InstanceId, "blurred", blur.InstanceId, "image"));
+
+        result.IsValid.ShouldBeFalse();
+        result.Errors.ShouldHaveSingleItem().Code.ShouldBe(DiagnosticCodes.InvalidGraph);
+    }
+
+    [Fact]
+    public void ValidateConnection_unknown_endpoint_reports_the_graph_diagnostic()
+    {
+        WorkflowDocument document = WorkflowDocument.Create("workflow");
+        NodeInstance source = document.AddNode(TestNodes.SourceType, 1, new CanvasPosition(0, 0));
+
+        ValidationResult result = _validator.ValidateConnection(
+            document,
+            new WorkflowConnection(Guid.NewGuid(), source.InstanceId, "image", Guid.NewGuid(), "image"));
+
+        result.IsValid.ShouldBeFalse();
+        result.Errors.ShouldHaveSingleItem().Code.ShouldBe(DiagnosticCodes.InvalidGraph);
+    }
+
+    [Fact]
+    public void ValidateConnection_unresolved_definition_is_not_judged_on_ports()
+    {
+        WorkflowDocument document = WorkflowDocument.Create("workflow");
+        NodeInstance source = document.AddNode(TestNodes.SourceType, 1, new CanvasPosition(0, 0));
+        NodeInstance absent = document.AddNode(TestNodes.AbsentType, 1, new CanvasPosition(200, 0));
+
+        ValidationResult result = _validator.ValidateConnection(
+            document,
+            new WorkflowConnection(Guid.NewGuid(), source.InstanceId, "image", absent.InstanceId, "image"));
+
+        // The document already reports the missing definition; the wire adds no
+        // second report for a node this build cannot describe.
+        result.Diagnostics.ShouldBeEmpty();
+    }
+
     /// <summary>
     /// A blur definition that declares one parameter of every kind the validator
     /// distinguishes, so a parameter rule can be exercised without a native node.

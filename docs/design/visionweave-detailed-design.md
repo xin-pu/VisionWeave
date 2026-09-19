@@ -185,6 +185,10 @@ unreadable value cannot reach an executor as a runtime failure. A disabled node
 is never executed, so only its value shapes are checked, not whether a required
 value is present.
 
+Editing reports its own outcome in the same way rather than throwing into a
+binding layer: `VW-EDIT-001` is a refused edit, which leaves the document
+untouched, and `VW-EDIT-002` is an undo or redo with nothing to reverse.
+
 ## 5. Execution design
 
 ### 5.1 Execution contract
@@ -280,6 +284,18 @@ Nodify renders and interacts with a projection of `WorkflowNodeViewModel` and
 is legal, run an algorithm, or own image data. The UI follows a one-way commit
 protocol: **UI intent -> application mutation -> accepted graph delta -> UI
 projection refresh**. ViewModel property setters never mutate Domain directly.
+
+An intent reaches the document as an `IDocumentCommand` handed to
+`DocumentCommandHistory.Execute`, which owns the single undo stack. A command
+carries the data its own reversal needs — the identifiers it created, the values
+it replaced, the entries it removed — so undo never rebuilds a whole document and
+the UI never supplies the state to restore. The returned `DocumentCommandResult`
+says whether the document changed and, when it did not, why; a refused edit is
+reported with diagnostics and leaves the document and the history untouched.
+Connection legality is judged by `WorkflowValidator.ValidateConnection`, which
+reports only the diagnostics a candidate wire itself would introduce, so the
+canvas can judge a pending connection while the rest of the graph is still
+incomplete.
 
 ```text
 NodeDefinition + NodeInstance
@@ -478,7 +494,7 @@ trusted code; sandboxing is a future feature, not an implied security boundary.
 | Tier | Proof |
 | --- | --- |
 | Domain unit tests | Port compatibility, multiplicity, cycle detection, stable diagnostics, graph changes. |
-| Application unit tests | Topological order, dirty-subgraph selection, cancellation, branch blocking, undo/redo. |
+| Application unit tests | Topological order, dirty-subgraph selection, cancellation, branch blocking, document command history, undo grouping, refused edits. |
 | OpenCV integration tests | Expected pixels / geometry for each migrated node, disposal and cache behavior. |
 | Persistence integration tests | Save/load round trip, malformed document rejection, migrations, missing-node placeholders. |
 | Architecture tests | Dependency direction and no WPF/OpenCV reference in Domain. |

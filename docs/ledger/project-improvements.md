@@ -138,3 +138,16 @@
 - **Evidence:** `src/VisionWeave.Persistence/Workflows/WorkflowDocumentReader.cs`, `src/VisionWeave.Persistence/Workflows/WorkflowDocumentWriter.cs`, `docs/adr/0004-workflow-document-and-format.md`, `docs/design/visionweave-detailed-design.md` (section 7).
 - **Owner:** VisionWeave maintainers.
 - **Review again:** Before the editor renders a placeholder node, or before the snapshot computes a resource fingerprint.
+
+### PL-2026-012 - Deliver the application editing services
+
+- **Status:** Open
+- **Priority:** P1
+- **Recorded on:** 2026-09-19
+- **Scope:** The headless editing boundary the canvas will call: a document command/history service that owns undo/redo, and an application-facing file/session service around the `.vwflow` reader and writer.
+- **Observation:** The document model and the validator are complete, and ADR-0006 requires that a UI interaction becomes an application command which reports its outcome as diagnostics, with a single undo stack that owns the data its own reversal needs. Neither the command history nor a session service for new/open/save/autosave/recovery exists yet, so the editor slice has nothing to call and the persistence layer has no caller that manages an editing session.
+- **Decision or next step:** Add the command/history service first, then wrap `WorkflowDocumentReader` and `WorkflowDocumentWriter` in a session service that owns the current file, the dirty state, autosave, and recovery. Keep connection legality in `WorkflowValidator` so no command re-implements a rule.
+- **Update (2026-09-19):** The command and history half is implemented. `IDocumentCommand` carries one reversible edit and the data its own reversal needs; `DocumentCommandHistory` owns the single undo stack and returns a `DocumentCommandResult` instead of throwing at the caller. `AddNodeCommand`, `RemoveNodeCommand`, `MoveNodesCommand`, `SetNodeParameterCommand`, `ConnectPortsCommand`, and `DisconnectPortsCommand` cover the canvas intents of ADR-0006. A refused edit changes neither the document nor the history, a semantic edit increments the revision while a move does not, and `SetNodeParameterCommand` coalesces successive edits of one parameter within `DocumentEditingOptions.ParameterCoalescingWindow`. `WorkflowValidator.ValidateConnection` is the single judge of a candidate wire and reports only the diagnostics that wire would introduce, so a pending connection can be judged while the rest of the graph is still incomplete. The session service remains open.
+- **Evidence:** `src/VisionWeave.Application/Editing/`, `src/VisionWeave.Application/Validation/WorkflowValidator.cs` (`ValidateConnection`), `tests/VisionWeave.Application.Tests/Editing/`, `tests/VisionWeave.Application.Tests/Validation/WorkflowValidatorTests.cs`, `docs/design/visionweave-detailed-design.md` (sections 4.3, 6.1, and 10).
+- **Owner:** VisionWeave maintainers.
+- **Review again:** When the session service lands, or when a canvas intent needs a command the set does not provide.

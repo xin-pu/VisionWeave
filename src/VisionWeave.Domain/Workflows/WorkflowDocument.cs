@@ -174,9 +174,11 @@ public sealed class WorkflowDocument
     /// Removes a node instance and every connection attached to it.
     /// </summary>
     /// <param name="instanceId">The instance identifier.</param>
-    public void RemoveNode(Guid instanceId)
+    /// <returns>The removed instance, which a caller may keep as the data needed
+    /// to restore it.</returns>
+    public NodeInstance RemoveNode(Guid instanceId)
     {
-        if (!_nodes.Remove(instanceId))
+        if (!_nodes.Remove(instanceId, out NodeInstance? removed))
         {
             throw new KeyNotFoundException($"Node instance '{instanceId}' is not present in the document.");
         }
@@ -184,6 +186,28 @@ public sealed class WorkflowDocument
         _connections.RemoveAll(connection =>
             connection.SourceNodeId == instanceId || connection.TargetNodeId == instanceId);
 
+        Commit(semantic: true);
+        return removed;
+    }
+
+    /// <summary>
+    /// Restores a node instance that was removed from this document, together with
+    /// the state the instance carries: position, label, enabled flag, saved
+    /// parameter values, and preserved fields. Connections are restored separately
+    /// because the removal also dropped them. The instance keeps its identifier, so
+    /// a caller can restore connections that refer to it.
+    /// </summary>
+    /// <param name="node">A removed instance of this document.</param>
+    public void RestoreNode(NodeInstance node)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+
+        if (_nodes.ContainsKey(node.InstanceId))
+        {
+            throw new InvalidOperationException($"Node instance '{node.InstanceId}' already exists in the document.");
+        }
+
+        _nodes.Add(node.InstanceId, node);
         Commit(semantic: true);
     }
 
@@ -231,6 +255,20 @@ public sealed class WorkflowDocument
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         GetNode(instanceId).SetParameter(name, value);
+        Commit(semantic: true);
+    }
+
+    /// <summary>
+    /// Removes a saved parameter value, so the node falls back to the definition's
+    /// declared default. Removing an unset parameter is not an error: the caller is
+    /// stating the intended value, not the preceding state.
+    /// </summary>
+    /// <param name="instanceId">The instance identifier.</param>
+    /// <param name="name">The parameter name.</param>
+    public void ClearNodeParameter(Guid instanceId, string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        GetNode(instanceId).ClearParameter(name);
         Commit(semantic: true);
     }
 
@@ -374,7 +412,7 @@ public sealed class WorkflowDocument
 
     /// <summary>
     /// Creates a deep copy that shares no mutable state with this document, which
-    /// undo, redo, and snapshot construction rely on.
+    /// copy/paste and any off-document comparison rely on.
     /// </summary>
     /// <returns>The copy.</returns>
     public WorkflowDocument Clone()

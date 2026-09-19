@@ -76,6 +76,12 @@ public static class DiagnosticCodes
     /// <summary>A required parameter has neither a saved value nor a declared default.</summary>
     public const string MissingRequiredParameter = "VW-PARAM-005";
 
+    /// <summary>An edit was refused, so the document is unchanged.</summary>
+    public const string EditRefused = "VW-EDIT-001";
+
+    /// <summary>There is no command to undo or to redo.</summary>
+    public const string EmptyHistory = "VW-EDIT-002";
+
     /// <summary>The stored file is not a readable workflow document.</summary>
     public const string UnreadableDocument = "VW-FILE-001";
 
