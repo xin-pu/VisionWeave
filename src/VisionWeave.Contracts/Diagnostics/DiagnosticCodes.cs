@@ -39,4 +39,13 @@ public static class DiagnosticCodes
 
     /// <summary>An output was too large for the cache budget and was not cached.</summary>
     public const string OutputExceedsCacheBudget = "VW-EXEC-006";
+
+    /// <summary>No executor is registered for the definition's executor identifier.</summary>
+    public const string MissingExecutor = "VW-EXEC-007";
+
+    /// <summary>A published output could not be converted for preview.</summary>
+    public const string PreviewConversionFailed = "VW-EXEC-008";
+
+    /// <summary>A private resource of a node could not be released.</summary>
+    public const string ResourceDisposalFailed = "VW-EXEC-009";
 }

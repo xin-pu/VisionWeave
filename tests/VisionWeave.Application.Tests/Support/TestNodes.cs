@@ -11,6 +11,16 @@ namespace VisionWeave.Application.Tests.Support;
 /// </summary>
 internal static class TestNodes
 {
+    public const string SourceExecutorTypeId = "test.image-source";
+
+    public const string BlurExecutorTypeId = "test.gaussian-blur";
+
+    public const string MaskingExecutorTypeId = "test.masking";
+
+    public const string MergeExecutorTypeId = "test.merge";
+
+    public const string CountExecutorTypeId = "test.count";
+
     public static readonly NodeTypeId SourceType = new("visionweave.test.image-source");
 
     public static readonly NodeTypeId BlurType = new("visionweave.test.gaussian-blur");
@@ -31,7 +41,7 @@ internal static class TestNodes
             "Input",
             [Output("image", BuiltInPortTypeIds.ImageFrame)],
             [],
-            "test.image-source");
+            SourceExecutorTypeId);
 
     public static NodeDefinition Blur(int version = 1)
         => new(
@@ -41,7 +51,7 @@ internal static class TestNodes
             "Filter",
             [Input("image", BuiltInPortTypeIds.ImageFrame), Output("blurred", BuiltInPortTypeIds.ImageFrame)],
             [new ParameterDefinition("kernelSize", ParameterKind.Integer, true, "Kernel size", 1, 31, null, 3)],
-            "test.gaussian-blur");
+            BlurExecutorTypeId);
 
     public static NodeDefinition Masking(int version = 1)
         => new(
@@ -55,7 +65,7 @@ internal static class TestNodes
                 Output("masked", BuiltInPortTypeIds.ImageFrame),
             ],
             [],
-            "test.masking");
+            MaskingExecutorTypeId);
 
     public static NodeDefinition Merge(int version = 1)
         => new(
@@ -65,7 +75,7 @@ internal static class TestNodes
             "Composition",
             [Input("frames", BuiltInPortTypeIds.ImageFrame, PortMultiplicity.Many), Output("image", BuiltInPortTypeIds.ImageFrame)],
             [],
-            "test.merge");
+            MergeExecutorTypeId);
 
     public static NodeDefinition Count(int version = 1)
         => new(
@@ -75,7 +85,7 @@ internal static class TestNodes
             "Analysis",
             [Input("image", BuiltInPortTypeIds.ImageFrame), Output("count", BuiltInPortTypeIds.Number)],
             [],
-            "test.count");
+            CountExecutorTypeId);
 
     public static NodeDefinitionCatalog Catalog(params NodeDefinition[] definitions)
         => new(definitions);
