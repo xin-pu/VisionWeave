@@ -189,6 +189,22 @@ Editing reports its own outcome in the same way rather than throwing into a
 binding layer: `VW-EDIT-001` is a refused edit, which leaves the document
 untouched, and `VW-EDIT-002` is an undo or redo with nothing to reverse.
 
+A validation run is handed to the editor as a `ValidationProjection`: an
+immutable view of one `ValidationResult`, indexed by stable node instance
+identifier and tagged with the revision it was computed from. Selection is
+presentation state that changes far more often than the document and can
+outlive the edit that produced the projection, so the projection answers
+`DiagnosticsFor`, `SeverityOf`, and `Select` from its own snapshot instead of
+re-validating, and it reports nothing for an identifier the document no longer
+contains. `Select` returns the selected nodes' diagnostics together with the
+document-level ones, in the order validation reported them, and does not depend
+on the order or the multiplicity of the identifiers it was given. `Matches`
+tells the caller whether the projection still describes the current revision; a
+layout-only move changes no revision, so a node move does not invalidate it,
+while a semantic edit does, and a superseded projection is replaced rather than
+queried. Port-level and connection-level attribution is not available yet,
+because a diagnostic carries only its node instance identifier.
+
 ## 5. Execution design
 
 ### 5.1 Execution contract
@@ -313,7 +329,9 @@ and optional preview bitmap. It has no OpenCV `Mat` property.
 
 `PortViewModel` exposes display text, declared data type, connector anchor,
 connection state, direction, and validation state. `WorkflowConnectionViewModel`
-binds source/target anchors and owns only visual connection state.
+binds source/target anchors and owns only visual connection state. A port's own
+validation state needs the attribution tracked as PL-2026-013; until it exists,
+a port presents the severity of the node that owns it.
 
 The view model maps property-change actions into application commands:
 
@@ -509,7 +527,7 @@ trusted code; sandboxing is a future feature, not an implied security boundary.
 | Tier | Proof |
 | --- | --- |
 | Domain unit tests | Port compatibility, multiplicity, cycle detection, stable diagnostics, graph changes. |
-| Application unit tests | Topological order, dirty-subgraph selection, cancellation, branch blocking, document command history, undo grouping, refused edits. |
+| Application unit tests | Topological order, dirty-subgraph selection, cancellation, branch blocking, document command history, undo grouping, refused edits, selection-safe validation projection. |
 | OpenCV integration tests | Expected pixels / geometry for each migrated node, disposal and cache behavior. |
 | Persistence integration tests | Save/load round trip, malformed document rejection, migrations, missing-node placeholders. |
 | Architecture tests | Dependency direction and no WPF/OpenCV reference in Domain. |
