@@ -67,16 +67,27 @@ internal sealed class RunState
         foreach (NodeInputBinding binding in planned.Inputs)
         {
             connectionsPerPort[binding.TargetPortId] = connectionsPerPort.GetValueOrDefault(binding.TargetPortId) + 1;
+            bool optionalInput = IsOptionalInput(planned, binding.TargetPortId);
 
             if (Plan.TryGetNode(binding.SourceNodeId, out ExecutionPlanNode? producer) && producer is not null)
             {
                 if (!_states.TryGetValue(producer.InstanceId, out NodeRunState state))
                 {
+                    if (optionalInput)
+                    {
+                        continue;
+                    }
+
                     return $"Node instance '{producer.InstanceId}' has not produced its outputs yet.";
                 }
 
                 if (state != NodeRunState.Succeeded)
                 {
+                    if (optionalInput)
+                    {
+                        continue;
+                    }
+
                     return $"Node instance '{producer.InstanceId}' ended as {state}, so it produced no value for input port '{binding.TargetPortId}'.";
                 }
 
@@ -85,6 +96,11 @@ internal sealed class RunState
 
             if (_inputs is null || !_inputs.TryGetValue(binding.SourceNodeId, binding.SourcePortId, out _))
             {
+                if (optionalInput)
+                {
+                    continue;
+                }
+
                 return $"No value is available for input port '{binding.TargetPortId}' from node instance '{binding.SourceNodeId}', which is not part of this run.";
             }
         }
@@ -126,6 +142,11 @@ internal sealed class RunState
 
             if (value is null)
             {
+                if (IsOptionalInput(planned, item.TargetPortId))
+                {
+                    continue;
+                }
+
                 binding = NodeInputBindingResult.Blocked(
                     $"Input port '{item.TargetPortId}' has no value.");
                 return false;
@@ -137,6 +158,9 @@ internal sealed class RunState
         binding = NodeInputBindingResult.Bound(values);
         return true;
     }
+
+    private static bool IsOptionalInput(ExecutionPlanNode planned, string portId)
+        => planned.Node.Definition.FindPort(portId)?.IsOptional == true;
 
     internal void RegisterScope(Guid nodeId, ExecutionResourceScope scope)
     {
