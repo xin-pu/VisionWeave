@@ -848,14 +848,18 @@ Morphology, Contours, Draw, and Inspect.
 The catalog is filled in batches rather than at once. The first build shipped
 `Image Source` and `Save Image` in Input/Output, and `Gaussian Blur` and `Resize` as
 the Filter and Transform pair that proves the pipeline. The Aries migration then
-added the common single-image operations in three batches. The first took `Colour
+added the common single-image operations in four batches. The first took `Colour
 Conversion` and `Crop` in Transform, `Median Blur` in Filter, and `Threshold` in
 Threshold. The second took the smoothing and pyramid nodes: `Blur` and `Bilateral
 Filter` in Filter, `Adaptive Threshold` in Threshold, and `Pyramid Down` and
 `Pyramid Up` in Transform. The third took the derivative and edge nodes: `Sobel`,
 `Scharr`, and `Laplacian` in Filter, which measure how fast an image changes, and
 `Canny` beside them, which is the one of the four whose result is a map rather than a
-measurement. The first two batches were chosen the same way: each node says what it
+measurement. The fourth filled the Morphology category the design has listed since
+the first release: `Erode` and `Dilate`, which thin and thicken by a structuring
+element, and `Morphology Ex` beside them, whose operation picks the opening, the
+closing, the outline, or one of the two hats. The first two batches were chosen the
+same way: each node says what it
 does on a frame the test writes itself, a uniform field or a step with a couple of
 marked pixels in it, so none of them needs a curated sample image to be
 regression-tested. The third waited on the one decision its nodes share, which is the
@@ -866,13 +870,20 @@ value nothing could read and nobody could see. With that settled the four read t
 same hand-written frames as the batches before them, a step being what a derivative is
 defined on, and each departure the batch makes from the reference — the axis the
 `Scharr` node declares, the apertures the `Sobel` and `Laplacian` nodes offer, the
-thresholds the `Canny` node refuses — is recorded in PL-2026-003.
+thresholds the `Canny` node refuses — is recorded in PL-2026-003. The fourth needed no
+such decision: a structuring element reads the neighbours of a pixel and writes its
+type back, so those nodes accept every layout a frame can hold and report the one they
+were given, exactly as the two pyramid nodes do, and the features they are tested on
+are the same hand-written ones — a step, a single brighter pixel, and a single gap —
+because what an element can remove or fill is measured in pixels. Its departures are
+recorded in PL-2026-003 as well: the kernel is a shape and the side of a square rather
+than a kernel the user assembles, the anchor is always the centre, and the operation is
+one of five options rather than a number.
 What the batches leave out names its reason in the issue that
 migrated them: `Filter2D`, `Normalize`, the point scaling node, and the channel nodes
 wait on a kernel representation, on a decision about masks and depths, on a consumer
-of its own, and on multi-port nodes respectively; the morphology and draw families
-wait on the batch after theirs, and the contour family waits on the `Contours` value
-ADR-0003 defers.
+of its own, and on multi-port nodes respectively; the draw family waits on the batch
+after this one, and the contour family waits on the `Contours` value ADR-0003 defers.
 The two file-backed nodes — `Image Source` and `Save Image` — are the ones that
 name a file, so they are the nodes a working directory is resolved for (5.4): each
 declares a required `path` parameter, the save node additionally declares the

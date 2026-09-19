@@ -76,4 +76,10 @@ public static class OpenCvParameterBounds
 
     /// <summary>The greatest offset an adaptive threshold subtracts from the local average.</summary>
     public const double MaxConstant = MaxLevel;
+
+    /// <summary>The fewest times a morphology node applies its structuring element.</summary>
+    public const int MinIterations = 1;
+
+    /// <summary>The most times a morphology node applies its structuring element.</summary>
+    public const int MaxIterations = 16;
 }

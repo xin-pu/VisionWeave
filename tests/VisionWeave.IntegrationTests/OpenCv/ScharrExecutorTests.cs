@@ -24,7 +24,7 @@ public sealed class ScharrExecutorTests
     {
         LeaseLedger ledger = new();
         var scope = new TestResourceScope();
-        MatFrameLease input = MatFrameLease.Create(StepFrame.AcrossColumns(5), ledger);
+        MatFrameLease input = MatFrameLease.Create(FeatureFrame.AcrossColumns(5), ledger);
 
         NodeExecutionResult result = await new ScharrExecutor(ledger).ExecuteAsync(
             Request(scope, input),
@@ -67,7 +67,7 @@ public sealed class ScharrExecutorTests
     {
         LeaseLedger ledger = new();
         var scope = new TestResourceScope();
-        MatFrameLease input = MatFrameLease.Create(StepFrame.DownRows(5), ledger);
+        MatFrameLease input = MatFrameLease.Create(FeatureFrame.DownRows(5), ledger);
 
         NodeExecutionResult result = await new ScharrExecutor(ledger).ExecuteAsync(
             Request(scope, input, xOrder: 0, yOrder: 1),
@@ -103,7 +103,7 @@ public sealed class ScharrExecutorTests
     {
         LeaseLedger ledger = new();
         var scope = new TestResourceScope();
-        MatFrameLease input = MatFrameLease.Create(StepFrame.AcrossColumns(5), ledger);
+        MatFrameLease input = MatFrameLease.Create(FeatureFrame.AcrossColumns(5), ledger);
 
         NodeExecutionResult result = await new ScharrExecutor(ledger).ExecuteAsync(
             Request(scope, input, xOrder, yOrder),
@@ -126,7 +126,7 @@ public sealed class ScharrExecutorTests
     {
         LeaseLedger ledger = new();
         var scope = new TestResourceScope();
-        MatFrameLease input = MatFrameLease.Create(StepFrame.AcrossColumns(5), ledger);
+        MatFrameLease input = MatFrameLease.Create(FeatureFrame.AcrossColumns(5), ledger);
 
         NodeExecutionResult result = await new ScharrExecutor(ledger).ExecuteAsync(
             Request(scope, input, scale: scale),
@@ -160,7 +160,7 @@ public sealed class ScharrExecutorTests
     {
         LeaseLedger ledger = new();
         var scope = new TestResourceScope();
-        MatFrameLease input = MatFrameLease.Create(StepFrame.AcrossColumns(5), ledger);
+        MatFrameLease input = MatFrameLease.Create(FeatureFrame.AcrossColumns(5), ledger);
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
 

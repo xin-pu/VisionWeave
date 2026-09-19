@@ -46,6 +46,9 @@ public sealed class OpenCvNodeCatalogTests
         catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.ScharrTypeId));
         catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.LaplacianTypeId));
         catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.CannyTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.ErodeTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.DilateTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.MorphologyExTypeId));
 
         foreach (NodeDefinition definition in Definitions)
         {
@@ -92,7 +95,10 @@ public sealed class OpenCvNodeCatalogTests
                     OpenCvNodeIds.ReducedPortId,
                     OpenCvNodeIds.EnlargedPortId,
                     OpenCvNodeIds.GradientPortId,
-                    OpenCvNodeIds.EdgesPortId);
+                    OpenCvNodeIds.EdgesPortId,
+                    OpenCvNodeIds.ErodedPortId,
+                    OpenCvNodeIds.DilatedPortId,
+                    OpenCvNodeIds.MorphedPortId);
             }
         }
     }
