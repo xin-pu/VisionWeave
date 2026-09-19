@@ -49,3 +49,14 @@
 - **Evidence:** `src/VisionWeave.Application/Execution/IExecutionInputSource.cs`, `src/VisionWeave.Application/Execution/ExecutionOptions.cs`, `src/VisionWeave.Contracts/Diagnostics/DiagnosticCodes.cs`.
 - **Owner:** VisionWeave maintainers.
 - **Review again:** When the editor wires incremental runs to a plan built from changed nodes.
+
+### PL-2026-005 - File-backed input and output nodes
+
+- **Status:** Open
+- **Recorded on:** 2026-09-19
+- **Scope:** The Input/Output node family of the first-release catalog: the image source and save-image nodes.
+- **Observation:** The OpenCV layer now ships Gaussian blur and resize, so a native frame can be produced, transformed, previewed, and released by a real run, but the catalog has no node that reads or writes a file. The tests therefore supply frames through a test-only source definition, and no user workflow can start from a real image yet.
+- **Decision or next step:** Add the file-backed source and save nodes together with the path-parameter kind and the work-directory rules the design defers, so that a saved workflow can be run end to end from the editor.
+- **Evidence:** `src/VisionWeave.OpenCv/Nodes/OpenCvNodeDefinitionProvider.cs`, `tests/VisionWeave.IntegrationTests/Support/NativeWorkflow.cs`, `docs/design/visionweave-detailed-design.md` (section 8).
+- **Owner:** VisionWeave maintainers.
+- **Review again:** Before the first-release node catalog is frozen.
