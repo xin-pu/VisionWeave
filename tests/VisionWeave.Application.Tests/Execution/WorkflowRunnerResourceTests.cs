@@ -56,6 +56,10 @@ public sealed class WorkflowRunnerResourceTests : RunnerTestBase
         NodeRunReport report = summary.Nodes.Single(node => node.NodeInstanceId == source.InstanceId);
         report.Diagnostics.ShouldHaveSingleItem().Exception.ShouldBeOfType<InvalidOperationException>();
 
+        // An executor that threw reported no result of its own, and the run does not
+        // attribute the time it waited for the exception to the node.
+        report.Duration.ShouldBe(TimeSpan.Zero);
+
         frames.Lease.IsDisposed.ShouldBeTrue();
         ledger.Created.ShouldBe(1);
         ledger.Released.ShouldBe(1);
