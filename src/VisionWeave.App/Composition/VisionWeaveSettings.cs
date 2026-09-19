@@ -25,6 +25,37 @@ internal sealed record VisionWeaveSettings(
         WorkflowAutosaveOptions.Default);
 
     /// <summary>
+    /// Loads the deployment and optional per-user configuration files without
+    /// letting an unreadable file or an unbindable value escape the startup
+    /// boundary.
+    /// </summary>
+    /// <param name="basePath">The directory containing the settings files.</param>
+    /// <returns>The bound settings, or a safe diagnostic explaining the failure.</returns>
+    internal static SettingsLoadResult Load(string basePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(basePath);
+
+        try
+        {
+            IConfiguration configuration = new ConfigurationBuilder()
+                .SetBasePath(basePath)
+                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
+                .AddJsonFile("appsettings.user.json", optional: true, reloadOnChange: false)
+                .Build();
+
+            return SettingsLoadResult.Success(Bind(configuration));
+        }
+        catch (Exception exception) when (IsConfigurationFailure(exception))
+        {
+            return SettingsLoadResult.Failure(new NodeDiagnostic(
+                DiagnosticCodes.InvalidSetting,
+                DiagnosticSeverity.Error,
+                "VisionWeave could not load its configuration. Ensure appsettings.json is present and contains valid settings.",
+                null));
+        }
+    }
+
+    /// <summary>
     /// Binds every section, leaving a key the file does not mention at the
     /// default its own options type declares.
     /// </summary>
@@ -48,4 +79,11 @@ internal sealed record VisionWeaveSettings(
     private static T BindSection<T>(IConfiguration configuration, string name, T fallback)
         where T : class
         => configuration.GetSection($"{SectionName}:{name}").Get<T>() ?? fallback;
+
+    private static bool IsConfigurationFailure(Exception exception)
+        => exception is System.IO.IOException
+            or UnauthorizedAccessException
+            or System.IO.InvalidDataException
+            or FormatException
+            or InvalidOperationException;
 }

@@ -1,5 +1,4 @@
 ﻿using System.Windows;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using VisionWeave.App.Composition;
@@ -18,7 +17,17 @@ public partial class App : System.Windows.Application
     {
         base.OnStartup(e);
 
-        VisionWeaveSettings settings = VisionWeaveSettings.Bind(LoadConfiguration());
+        SettingsLoadResult load = VisionWeaveSettings.Load(AppContext.BaseDirectory);
+        if (!load.Succeeded)
+        {
+            using ILoggerFactory bootstrapFactory = LoggerFactory.Create(
+                builder => builder.AddDebug().SetMinimumLevel(LogLevel.Information));
+            ReportRejectedSettings(bootstrapFactory.CreateLogger<App>(), load.Diagnostics);
+            Shutdown(1);
+            return;
+        }
+
+        VisionWeaveSettings settings = load.Settings!;
         IReadOnlyList<NodeDiagnostic> problems = settings.Validate();
 
         ServiceCollection services = new();
@@ -53,13 +62,6 @@ public partial class App : System.Windows.Application
         _services?.Dispose();
         base.OnExit(e);
     }
-
-    private static IConfiguration LoadConfiguration()
-        => new ConfigurationBuilder()
-            .SetBasePath(AppContext.BaseDirectory)
-            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
-            .AddJsonFile("appsettings.user.json", optional: true, reloadOnChange: false)
-            .Build();
 
     private static void LogSettings(ILogger logger, VisionWeaveSettings settings)
     {

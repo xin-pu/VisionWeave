@@ -10,6 +10,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/VisionWeave.Application.Tests/VisionWeave.Application.Tests.csproj" />
+    <Project Path="tests/VisionWeave.App.Tests/VisionWeave.App.Tests.csproj" />
     <Project Path="tests/VisionWeave.ArchitectureTests/VisionWeave.ArchitectureTests.csproj" />
     <Project Path="tests/VisionWeave.Domain.Tests/VisionWeave.Domain.Tests.csproj" />
     <Project Path="tests/VisionWeave.IntegrationTests/VisionWeave.IntegrationTests.csproj" />
