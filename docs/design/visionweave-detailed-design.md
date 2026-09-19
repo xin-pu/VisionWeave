@@ -174,6 +174,17 @@ including `VW-GRAPH-001` (cycle detected), `VW-PORT-001` (incompatible port),
 failed). UI messages, logs, and tests reference these identifiers rather than
 duplicating strings.
 
+Parameter values are validated where a node's definition resolves, not by the
+executor that happens to read them: `VW-PARAM-001` reports a value whose shape
+does not match the declared kind, `VW-PARAM-002` a numeric value outside the
+declared bounds, `VW-PARAM-003` an option the definition does not declare,
+`VW-PARAM-004` a name the definition does not declare, and `VW-PARAM-005` a
+required parameter the document leaves unset while the definition declares no
+default. A document that reports any of them never becomes a snapshot, so an
+unreadable value cannot reach an executor as a runtime failure. A disabled node
+is never executed, so only its value shapes are checked, not whether a required
+value is present.
+
 ## 5. Execution design
 
 ### 5.1 Execution contract

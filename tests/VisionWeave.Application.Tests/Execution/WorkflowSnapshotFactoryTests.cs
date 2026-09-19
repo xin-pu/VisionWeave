@@ -69,7 +69,7 @@ public sealed class WorkflowSnapshotFactoryTests
     {
         NodeDefinition withoutDefault = TestNodes.Blur() with
         {
-            Parameters = [new ParameterDefinition("kernelSize", ParameterKind.Integer, true, "Kernel size", 1, 31)],
+            Parameters = [new ParameterDefinition("kernelSize", ParameterKind.Integer, false, "Kernel size", 1, 31)],
         };
 
         var factory = new WorkflowSnapshotFactory(TestNodes.Catalog(TestNodes.Source(), withoutDefault));
@@ -82,6 +82,43 @@ public sealed class WorkflowSnapshotFactoryTests
         WorkflowSnapshot snapshot = factory.Build(document).Snapshot!;
 
         snapshot.GetNode(blur.InstanceId).Parameters.Contains("kernelSize").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Build_required_parameter_without_a_value_is_refused_before_a_snapshot_exists()
+    {
+        NodeDefinition withoutDefault = TestNodes.Blur() with
+        {
+            Parameters = [new ParameterDefinition("kernelSize", ParameterKind.Integer, true, "Kernel size", 1, 31)],
+        };
+
+        var factory = new WorkflowSnapshotFactory(TestNodes.Catalog(TestNodes.Source(), withoutDefault));
+
+        WorkflowDocument document = WorkflowDocument.Create("workflow");
+        NodeInstance source = document.AddNode(TestNodes.SourceType, 1, new CanvasPosition(0, 0));
+        NodeInstance blur = document.AddNode(TestNodes.BlurType, 1, new CanvasPosition(200, 0));
+        document.AddConnection(source.InstanceId, "image", blur.InstanceId, "image");
+
+        SnapshotBuildResult result = factory.Build(document);
+
+        result.Succeeded.ShouldBeFalse();
+        result.Snapshot.ShouldBeNull();
+        result.Validation.HasCode(DiagnosticCodes.MissingRequiredParameter).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Build_out_of_range_parameter_is_refused_before_a_snapshot_exists()
+    {
+        WorkflowDocument document = WorkflowDocument.Create("workflow");
+        NodeInstance source = document.AddNode(TestNodes.SourceType, 1, new CanvasPosition(0, 0));
+        NodeInstance blur = document.AddNode(TestNodes.BlurType, 1, new CanvasPosition(200, 0));
+        document.AddConnection(source.InstanceId, "image", blur.InstanceId, "image");
+        document.SetNodeParameter(blur.InstanceId, "kernelSize", 40);
+
+        SnapshotBuildResult result = _factory.Build(document);
+
+        result.Succeeded.ShouldBeFalse();
+        result.Validation.HasCode(DiagnosticCodes.ParameterOutOfRange).ShouldBeTrue();
     }
 
     [Fact]

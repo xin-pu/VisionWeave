@@ -1,4 +1,5 @@
-﻿using VisionWeave.Application.Definitions;
+﻿using System.Globalization;
+using VisionWeave.Application.Definitions;
 using VisionWeave.Contracts.Diagnostics;
 using VisionWeave.Contracts.Nodes;
 using VisionWeave.Contracts.Ports;
@@ -49,6 +50,11 @@ public sealed class WorkflowValidator
         foreach (NodeInstance node in nodes)
         {
             ResolveNode(node, resolved, diagnostics);
+
+            if (resolved.TryGetValue(node.InstanceId, out NodeDefinition? definition))
+            {
+                ValidateParameters(node, definition, diagnostics);
+            }
         }
 
         ValidateConnections(document, nodes, resolved, diagnostics);
@@ -83,6 +89,186 @@ public sealed class WorkflowValidator
             $"Node instance '{node.InstanceId}' uses node type '{node.NodeTypeId}', which is not provided by this build.",
             node.InstanceId));
     }
+
+    /// <summary>
+    /// Validates the parameter values a document saved against the definition
+    /// that now resolves. A value the executor could not read is refused here
+    /// rather than surfacing later as an execution failure, and a required
+    /// parameter the document leaves unset is refused before the run starts.
+    /// </summary>
+    private static void ValidateParameters(
+        NodeInstance node,
+        NodeDefinition definition,
+        List<NodeDiagnostic> diagnostics)
+    {
+        foreach (KeyValuePair<string, object?> saved in node.Parameters.OrderBy(item => item.Key, StringComparer.Ordinal))
+        {
+            ParameterDefinition? declared = definition.Parameters
+                .FirstOrDefault(parameter => string.Equals(parameter.Name, saved.Key, StringComparison.Ordinal));
+
+            if (declared is null)
+            {
+                diagnostics.Add(new NodeDiagnostic(
+                    DiagnosticCodes.UnknownParameter,
+                    DiagnosticSeverity.Error,
+                    $"Node instance '{node.InstanceId}' saves parameter '{saved.Key}', which node type '{definition.TypeId}' version {definition.TypeVersion} does not declare.",
+                    node.InstanceId));
+                continue;
+            }
+
+            // An explicit null is how a document clears a value, so it counts as
+            // unset rather than as a value of the wrong shape.
+            if (saved.Value is not null)
+            {
+                ValidateParameterValue(node, declared, saved.Value, diagnostics);
+            }
+        }
+
+        if (!node.IsEnabled)
+        {
+            // A disabled node is not executed, so a missing value cannot block a run.
+            return;
+        }
+
+        foreach (ParameterDefinition declared in definition.Parameters)
+        {
+            bool supplied = node.Parameters.TryGetValue(declared.Name, out object? saved) && saved is not null;
+
+            if (declared.IsRequired && !supplied && declared.DefaultValue is null)
+            {
+                diagnostics.Add(new NodeDiagnostic(
+                    DiagnosticCodes.MissingRequiredParameter,
+                    DiagnosticSeverity.Error,
+                    $"Parameter '{declared.Name}' of node instance '{node.InstanceId}' is required, but the document supplies no value and the definition declares no default.",
+                    node.InstanceId));
+            }
+        }
+    }
+
+    private static void ValidateParameterValue(
+        NodeInstance node,
+        ParameterDefinition declared,
+        object value,
+        List<NodeDiagnostic> diagnostics)
+    {
+        switch (declared.Kind)
+        {
+            case ParameterKind.Boolean:
+                if (value is not bool)
+                {
+                    RejectKind(node, declared, "a boolean", diagnostics);
+                }
+
+                break;
+            case ParameterKind.Text:
+            case ParameterKind.Path:
+                if (value is not string)
+                {
+                    RejectKind(node, declared, "text", diagnostics);
+                }
+
+                break;
+            case ParameterKind.Option:
+                if (value is not string option)
+                {
+                    RejectKind(node, declared, "one of its declared options", diagnostics);
+                }
+                else if (declared.Options is { Count: > 0 } options
+                    && !options.Contains(option, StringComparer.Ordinal))
+                {
+                    diagnostics.Add(new NodeDiagnostic(
+                        DiagnosticCodes.ParameterOptionNotDeclared,
+                        DiagnosticSeverity.Error,
+                        $"Parameter '{declared.Name}' of node instance '{node.InstanceId}' is '{option}', which is not one of the declared options: {string.Join(", ", options)}.",
+                        node.InstanceId));
+                }
+
+                break;
+            case ParameterKind.Integer:
+                if (!TryReadNumber(value, out double integer))
+                {
+                    RejectKind(node, declared, "a whole number", diagnostics);
+                }
+                else if (!double.IsFinite(integer) || integer != Math.Floor(integer))
+                {
+                    RejectKind(node, declared, "a whole number", diagnostics);
+                }
+                else
+                {
+                    ValidateBounds(node, declared, integer, diagnostics);
+                }
+
+                break;
+            case ParameterKind.Number:
+                if (!TryReadNumber(value, out double number) || !double.IsFinite(number))
+                {
+                    RejectKind(node, declared, "a finite number", diagnostics);
+                }
+                else
+                {
+                    ValidateBounds(node, declared, number, diagnostics);
+                }
+
+                break;
+            default:
+                break;
+        }
+    }
+
+    private static void ValidateBounds(
+        NodeInstance node,
+        ParameterDefinition declared,
+        double value,
+        List<NodeDiagnostic> diagnostics)
+    {
+        bool belowMinimum = declared.Minimum is { } minimum && value < minimum;
+        bool aboveMaximum = declared.Maximum is { } maximum && value > maximum;
+
+        if (!belowMinimum && !aboveMaximum)
+        {
+            return;
+        }
+
+        diagnostics.Add(new NodeDiagnostic(
+            DiagnosticCodes.ParameterOutOfRange,
+            DiagnosticSeverity.Error,
+            $"Parameter '{declared.Name}' of node instance '{node.InstanceId}' is {Format(value)}, which is outside the declared range {DescribeRange(declared)}.",
+            node.InstanceId));
+    }
+
+    private static void RejectKind(
+        NodeInstance node,
+        ParameterDefinition declared,
+        string expected,
+        List<NodeDiagnostic> diagnostics)
+        => diagnostics.Add(new NodeDiagnostic(
+            DiagnosticCodes.InvalidParameterValue,
+            DiagnosticSeverity.Error,
+            $"Parameter '{declared.Name}' of node instance '{node.InstanceId}' accepts only {expected}.",
+            node.InstanceId));
+
+    private static bool TryReadNumber(object value, out double number)
+    {
+        if (value is double or float or decimal or long or int or short or sbyte or byte or ushort or uint or ulong)
+        {
+            number = Convert.ToDouble(value, CultureInfo.InvariantCulture);
+            return true;
+        }
+
+        number = 0;
+        return false;
+    }
+
+    private static string DescribeRange(ParameterDefinition declared)
+        => (declared.Minimum, declared.Maximum) switch
+        {
+            ({ } minimum, { } maximum) => $"[{Format(minimum)}, {Format(maximum)}]",
+            ({ } minimum, null) => $"at least {Format(minimum)}",
+            (null, { } maximum) => $"at most {Format(maximum)}",
+            _ => "the declared range",
+        };
+
+    private static string Format(double value) => value.ToString(CultureInfo.InvariantCulture);
 
     private void ValidateConnections(
         WorkflowDocument document,

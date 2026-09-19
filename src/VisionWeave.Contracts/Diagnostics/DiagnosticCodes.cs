@@ -61,6 +61,21 @@ public static class DiagnosticCodes
     /// <summary>A node reported an image frame lease it received as an input.</summary>
     public const string NodeOutputLeaseNotOwned = "VW-EXEC-013";
 
+    /// <summary>A saved parameter value is not the shape its definition declares.</summary>
+    public const string InvalidParameterValue = "VW-PARAM-001";
+
+    /// <summary>A saved numeric parameter value is outside the declared bounds.</summary>
+    public const string ParameterOutOfRange = "VW-PARAM-002";
+
+    /// <summary>A saved option value is not one the definition declares.</summary>
+    public const string ParameterOptionNotDeclared = "VW-PARAM-003";
+
+    /// <summary>The document saves a parameter the node definition does not declare.</summary>
+    public const string UnknownParameter = "VW-PARAM-004";
+
+    /// <summary>A required parameter has neither a saved value nor a declared default.</summary>
+    public const string MissingRequiredParameter = "VW-PARAM-005";
+
     /// <summary>The stored file is not a readable workflow document.</summary>
     public const string UnreadableDocument = "VW-FILE-001";
 

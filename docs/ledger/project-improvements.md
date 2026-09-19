@@ -65,14 +65,16 @@
 
 ### PL-2026-006 - Parameter values are not validated at the definition boundary
 
-- **Status:** Open
+- **Status:** Implemented
+- **Priority:** P1
 - **Recorded on:** 2026-09-19
 - **Scope:** Definition-boundary validation of node parameter values: kind, bounds, options, unknown names, and required values.
 - **Observation:** The snapshot now merges each declared `ParameterDefinition.DefaultValue` under the values a document saved, so a node placed without an explicit value reaches the executor with its default. Nothing validates the saved values themselves: a text value where an integer is declared, a number outside `Minimum`/`Maximum`, an option outside `Options`, or a name the definition does not declare all travel through the snapshot unchanged, and an executor re-checks only the values it happens to read. A required parameter that also declares no default is absent from the snapshot, so `NodeParameterSet.GetInt32` throws `KeyNotFoundException` and the run reports it as `VW-EXEC-001` instead of refusing the document up front. `ParameterDefinition.IsRequired`, `Minimum`, `Maximum`, and `Options` are therefore schema data the editor can show but the build does not enforce.
 - **Decision or next step:** Validate parameter values where the definition is resolved — in the snapshot factory or a dedicated validator — with diagnostics for a kind mismatch, an out-of-range value, an unknown parameter name, and a missing required value, so an unrunnable document is refused before a snapshot exists. Every OpenCV definition starts from a declared default today, which is why the shipped catalog runs as placed; keep it that way until this validation lands.
-- **Evidence:** `src/VisionWeave.Application/Execution/WorkflowSnapshotFactory.cs`, `src/VisionWeave.Contracts/Nodes/ParameterDefinition.cs`, `tests/VisionWeave.Application.Tests/Execution/WorkflowSnapshotFactoryTests.cs` (`Build_parameter_without_a_default_stays_absent`), `tests/VisionWeave.IntegrationTests/OpenCv/OpenCvNodeCatalogTests.cs`.
+- **Update (2026-09-19):** `WorkflowValidator` now checks parameters where it already resolves a node's definition, so a document that reports any parameter diagnostic never becomes a snapshot and no unreadable value reaches an executor. `VW-PARAM-001` reports a value whose shape does not match the declared kind (including a fractional value for an integer parameter), `VW-PARAM-002` a numeric value outside `Minimum`/`Maximum`, `VW-PARAM-003` an option outside the declared set, `VW-PARAM-004` a name the definition does not declare, and `VW-PARAM-005` a required parameter with neither a saved value nor a declared default. A saved `null` counts as unset rather than a kind mismatch, and a disabled node is only shape-checked, because its required values never reach a run.
+- **Evidence:** `src/VisionWeave.Application/Validation/WorkflowValidator.cs`, `src/VisionWeave.Contracts/Diagnostics/DiagnosticCodes.cs`, `src/VisionWeave.Application/Execution/WorkflowSnapshotFactory.cs`, `tests/VisionWeave.Application.Tests/Validation/WorkflowValidatorTests.cs`, `tests/VisionWeave.Application.Tests/Execution/WorkflowSnapshotFactoryTests.cs`, `docs/design/visionweave-detailed-design.md` (section 4.3).
 - **Owner:** VisionWeave maintainers.
-- **Review again:** Before the editor writes parameter values into a document, and before a path parameter enters the catalog.
+- **Review again:** When the editor writes parameter values into a document, or when a path parameter enters the catalog.
 
 ### PL-2026-007 - Deliver the persisted workflow vertical slice
 

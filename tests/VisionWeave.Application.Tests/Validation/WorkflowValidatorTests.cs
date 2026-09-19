@@ -3,6 +3,7 @@ using VisionWeave.Application.Definitions;
 using VisionWeave.Application.Tests.Support;
 using VisionWeave.Application.Validation;
 using VisionWeave.Contracts.Diagnostics;
+using VisionWeave.Contracts.Nodes;
 using VisionWeave.Domain.Workflows;
 
 namespace VisionWeave.Application.Tests.Validation;
@@ -211,6 +212,115 @@ public sealed class WorkflowValidatorTests
     }
 
     [Fact]
+    public void Validate_parameter_of_the_wrong_kind_reports_vw_param_001()
+    {
+        ValidationResult result = ValidateProbe(
+            Probe(),
+            (document, probe) => document.SetNodeParameter(probe.InstanceId, "count", "five"));
+
+        result.IsValid.ShouldBeFalse();
+        result.HasCode(DiagnosticCodes.InvalidParameterValue).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Validate_fractional_value_for_an_integer_parameter_reports_vw_param_001()
+    {
+        ValidationResult result = ValidateProbe(
+            Probe(),
+            (document, probe) => document.SetNodeParameter(probe.InstanceId, "count", 2.5));
+
+        result.HasCode(DiagnosticCodes.InvalidParameterValue).ShouldBeTrue();
+        result.HasCode(DiagnosticCodes.ParameterOutOfRange).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Validate_parameter_outside_the_declared_range_reports_vw_param_002()
+    {
+        ValidationResult result = ValidateProbe(
+            Probe(),
+            (document, probe) => document.SetNodeParameter(probe.InstanceId, "sigma", 250d));
+
+        result.HasCode(DiagnosticCodes.ParameterOutOfRange).ShouldBeTrue();
+        result.Diagnostics.Single(item => item.Code == DiagnosticCodes.ParameterOutOfRange)
+            .Message.ShouldContain("[0, 100]");
+    }
+
+    [Fact]
+    public void Validate_option_outside_the_declared_set_reports_vw_param_003()
+    {
+        ValidationResult result = ValidateProbe(
+            Probe(),
+            (document, probe) => document.SetNodeParameter(probe.InstanceId, "mode", "turbo"));
+
+        result.HasCode(DiagnosticCodes.ParameterOptionNotDeclared).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Validate_undeclared_parameter_name_reports_vw_param_004()
+    {
+        ValidationResult result = ValidateProbe(
+            Probe(),
+            (document, probe) => document.SetNodeParameter(probe.InstanceId, "kernelSize", 5));
+
+        result.HasCode(DiagnosticCodes.UnknownParameter).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Validate_required_parameter_without_a_value_reports_vw_param_005()
+    {
+        NodeDefinition withoutDefault = TestNodes.Blur() with
+        {
+            Parameters = [new ParameterDefinition("kernelSize", ParameterKind.Integer, true, "Kernel size", 1, 31)],
+        };
+
+        ValidationResult result = ValidateProbe(withoutDefault);
+
+        result.HasCode(DiagnosticCodes.MissingRequiredParameter).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Validate_disabled_node_without_a_required_value_reports_nothing()
+    {
+        NodeDefinition withoutDefault = TestNodes.Blur() with
+        {
+            Parameters = [new ParameterDefinition("kernelSize", ParameterKind.Integer, true, "Kernel size", 1, 31)],
+        };
+
+        ValidationResult result = ValidateProbe(
+            withoutDefault,
+            (document, probe) => document.SetNodeEnabled(probe.InstanceId, false));
+
+        result.Diagnostics.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Validate_parameter_cleared_with_null_is_not_a_kind_error()
+    {
+        ValidationResult result = ValidateProbe(
+            Probe(),
+            (document, probe) => document.SetNodeParameter(probe.InstanceId, "count", null));
+
+        result.Diagnostics.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Validate_parameter_of_every_declared_kind_reports_nothing()
+    {
+        ValidationResult result = ValidateProbe(
+            Probe(),
+            (document, probe) =>
+            {
+                document.SetNodeParameter(probe.InstanceId, "count", 4);
+                document.SetNodeParameter(probe.InstanceId, "sigma", 1.5);
+                document.SetNodeParameter(probe.InstanceId, "flag", false);
+                document.SetNodeParameter(probe.InstanceId, "title", "outer");
+                document.SetNodeParameter(probe.InstanceId, "mode", "precise");
+            });
+
+        result.Diagnostics.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void Validate_same_document_twice_reports_the_same_sequence()
     {
         WorkflowDocument document = WorkflowDocument.Create("workflow");
@@ -227,5 +337,37 @@ public sealed class WorkflowValidatorTests
 
         firstPass.Diagnostics.Count.ShouldBeGreaterThan(1);
         secondPass.Diagnostics.ShouldBe(firstPass.Diagnostics);
+    }
+
+    /// <summary>
+    /// A blur definition that declares one parameter of every kind the validator
+    /// distinguishes, so a parameter rule can be exercised without a native node.
+    /// </summary>
+    private static NodeDefinition Probe()
+        => TestNodes.Blur() with
+        {
+            Parameters =
+            [
+                new ParameterDefinition("count", ParameterKind.Integer, true, "Count", 1, 10, null, 5),
+                new ParameterDefinition("sigma", ParameterKind.Number, false, "Sigma", 0, 100, null, 1d),
+                new ParameterDefinition("flag", ParameterKind.Boolean, false, "Flag", null, null, null, true),
+                new ParameterDefinition("title", ParameterKind.Text, false, "Title", null, null, null, "untitled"),
+                new ParameterDefinition("mode", ParameterKind.Option, false, "Mode", null, null, ["fast", "precise"], "fast"),
+            ],
+        };
+
+    private static ValidationResult ValidateProbe(
+        NodeDefinition definition,
+        Action<WorkflowDocument, NodeInstance>? configure = null)
+    {
+        var validator = new WorkflowValidator(TestNodes.Catalog(TestNodes.Source(), definition));
+
+        WorkflowDocument document = WorkflowDocument.Create("probe");
+        NodeInstance source = document.AddNode(TestNodes.SourceType, 1, new CanvasPosition(0, 0));
+        NodeInstance probe = document.AddNode(TestNodes.BlurType, 1, new CanvasPosition(200, 0));
+        document.AddConnection(source.InstanceId, "image", probe.InstanceId, "image");
+        configure?.Invoke(document, probe);
+
+        return validator.Validate(document);
     }
 }
