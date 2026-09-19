@@ -243,7 +243,7 @@ public sealed class WorkflowRunner
         {
             NodeExecutionResult result = await executor.ExecuteAsync(request, cancellationToken).ConfigureAwait(false);
             stopwatch.Stop();
-            await CompleteNodeAsync(nodeId, result, stopwatch.Elapsed, context, cancellationToken).ConfigureAwait(false);
+            await CompleteNodeAsync(nodeId, result, binding.Values!, stopwatch.Elapsed, context, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -268,6 +268,7 @@ public sealed class WorkflowRunner
     private async Task CompleteNodeAsync(
         Guid nodeId,
         NodeExecutionResult result,
+        IReadOnlyDictionary<string, PortValue> inputs,
         TimeSpan elapsed,
         RunState context,
         CancellationToken cancellationToken)
@@ -278,12 +279,24 @@ public sealed class WorkflowRunner
         switch (result.Status)
         {
             case NodeExecutionStatus.Succeeded:
+                if (!NodeOutputContract.TryValidate(
+                    nodeId,
+                    context.Plan.GetNode(nodeId).Node.Definition,
+                    inputs,
+                    result.Outputs,
+                    out NodeDiagnostic? violation))
+                {
+                    ReleaseUnpublishedOutputs(result.Outputs, inputs);
+                    context.Fail(nodeId, null, null, null, duration, [.. diagnostics, violation!]);
+                    return;
+                }
+
                 await PublishAndObserveAsync(nodeId, result, duration, diagnostics, context, cancellationToken)
                     .ConfigureAwait(false);
                 return;
 
             case NodeExecutionStatus.Cancelled:
-                ReleaseUnpublishedOutputs(result.Outputs);
+                ReleaseUnpublishedOutputs(result.Outputs, inputs);
                 context.SetCancelled(
                     nodeId,
                     DiagnosticCodes.NodeExecutionCancelled,
@@ -292,7 +305,7 @@ public sealed class WorkflowRunner
                 return;
 
             default:
-                ReleaseUnpublishedOutputs(result.Outputs);
+                ReleaseUnpublishedOutputs(result.Outputs, inputs);
                 context.Fail(
                     nodeId,
                     diagnostics.Count > 0 ? null : DiagnosticCodes.NodeExecutionFailed,
@@ -306,8 +319,30 @@ public sealed class WorkflowRunner
         }
     }
 
-    private static void ReleaseUnpublishedOutputs(IReadOnlyDictionary<string, PortValue> outputs)
-        => RunState.ReleaseOrphaned(outputs.Values.OfType<ImageFrameValue>().Select(value => value.Lease));
+    /// <summary>
+    /// Releases the frames a node reported but that were never published, because
+    /// the node failed, was cancelled, or violated its output contract before the
+    /// runtime could hand its values to the scheduler. A lease the node received as
+    /// an input is left alone: the run does not own it, and releasing it would free
+    /// a frame that another consumer of the same producer still reads.
+    /// </summary>
+    private static void ReleaseUnpublishedOutputs(
+        IReadOnlyDictionary<string, PortValue> outputs,
+        IReadOnlyDictionary<string, PortValue> inputs)
+    {
+        HashSet<ImageFrameLease> borrowed = [.. inputs.Values.OfType<ImageFrameValue>().Select(value => value.Lease)];
+        List<ImageFrameLease> owned = [];
+
+        foreach (ImageFrameValue frame in outputs.Values.OfType<ImageFrameValue>())
+        {
+            if (!borrowed.Contains(frame.Lease) && !owned.Contains(frame.Lease))
+            {
+                owned.Add(frame.Lease);
+            }
+        }
+
+        RunState.ReleaseOrphaned(owned);
+    }
 
     /// <summary>
     /// Publishes the outputs of a node that succeeded and then lets the observer

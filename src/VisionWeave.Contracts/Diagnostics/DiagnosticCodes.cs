@@ -48,4 +48,16 @@ public static class DiagnosticCodes
 
     /// <summary>A private resource of a node could not be released.</summary>
     public const string ResourceDisposalFailed = "VW-EXEC-009";
+
+    /// <summary>A successful node reported a value on a port its definition does not declare as an output.</summary>
+    public const string NodeOutputUndeclared = "VW-EXEC-010";
+
+    /// <summary>A reported output value does not carry the port type its port declares.</summary>
+    public const string NodeOutputTypeMismatch = "VW-EXEC-011";
+
+    /// <summary>A node reported one image frame lease on more than one output port.</summary>
+    public const string NodeOutputLeaseAliased = "VW-EXEC-012";
+
+    /// <summary>A node reported an image frame lease it received as an input.</summary>
+    public const string NodeOutputLeaseNotOwned = "VW-EXEC-013";
 }
