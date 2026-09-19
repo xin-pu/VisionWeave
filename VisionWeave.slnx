@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/VisionWeave.App/VisionWeave.App.csproj" />
+    <Project Path="src/VisionWeave.Application/VisionWeave.Application.csproj" />
+    <Project Path="src/VisionWeave.Contracts/VisionWeave.Contracts.csproj" />
+    <Project Path="src/VisionWeave.Domain/VisionWeave.Domain.csproj" />
+    <Project Path="src/VisionWeave.OpenCv/VisionWeave.OpenCv.csproj" />
+    <Project Path="src/VisionWeave.Persistence/VisionWeave.Persistence.csproj" />
+    <Project Path="src/VisionWeave.PluginSdk/VisionWeave.PluginSdk.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/VisionWeave.Application.Tests/VisionWeave.Application.Tests.csproj" />
+    <Project Path="tests/VisionWeave.ArchitectureTests/VisionWeave.ArchitectureTests.csproj" />
+    <Project Path="tests/VisionWeave.Domain.Tests/VisionWeave.Domain.Tests.csproj" />
+    <Project Path="tests/VisionWeave.IntegrationTests/VisionWeave.IntegrationTests.csproj" />
+  </Folder>
+</Solution>
