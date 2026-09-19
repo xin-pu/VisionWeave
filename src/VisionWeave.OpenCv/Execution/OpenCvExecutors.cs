@@ -32,6 +32,11 @@ public static class OpenCvExecutors
             [OpenCvNodeIds.CropExecutorTypeId] = new CropExecutor(ledger),
             [OpenCvNodeIds.MedianBlurExecutorTypeId] = new MedianBlurExecutor(ledger),
             [OpenCvNodeIds.ThresholdExecutorTypeId] = new ThresholdExecutor(ledger),
+            [OpenCvNodeIds.BlurExecutorTypeId] = new BlurExecutor(ledger),
+            [OpenCvNodeIds.BilateralFilterExecutorTypeId] = new BilateralFilterExecutor(ledger),
+            [OpenCvNodeIds.AdaptiveThresholdExecutorTypeId] = new AdaptiveThresholdExecutor(ledger),
+            [OpenCvNodeIds.PyrDownExecutorTypeId] = new PyrDownExecutor(ledger),
+            [OpenCvNodeIds.PyrUpExecutorTypeId] = new PyrUpExecutor(ledger),
         }.ToFrozenDictionary(StringComparer.Ordinal);
     }
 }
