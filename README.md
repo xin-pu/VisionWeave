@@ -12,6 +12,14 @@ Aries 仅用于发现历史使用场景和设计问题。VisionWeave 不承诺�
 - `docs/adr/`：架构决策记录。
 - `docs/ledger/`：项目风险、改进和标准偏差记录。
 
+## Settings and startup
+
+```powershell
+dotnet run --project src/VisionWeave.App
+```
+
+`src/VisionWeave.App/appsettings.json` 随可执行文件发布，给出执行并发、预览像素上限与自动保存间隔的默认值；同目录下可选的 `appsettings.user.json` 在本机覆盖这些值，未写出的键沿用其选项类型声明的默认值。启动时会逐节校验设置，无法执行的取值以 `VW-CONFIG-001` 记录并弹出提示后终止启动，而不是换成别的值继续运行。
+
 ## Local verification
 
 ```powershell

@@ -189,6 +189,10 @@ Editing reports its own outcome in the same way rather than throwing into a
 binding layer: `VW-EDIT-001` is a refused edit, which leaves the document
 untouched, and `VW-EDIT-002` is an undo or redo with nothing to reverse.
 
+The host reports its own conditions the same way: a setting outside the range the
+runtime can honor is `VW-CONFIG-001`, and the application refuses to start rather
+than running with a substituted value.
+
 ## 5. Execution design
 
 ### 5.1 Execution contract
@@ -479,16 +483,34 @@ GraphX controls, Aries view models, or serialization format.
 
 ## 9. Configuration, diagnostics, and security
 
-`appsettings.json` contains only safe defaults. Typed Options classes own
-execution concurrency, preview limits, cache limits, autosave interval, and
-plugin search locations. Startup validates values and reports actionable,
-non-secret errors.
+The host reads `appsettings.json` beside the executable, which ships safe
+defaults, and an optional `appsettings.user.json` that overrides them on one
+machine. Each section binds to the options record of the layer that honors it —
+`ExecutionOptions` in Application, `FramePreviewOptions` in OpenCv, and
+`WorkflowAutosaveOptions` in Persistence, which owns the working copy the
+interval refreshes. A key the file omits keeps the default that record declares,
+so a partial file stays valid. Plugin search locations arrive with the plugin
+loader and its ADR.
 
-Structured logs include `OperationId`, `WorkflowId`, `NodeId`, `NodeTypeId`,
-`DiagnosticCode`, and elapsed milliseconds. Logs never include full image
-payloads, credentials, tokens, or unsafe path contents. Node failures are
-logged once at the execution boundary with the original exception as context;
-the UI receives a safe diagnostic.
+Every section is validated at startup, before any service reaches the shell. A
+value outside the range the runtime can honor is reported as `VW-CONFIG-001` in
+a modal message and in the log, and startup stops: clamping a limit the user
+wrote down would make a misconfiguration indistinguishable from a defect.
+`VisionWeaveSettings` performs that binding and checking, `VisionWeaveServices`
+registers the node catalog, the validator, and the resolved options, and `App` is
+the only project that references the host stack of ADR-0007. Node definitions
+enter the catalog through one registration path, so a duplicate node type
+identifier fails composition rather than shadowing the definition that arrived
+first.
+
+Structured logs use named fields rather than interpolated prose. Startup records
+the resolved settings and the empty document it opened; a rejected setting is
+logged once where it is reported. Run-boundary logs add `OperationId`,
+`WorkflowId`, `NodeId`, `NodeTypeId`, `DiagnosticCode`, and elapsed milliseconds
+when that path is wired. Logs never include full image payloads, credentials,
+tokens, or unsafe path contents. A node failure is logged once at the execution
+boundary with the original exception as context; the UI receives a safe
+diagnostic.
 
 Plugins are disabled by default in the first release. `PluginSdk` is still
 implemented as a small stable contract so built-in providers exercise the same
@@ -509,15 +531,22 @@ trusted code; sandboxing is a future feature, not an implied security boundary.
 | Tier | Proof |
 | --- | --- |
 | Domain unit tests | Port compatibility, multiplicity, cycle detection, stable diagnostics, graph changes. |
-| Application unit tests | Topological order, dirty-subgraph selection, cancellation, branch blocking, document command history, undo grouping, refused edits. |
-| OpenCV integration tests | Expected pixels / geometry for each migrated node, disposal and cache behavior. |
-| Persistence integration tests | Save/load round trip, malformed document rejection, migrations, missing-node placeholders. |
-| Architecture tests | Dependency direction and no WPF/OpenCV reference in Domain. |
+| Application unit tests | Topological order, dirty-subgraph selection, cancellation, branch blocking, document command history, undo grouping, refused edits, settings validation. |
+| OpenCV integration tests | Expected pixels / geometry for each migrated node, disposal and cache behavior, preview limit validation. |
+| Persistence integration tests | Save/load round trip, malformed document rejection, migrations, missing-node placeholders, autosave policy validation. |
+| Architecture tests | Dependency direction, no WPF/OpenCV/host stack reference in Domain, and no host stack reference in any core assembly. |
 | UI smoke tests | Canvas add/connect/delete, property edit, run/cancel, light/dark template rendering. |
 
 Tests use xUnit and Shouldly. Test names use the form
 `Member_condition_expected_result`, e.g.
 `ConnectPorts_incompatible_image_and_contours_returns_port_diagnostic`.
+
+The host composition root has no automated test project, so its wiring is
+verified by starting the application twice: once with the shipped settings, which
+must open an empty document, and once with a settings file that holds rejected
+values, which must report `VW-CONFIG-001` and exit without opening a document. The
+validation that decision rests on is unit-tested in the layers that own each
+options record.
 
 The initial CI command sequence is restore, build, test, format verification,
 and analyzer verification. `global.json`, `.editorconfig`, analyzer choices,
