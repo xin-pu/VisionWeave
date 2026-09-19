@@ -1,11 +1,15 @@
 ﻿using System.Windows;
+using VisionWeave.App.ViewModels;
 
 namespace VisionWeave.App;
 
 public partial class MainWindow : Window
 {
-    public MainWindow()
+    internal MainWindow(MainWindowViewModel viewModel)
     {
+        ArgumentNullException.ThrowIfNull(viewModel);
+
         InitializeComponent();
+        DataContext = viewModel;
     }
 }

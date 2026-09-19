@@ -87,6 +87,33 @@ public sealed class AssemblyDependencyTests
             forbiddenPrefixes: ["Nodify", "OpenCvSharp", "Presentation", "Wpf.Ui"]);
     }
 
+    /// <summary>
+    /// The host stack — the dependency-injection, configuration, and logging
+    /// packages, and the UI frameworks — is reachable only from the composition
+    /// root, so a core assembly cannot quietly become dependent on how the
+    /// application is hosted.
+    /// </summary>
+    [Fact]
+    public void Core_assemblies_avoid_host_frameworks()
+    {
+        Assembly[] core =
+        [
+            typeof(NodeTypeId).Assembly,
+            typeof(WorkflowDocument).Assembly,
+            typeof(WorkflowRunner).Assembly,
+            typeof(MatFrameLease).Assembly,
+            typeof(IVisionWeavePlugin).Assembly,
+            typeof(PersistenceModule).Assembly,
+        ];
+
+        foreach (Assembly assembly in core)
+        {
+            AssertNoForbiddenReference(
+                assembly,
+                forbiddenPrefixes: ["Nodify", "Wpf.Ui", "Presentation", "Microsoft.Extensions"]);
+        }
+    }
+
     private static void AssertVisionWeaveReferences(Assembly assembly, params string[] allowed)
     {
         string[] references = VisionWeaveReferences(assembly);

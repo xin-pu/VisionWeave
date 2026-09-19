@@ -6,7 +6,7 @@
         xmlns:nodify="https://miroiu.github.io/nodify"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         mc:Ignorable="d"
-        Title="VisionWeave"
+        Title="{Binding WindowTitle}"
         Width="1280"
         Height="800"
         MinWidth="960"
@@ -48,7 +48,7 @@
                            Text="Nodes" />
                 <TextBlock Margin="0,8,0,0"
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                           Text="The node catalog will be projected here." />
+                           Text="{Binding NodeCatalogSummary}" />
             </StackPanel>
         </ui:Card>
 
@@ -75,7 +75,7 @@
         </ui:Card>
 
         <StatusBar Grid.Row="2" Grid.ColumnSpan="3">
-            <StatusBarItem Content="Ready" />
+            <StatusBarItem Content="{Binding DocumentSummary}" />
         </StatusBar>
     </Grid>
 </Window>
