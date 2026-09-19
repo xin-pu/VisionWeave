@@ -1,0 +1,31 @@
+﻿using System.Collections.Frozen;
+using VisionWeave.Contracts.Execution;
+using VisionWeave.Contracts.Values;
+using VisionWeave.OpenCv.Nodes;
+
+namespace VisionWeave.OpenCv.Execution;
+
+/// <summary>
+/// The executor registrations the OpenCV layer contributes. The composition root
+/// merges them with the registrations of the other providers and resolves a
+/// definition by its executor type identifier, so a built-in node and a plugin
+/// node are resolved the same way.
+/// </summary>
+public static class OpenCvExecutors
+{
+    /// <summary>
+    /// Creates the built-in OpenCV executors.
+    /// </summary>
+    /// <param name="ledger">The ledger the executors report the leases they create to.</param>
+    /// <returns>The executors keyed by executor type identifier.</returns>
+    public static IReadOnlyDictionary<string, INodeExecutor> CreateDefaults(ILeaseLedger ledger)
+    {
+        ArgumentNullException.ThrowIfNull(ledger);
+
+        return new Dictionary<string, INodeExecutor>(StringComparer.Ordinal)
+        {
+            [OpenCvNodeIds.GaussianBlurExecutorTypeId] = new GaussianBlurExecutor(ledger),
+            [OpenCvNodeIds.ResizeExecutorTypeId] = new ResizeExecutor(ledger),
+        }.ToFrozenDictionary(StringComparer.Ordinal);
+    }
+}

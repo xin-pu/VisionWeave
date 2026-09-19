@@ -1,0 +1,11 @@
+root = true
+
+[*.{cs,xaml}]
+charset = utf-8-bom
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+
+[*.cs]
+dotnet_style_qualification_for_field = false:suggestion
+dotnet_diagnostic.IDE0130.severity = error

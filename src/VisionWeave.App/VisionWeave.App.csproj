@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>VisionWeave.App</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="Nodify" />
+    <PackageReference Include="WPF-UI" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\VisionWeave.Application\VisionWeave.Application.csproj" />
+    <ProjectReference Include="..\VisionWeave.OpenCv\VisionWeave.OpenCv.csproj" />
+    <ProjectReference Include="..\VisionWeave.Persistence\VisionWeave.Persistence.csproj" />
+    <ProjectReference Include="..\VisionWeave.PluginSdk\VisionWeave.PluginSdk.csproj" />
+  </ItemGroup>
+
+</Project>
