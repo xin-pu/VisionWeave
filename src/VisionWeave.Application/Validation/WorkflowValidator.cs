@@ -143,7 +143,7 @@ public sealed class WorkflowValidator
 
         ValidatePorts(connection, source!, target!, resolved, incoming, diagnostics);
 
-        if (TryDescribeCycle(document.Connections, connection, out string cycle))
+        if (CycleDetection.TryDescribeCandidate(document.Connections, connection, out string cycle))
         {
             diagnostics.Add(new NodeDiagnostic(
                 DiagnosticCodes.InvalidGraph,
@@ -435,7 +435,15 @@ public sealed class WorkflowValidator
         }
 
         ValidateRequiredInputs(nodes, resolved, boundInputs, diagnostics);
-        DetectCycles([.. nodes.Select(node => node.InstanceId)], adjacency, diagnostics);
+
+        foreach (ClosedCycle closed in CycleDetection.Find([.. nodes.Select(node => node.InstanceId)], adjacency))
+        {
+            diagnostics.Add(new NodeDiagnostic(
+                DiagnosticCodes.InvalidGraph,
+                DiagnosticSeverity.Error,
+                $"The connection from node instance '{closed.From}' to node instance '{closed.To}' closes a cycle: {closed.Cycle}.",
+                closed.From));
+        }
     }
 
     private static void ValidateRequiredInputs(
@@ -564,169 +572,5 @@ public sealed class WorkflowValidator
                 null,
                 new PortTarget(target.InstanceId, targetPort.Id)));
         }
-    }
-
-    private static void DetectCycles(
-        IReadOnlyList<Guid> nodeOrder,
-        IReadOnlyDictionary<Guid, List<Guid>> adjacency,
-        List<NodeDiagnostic> diagnostics)
-    {
-        // An absent entry means unvisited, 1 means on the current path, and 2
-        // means fully explored.
-        Dictionary<Guid, int> state = [];
-        List<Guid> path = [];
-
-        foreach (Guid root in nodeOrder)
-        {
-            if (state.ContainsKey(root))
-            {
-                continue;
-            }
-
-            var stack = new Stack<(Guid Node, int NextConsumer)>();
-            state[root] = 1;
-            path.Add(root);
-            stack.Push((root, 0));
-
-            while (stack.Count > 0)
-            {
-                (Guid node, int nextConsumer) = stack.Pop();
-                IReadOnlyList<Guid> consumers = ConsumersOf(adjacency, node);
-
-                if (nextConsumer < consumers.Count)
-                {
-                    stack.Push((node, nextConsumer + 1));
-                    Guid consumer = consumers[nextConsumer];
-
-                    if (state.TryGetValue(consumer, out int consumerState))
-                    {
-                        if (consumerState == 1)
-                        {
-                            diagnostics.Add(new NodeDiagnostic(
-                                DiagnosticCodes.InvalidGraph,
-                                DiagnosticSeverity.Error,
-                                $"The connection from node instance '{node}' to node instance '{consumer}' closes a cycle: {DescribeCycle(path, consumer)}.",
-                                node));
-                        }
-
-                        continue;
-                    }
-
-                    state[consumer] = 1;
-                    path.Add(consumer);
-                    stack.Push((consumer, 0));
-                    continue;
-                }
-
-                state[node] = 2;
-                path.RemoveAt(path.Count - 1);
-            }
-        }
-    }
-
-    private static IReadOnlyList<Guid> ConsumersOf(IReadOnlyDictionary<Guid, List<Guid>> adjacency, Guid node)
-        => adjacency.TryGetValue(node, out List<Guid>? consumers) ? consumers : [];
-
-    /// <summary>
-    /// Determines whether adding one connection to a graph would close a cycle, and
-    /// describes the cycle when it would. The candidate closes a cycle exactly when
-    /// its target already reaches its source, which is what the search looks for.
-    /// </summary>
-    /// <param name="connections">The connections already in the graph.</param>
-    /// <param name="candidate">The connection being considered.</param>
-    /// <param name="cycle">The cycle the candidate would close.</param>
-    /// <returns><see langword="true"/> when the candidate closes a cycle.</returns>
-    private static bool TryDescribeCycle(
-        IReadOnlyList<WorkflowConnection> connections,
-        WorkflowConnection candidate,
-        out string cycle)
-    {
-        Dictionary<Guid, List<Guid>> adjacency = [];
-
-        foreach (WorkflowConnection connection in connections)
-        {
-            AddEdge(adjacency, connection.SourceNodeId, connection.TargetNodeId);
-        }
-
-        AddEdge(adjacency, candidate.SourceNodeId, candidate.TargetNodeId);
-
-        Dictionary<Guid, Guid> parent = [];
-        Queue<Guid> pending = new();
-        parent[candidate.TargetNodeId] = candidate.TargetNodeId;
-        pending.Enqueue(candidate.TargetNodeId);
-
-        while (pending.Count > 0)
-        {
-            Guid node = pending.Dequeue();
-
-            if (node == candidate.SourceNodeId)
-            {
-                cycle = DescribeCandidateCycle(parent, candidate);
-                return true;
-            }
-
-            foreach (Guid consumer in ConsumersOf(adjacency, node))
-            {
-                if (parent.TryAdd(consumer, node))
-                {
-                    pending.Enqueue(consumer);
-                }
-            }
-        }
-
-        cycle = string.Empty;
-        return false;
-    }
-
-    private static void AddEdge(Dictionary<Guid, List<Guid>> adjacency, Guid source, Guid target)
-    {
-        if (!adjacency.TryGetValue(source, out List<Guid>? consumers))
-        {
-            consumers = [];
-            adjacency.Add(source, consumers);
-        }
-
-        consumers.Add(target);
-    }
-
-    /// <summary>
-    /// Builds the cycle text from the search parents: the chain runs from the
-    /// candidate's target back to its source, and the candidate edge closes it.
-    /// </summary>
-    private static string DescribeCandidateCycle(
-        IReadOnlyDictionary<Guid, Guid> parent,
-        WorkflowConnection candidate)
-    {
-        List<Guid> chain = [];
-        Guid node = candidate.SourceNodeId;
-
-        while (node != candidate.TargetNodeId)
-        {
-            chain.Add(node);
-            node = parent[node];
-        }
-
-        chain.Reverse();
-        List<Guid> cycle = [candidate.SourceNodeId, candidate.TargetNodeId, .. chain];
-        return string.Join(" -> ", cycle.Select(item => item.ToString()));
-    }
-
-    private static string DescribeCycle(IReadOnlyList<Guid> path, Guid repeated)
-    {
-        List<string> steps = [];
-        bool reached = false;
-
-        foreach (Guid node in path)
-        {
-            reached |= node == repeated;
-
-            if (reached)
-            {
-                steps.Add(node.ToString());
-            }
-        }
-
-        steps.Add(repeated.ToString());
-        return string.Join(" -> ", steps);
     }
 }
