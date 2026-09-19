@@ -105,8 +105,9 @@ public sealed class WorkflowRunnerTests : RunnerTestBase
         document.AddConnection(source.InstanceId, "image", second.InstanceId, "image");
 
         LeaseLedger ledger = NewLedger();
-        var sourceFrames = new FrameSource(ledger);
-        var blurredFrames = new FrameSource(ledger, "blurred");
+        var observed = new SignalledLedger(ledger);
+        var sourceFrames = new FrameSource(observed);
+        var blurredFrames = new FrameSource(observed, "blurred");
         TaskCompletionSource<bool> secondRan = new(TaskCreationOptions.RunContinuationsAsynchronously);
         TaskCompletionSource<bool> firstMayFinish = new(TaskCreationOptions.RunContinuationsAsynchronously);
         bool frameAliveForSecond = false;
@@ -130,15 +131,19 @@ public sealed class WorkflowRunnerTests : RunnerTestBase
                 return Succeeded(blurredFrames.Produce());
             });
 
-        Task<WorkflowRunSummary> run = Runner(executors, ledger, Options(parallelism: 2))
+        Task<WorkflowRunSummary> run = Runner(executors, observed, Options(parallelism: 2))
             .RunAsync(Plan(document), CancellationToken.None);
 
-        await secondRan.Task;
-        // Let the second consumer finish and release its own reservation, so that
-        // the assertion below proves the frame outlives it.
-        await Task.Delay(50);
+        await secondRan.Task.Within("the second consumer to reach its work");
+
+        // The second consumer has let go of the reservation it held on the frame, and
+        // the first still holds one, so the assertion below proves the frame outlives
+        // the consumer that released it rather than that someone still holds it.
+        await observed.ReservationsReleased(1).Within("the second consumer to release its reservation");
+
         firstMayFinish.TrySetResult(true);
 
+        await run.Within("the run to finish once its first consumer was let go");
         WorkflowRunSummary summary = await run;
 
         summary.Status.ShouldBe(WorkflowRunStatus.Succeeded);
@@ -307,20 +312,43 @@ public sealed class WorkflowRunnerTests : RunnerTestBase
 
         LeaseLedger ledger = NewLedger();
         var probe = new ConcurrencyProbe();
+        int started = 0;
+        TaskCompletionSource<bool> firstStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<bool> firstMayFinish = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         StubResolver executors = new StubResolver().Add(TestNodes.SourceExecutorTypeId, (_, _) =>
             probe.TrackAsync(async () =>
             {
-                await Task.Delay(30);
+                if (Interlocked.Increment(ref started) == 1)
+                {
+                    // The first node is held until the test has seen it running, so
+                    // the window in which a second node could run beside it is opened
+                    // and closed by the test rather than by a moment of time.
+                    firstStarted.TrySetResult(true);
+                    await firstMayFinish.Task;
+                }
+
                 return Succeeded(Outputs());
             }));
 
-        WorkflowRunSummary summary = await Runner(executors, ledger, Options(parallelism: 1))
+        Task<WorkflowRunSummary> run = Runner(executors, ledger, Options(parallelism: 1))
             .RunAsync(Plan(document), CancellationToken.None);
+
+        await firstStarted.Task.Within("the first node to start");
+
+        Volatile.Read(ref started).ShouldBe(
+            1,
+            "a limit of one node must not start the second one while the first is still running.");
+
+        firstMayFinish.TrySetResult(true);
+
+        await run.Within("the run to finish once its held node was let go");
+        WorkflowRunSummary summary = await run;
 
         summary.Status.ShouldBe(WorkflowRunStatus.Succeeded);
         summary.Nodes.Count.ShouldBe(2);
         summary.Nodes.ShouldAllBe(node => node.State == NodeRunState.Succeeded);
+        Volatile.Read(ref started).ShouldBe(2);
         probe.Peak.ShouldBe(1);
     }
 }
