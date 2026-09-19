@@ -83,6 +83,21 @@ public sealed class WorkflowDocumentTests
     }
 
     [Fact]
+    public void MoveNode_increments_change_count_without_changing_revision()
+    {
+        WorkflowDocument document = WorkflowDocument.Create("workflow");
+        NodeInstance node = document.AddNode(BlurType, 1, new CanvasPosition(0, 0));
+        long revisionAfterAdd = document.Revision;
+        long changesAfterAdd = document.ChangeCount;
+
+        document.MoveNode(node.InstanceId, new CanvasPosition(40, 60));
+
+        document.Revision.ShouldBe(revisionAfterAdd);
+        document.ChangeCount.ShouldBe(changesAfterAdd + 1);
+        document.GetNode(node.InstanceId).Position.ShouldBe(new CanvasPosition(40, 60));
+    }
+
+    [Fact]
     public void AddConnection_valid_nodes_adds_edge()
     {
         WorkflowDocument document = WorkflowDocument.Create("workflow");

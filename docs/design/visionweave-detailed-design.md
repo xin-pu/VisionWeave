@@ -443,6 +443,21 @@ Autosave writes to a separate recoverable working copy. Atomic save uses a
 temporary file in the destination directory followed by replacement; failures
 do not overwrite the previously saved document.
 
+`WorkflowSession` is the editing session a caller works through, and it belongs
+to `Persistence` because it is the only layer that sees both the document and the
+file. It binds the document to its file and records whether that file may be
+written, whether the document has unsaved changes, and which diagnostics the load
+produced. Unsaved-change tracking counts every change, including a move, because
+a moved node is saved state; the document revision alone would miss it.
+`WorkflowSession.New`, `Open`, and `Recover` produce a session, `Save` writes it
+atomically and then drops the working copy, `TryAutosave` writes the working copy
+only for a dirty, writable document that has a path, and `Recover` reopens the
+working copy still bound to the document path, so saving a recovered document
+overwrites the document rather than the copy. A session recovered from a working
+copy starts dirty, because its content is not yet its file's content. Session
+ownership of the undo stack stays with `DocumentCommandHistory` in Application;
+the composition root pairs them for the editor.
+
 ## 8. Node catalog and Aries migration
 
 Initial node categories are Input/Output, Transform, Filter, Threshold,

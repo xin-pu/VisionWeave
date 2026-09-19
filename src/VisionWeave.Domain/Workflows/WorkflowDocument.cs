@@ -44,6 +44,15 @@ public sealed class WorkflowDocument
     public long Revision { get; private set; }
 
     /// <summary>
+    /// Gets how many changes this document has received since it was created or
+    /// hydrated. Unlike <see cref="Revision"/>, layout-only changes count too,
+    /// because a moved node is saved state: a caller comparing this value with the
+    /// one recorded at the last save knows whether the document has unsaved
+    /// changes, which the revision alone cannot tell.
+    /// </summary>
+    public long ChangeCount { get; private set; }
+
+    /// <summary>
     /// Gets the instant the document was created.
     /// </summary>
     public DateTimeOffset CreatedUtc { get; }
@@ -421,6 +430,7 @@ public sealed class WorkflowDocument
         {
             ModifiedUtc = ModifiedUtc,
             AppVersion = AppVersion,
+            ChangeCount = ChangeCount,
         };
 
         foreach (NodeInstance node in _nodes.Values)
@@ -469,6 +479,7 @@ public sealed class WorkflowDocument
             Revision++;
         }
 
+        ChangeCount++;
         ModifiedUtc = TimeProvider.GetUtcNow();
     }
 }
