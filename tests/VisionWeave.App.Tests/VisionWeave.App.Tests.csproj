@@ -19,6 +19,19 @@
     <ProjectReference Include="..\..\src\VisionWeave.App\VisionWeave.App.csproj" />
   </ItemGroup>
 
+  <!--
+    The shell's markup is linked rather than copied, so the theme and structure
+    tests read the files the application actually ships. They are linked as
+    content, not as pages: the test project must not compile a second copy of the
+    application's resource dictionaries.
+  -->
+  <ItemGroup>
+    <None Include="..\..\src\VisionWeave.App\App.xaml" Link="Shell\App.xaml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\VisionWeave.App\MainWindow.xaml" Link="Shell\MainWindow.xaml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\VisionWeave.App\Themes\Tokens.xaml" Link="Shell\Themes\Tokens.xaml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\VisionWeave.App\Themes\Shell.xaml" Link="Shell\Themes\Shell.xaml" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
