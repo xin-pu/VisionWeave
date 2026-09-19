@@ -1,4 +1,5 @@
 ﻿using Shouldly;
+using System.Text.RegularExpressions;
 using VisionWeave.Application.Definitions;
 using VisionWeave.Application.Tests.Support;
 using VisionWeave.Application.Validation;
@@ -157,6 +158,92 @@ public sealed class WorkflowValidatorTests
         result.IsValid.ShouldBeFalse();
         result.HasCode(DiagnosticCodes.InvalidGraph).ShouldBeTrue();
         result.Errors.ShouldAllBe(diagnostic => diagnostic.Code == DiagnosticCodes.InvalidGraph);
+    }
+
+    [Fact]
+    public void Validate_cycle_reports_the_edge_that_closes_it_and_the_path_back_to_it()
+    {
+        WorkflowDocument document = WorkflowDocument.Create("workflow");
+        NodeInstance first = document.AddNode(TestNodes.MaskingType, 1, new CanvasPosition(0, 0));
+        NodeInstance second = document.AddNode(TestNodes.MaskingType, 1, new CanvasPosition(200, 0));
+        NodeInstance third = document.AddNode(TestNodes.MaskingType, 1, new CanvasPosition(400, 0));
+        document.AddConnection(first.InstanceId, "masked", second.InstanceId, "image");
+        document.AddConnection(second.InstanceId, "masked", third.InstanceId, "image");
+        document.AddConnection(third.InstanceId, "masked", first.InstanceId, "image");
+
+        // Every required input is bound, so the cycle is the only condition the
+        // document earns and the test can read it without sorting it out.
+        NodeDiagnostic diagnostic = _validator.Validate(document).Errors.ShouldHaveSingleItem();
+
+        diagnostic.Code.ShouldBe(DiagnosticCodes.InvalidGraph);
+        diagnostic.Severity.ShouldBe(DiagnosticSeverity.Error);
+        diagnostic.Target.ShouldBeNull();
+
+        (Guid from, Guid to, IReadOnlyList<Guid> path) = ReadCycle(diagnostic);
+
+        // The condition belongs to the node the closing edge leaves, and the printed
+        // path runs from that edge's target around the cycle and back to the source.
+        diagnostic.NodeInstanceId.ShouldBe(from);
+        path[0].ShouldBe(to, "the printed path starts where the closing edge lands.");
+        path[^1].ShouldBe(to, "the printed path closes on the node it started from.");
+        path[^2].ShouldBe(from, "the closing edge is the last step of the printed path.");
+        path.Distinct().Order().ShouldBe(
+            new[] { first.InstanceId, second.InstanceId, third.InstanceId }.Order(),
+            "the printed path names each node of the cycle once.");
+    }
+
+    [Fact]
+    public void Validate_two_cycles_report_one_closing_edge_each()
+    {
+        WorkflowDocument document = WorkflowDocument.Create("workflow");
+        NodeInstance first = document.AddNode(TestNodes.MaskingType, 1, new CanvasPosition(0, 0));
+        NodeInstance second = document.AddNode(TestNodes.MaskingType, 1, new CanvasPosition(200, 0));
+        NodeInstance third = document.AddNode(TestNodes.MaskingType, 1, new CanvasPosition(400, 0));
+        NodeInstance fourth = document.AddNode(TestNodes.MaskingType, 1, new CanvasPosition(600, 0));
+        document.AddConnection(first.InstanceId, "masked", second.InstanceId, "image");
+        document.AddConnection(second.InstanceId, "masked", first.InstanceId, "image");
+        document.AddConnection(third.InstanceId, "masked", fourth.InstanceId, "image");
+        document.AddConnection(fourth.InstanceId, "masked", third.InstanceId, "image");
+
+        IReadOnlyList<NodeDiagnostic> errors = _validator.Validate(document).Errors;
+
+        errors.Count.ShouldBe(2);
+        errors.ShouldAllBe(diagnostic => diagnostic.Code == DiagnosticCodes.InvalidGraph);
+        errors
+            .SelectMany(diagnostic =>
+            {
+                (Guid from, Guid to, _) = ReadCycle(diagnostic);
+                return new[] { from, to };
+            })
+            .Distinct()
+            .Order()
+            .ShouldBe(
+                new[] { first.InstanceId, second.InstanceId, third.InstanceId, fourth.InstanceId }.Order(),
+                "each cycle is reported by an edge between two of its own nodes.");
+    }
+
+    [Fact]
+    public void Validate_reports_a_cycle_after_the_connection_diagnostics()
+    {
+        WorkflowDocument document = WorkflowDocument.Create("workflow");
+        NodeInstance first = document.AddNode(TestNodes.MaskingType, 1, new CanvasPosition(0, 0));
+        NodeInstance second = document.AddNode(TestNodes.MaskingType, 1, new CanvasPosition(200, 0));
+        document.AddConnection(first.InstanceId, "masked", second.InstanceId, "image");
+        document.AddConnection(second.InstanceId, "masked", first.InstanceId, "image");
+
+        NodeInstance source = document.AddNode(TestNodes.SourceType, 1, new CanvasPosition(0, 200));
+        NodeInstance count = document.AddNode(TestNodes.CountType, 1, new CanvasPosition(200, 200));
+        NodeInstance blur = document.AddNode(TestNodes.BlurType, 1, new CanvasPosition(400, 200));
+        document.AddConnection(source.InstanceId, "image", count.InstanceId, "image");
+        document.AddConnection(count.InstanceId, "count", blur.InstanceId, "image");
+
+        IReadOnlyList<NodeDiagnostic> errors = _validator.Validate(document).Errors;
+
+        // The wire is judged where it is read, and the cycle only once every wire has
+        // been, which is the order an editor marks the document in.
+        errors.Count.ShouldBe(2);
+        errors[0].Code.ShouldBe(DiagnosticCodes.IncompatiblePort);
+        ReadCycle(errors[1]);
     }
 
     [Fact]
@@ -425,6 +512,28 @@ public sealed class WorkflowValidatorTests
     }
 
     [Fact]
+    public void ValidateConnection_wire_that_closes_a_longer_cycle_reports_the_walk_back_path()
+    {
+        WorkflowDocument document = WorkflowDocument.Create("workflow");
+        NodeInstance first = document.AddNode(TestNodes.BlurType, 1, new CanvasPosition(0, 0));
+        NodeInstance second = document.AddNode(TestNodes.BlurType, 1, new CanvasPosition(200, 0));
+        NodeInstance third = document.AddNode(TestNodes.BlurType, 1, new CanvasPosition(400, 0));
+        document.AddConnection(first.InstanceId, "blurred", second.InstanceId, "image");
+        document.AddConnection(second.InstanceId, "blurred", third.InstanceId, "image");
+        var candidate = new WorkflowConnection(Guid.NewGuid(), third.InstanceId, "blurred", first.InstanceId, "image");
+
+        NodeDiagnostic diagnostic = _validator.ValidateConnection(document, candidate).Errors.ShouldHaveSingleItem();
+
+        // The candidate is the last step, so the printed cycle starts at the node it
+        // reaches and arrives back at the node it leaves.
+        diagnostic.Message.ShouldBe(
+            $"The connection from node instance '{third.InstanceId}' to node instance '{first.InstanceId}' closes a cycle: "
+            + $"{third.InstanceId} -> {first.InstanceId} -> {second.InstanceId} -> {third.InstanceId}.");
+        diagnostic.NodeInstanceId.ShouldBe(third.InstanceId);
+        diagnostic.Target.ShouldBe(new ConnectionTarget(candidate.ConnectionId));
+    }
+
+    [Fact]
     public void ValidateConnection_self_connection_reports_the_graph_diagnostic()
     {
         WorkflowDocument document = WorkflowDocument.Create("workflow");
@@ -466,6 +575,27 @@ public sealed class WorkflowValidatorTests
         // The document already reports the missing definition; the wire adds no
         // second report for a node this build cannot describe.
         result.Diagnostics.ShouldBeEmpty();
+    }
+
+    /// <summary>
+    /// Reads the closing edge and the printed path out of a cycle diagnostic. The
+    /// search may start anywhere in a cycle, so its text is read rather than
+    /// written out; the diagnostic contract is what that text has to keep.
+    /// </summary>
+    /// <param name="diagnostic">The diagnostic reported for a cycle.</param>
+    /// <returns>The edge that closes the cycle and the path it printed.</returns>
+    private static (Guid From, Guid To, IReadOnlyList<Guid> Path) ReadCycle(NodeDiagnostic diagnostic)
+    {
+        Match match = Regex.Match(
+            diagnostic.Message,
+            @"^The connection from node instance '([0-9a-f-]{36})' to node instance '([0-9a-f-]{36})' closes a cycle: (.+)\.$");
+
+        match.Success.ShouldBeTrue($"not a cycle diagnostic: {diagnostic.Message}");
+
+        return (
+            Guid.Parse(match.Groups[1].Value),
+            Guid.Parse(match.Groups[2].Value),
+            [.. match.Groups[3].Value.Split(" -> ").Select(Guid.Parse)]);
     }
 
     /// <summary>
