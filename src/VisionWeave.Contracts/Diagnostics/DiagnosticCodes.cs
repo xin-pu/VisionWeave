@@ -48,4 +48,13 @@ public static class DiagnosticCodes
 
     /// <summary>A private resource of a node could not be released.</summary>
     public const string ResourceDisposalFailed = "VW-EXEC-009";
+
+    /// <summary>The stored file is not a readable workflow document.</summary>
+    public const string UnreadableDocument = "VW-FILE-001";
+
+    /// <summary>The stored document schema is not one this build can migrate, so it opens read-only.</summary>
+    public const string UnsupportedDocumentSchema = "VW-FILE-002";
+
+    /// <summary>A stored entry or field was incoherent and was skipped while loading.</summary>
+    public const string DroppedDocumentEntry = "VW-FILE-003";
 }

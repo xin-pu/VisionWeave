@@ -171,14 +171,32 @@ public sealed class WorkflowDocumentTests
     }
 
     [Fact]
-    public void Restore_stored_revision_is_preserved()
+    public void Hydrate_rebuilding_the_document_keeps_the_stored_revision_and_instants()
     {
         var createdUtc = new DateTimeOffset(2026, 9, 19, 0, 0, 0, TimeSpan.Zero);
+        var modifiedUtc = createdUtc.AddHours(3);
+        var nodeId = Guid.NewGuid();
 
-        WorkflowDocument document = WorkflowDocument.Restore(Guid.NewGuid(), "loaded", 7, createdUtc);
+        WorkflowDocument document = WorkflowDocument.Hydrate(
+            Guid.NewGuid(),
+            "loaded",
+            createdUtc,
+            modifiedUtc,
+            revision: 7,
+            fill: target =>
+            {
+                target.AddNode(BlurType, 1, new CanvasPosition(0, 0), nodeId);
+                target.SetNodeParameter(nodeId, "kernelSize", 5);
+                target.PreserveNodeExtension(nodeId, "futureNodeField", """{"a":1}""");
+                target.PreserveExtension("futureField", """{"b":2}""");
+            });
 
         document.Revision.ShouldBe(7);
         document.CreatedUtc.ShouldBe(createdUtc);
+        document.ModifiedUtc.ShouldBe(modifiedUtc);
+        document.GetNode(nodeId).Parameters["kernelSize"].ShouldBe(5);
+        document.GetNode(nodeId).ExtensionData["futureNodeField"].ShouldBe("""{"a":1}""");
+        document.ExtensionData["futureField"].ShouldBe("""{"b":2}""");
     }
 
     [Fact]

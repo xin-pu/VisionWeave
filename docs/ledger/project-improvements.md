@@ -76,15 +76,17 @@
 
 ### PL-2026-007 - Deliver the persisted workflow vertical slice
 
-- **Status:** Open
+- **Status:** Implemented
 - **Priority:** P1
 - **Recorded on:** 2026-09-19
 - **Scope:** A real `.vwflow` document flowing from persistence into validation, snapshot construction, execution, and recovery diagnostics.
 - **Observation:** The Domain and Application layers now distinguish editable documents from executable snapshots, but the Persistence project has no exercised serializer/loader path. Without it, version handling, malformed-document recovery, resource references, and missing-node placeholders remain design-only behavior.
 - **Decision or next step:** Implement a versioned serializer and loader with round-trip, malformed-input, forward-version, and missing-definition tests. Keep WPF and Nodify types out of the format so the file remains an application-owned contract.
-- **Evidence:** `src/VisionWeave.Domain/Workflows/WorkflowDocument.cs`, `src/VisionWeave.Persistence/`, `docs/adr/0004-workflow-document-and-format.md`.
+- **Update (2026-09-19):** The narrow vertical slice is implemented on `feat/vwflow-persistence`. `WorkflowDocumentWriter` writes the versioned format deterministically, saves atomically through a temporary file in the destination directory, and keeps a separate recoverable working copy; `WorkflowDocumentReader` reports `VW-FILE-001` for a file that is not a readable document, `VW-FILE-002` and a read-only result for a schema version this build cannot migrate, and `VW-FILE-003` for an entry or field it had to skip. Unknown fields survive a load and a save verbatim, and a load restores the stored revision and modification instant instead of revising the document, which is why `WorkflowDocument.Restore` became `WorkflowDocument.Hydrate`.
+- **Update (2026-09-19):** The document `resources` list and each node's `portSchemaSnapshot` are preserved verbatim as extension fragments but are not modeled yet, and no migration pipeline exists, so an older or newer schema version opens read-only. That narrowing is tracked as PL-2026-011.
+- **Evidence:** `src/VisionWeave.Persistence/Workflows/`, `src/VisionWeave.Domain/Workflows/WorkflowDocument.cs`, `tests/VisionWeave.Persistence.Tests/Workflows/`, `tests/VisionWeave.IntegrationTests/Persistence/WorkflowFileExecutionTests.cs`, `docs/adr/0004-workflow-document-and-format.md`.
 - **Owner:** VisionWeave maintainers.
-- **Review again:** Before a user-created workflow can be saved or opened.
+- **Review again:** Before the editor writes documents, when a resource reference enters the catalog, or when the first schema migration is required.
 
 ### PL-2026-008 - Build the first Nodify editor vertical slice
 
@@ -121,3 +123,15 @@
 - **Evidence:** `src/VisionWeave.Application/Execution/WorkflowRunner.cs`, `tests/VisionWeave.Application.Tests/Execution/WorkflowRunnerCancellationTests.cs`, [#1](https://github.com/xin-pu/VisionWeave/issues/1).
 - **Owner:** VisionWeave maintainers.
 - **Review again:** Before extending quarantine behavior to plugins or adding more timing-dependent execution features.
+
+### PL-2026-011 - Model resource references and typed port schema snapshots
+
+- **Status:** Open
+- **Priority:** P1
+- **Recorded on:** 2026-09-19
+- **Scope:** The two `.vwflow` fields the format defines but the model does not carry — the document `resources` list and each node's `portSchemaSnapshot` — together with the migration pipeline that would let an unsupported schema version load instead of opening read-only.
+- **Observation:** The reader preserves both fields verbatim as extension fragments and the writer re-emits them, so a load and a save lose nothing, but nothing can read them either. A resource reference therefore cannot participate in the snapshot fingerprint of ADR-0004 decision 7, and a node whose plugin is absent cannot be rendered from its snapshot, so such a document opens and saves yet shows no placeholder. Every schema version other than the current one opens read-only because no `IWorkflowMigration` is registered.
+- **Decision or next step:** Add a typed port schema snapshot to the node instance model and a resource list to the document, emit both under their own top-level fields, and move the preserved fragments into them with the first schema migration. Introduce `IWorkflowMigration` keyed by source schema version, forward-only and idempotent, when the second schema version appears rather than before it.
+- **Evidence:** `src/VisionWeave.Persistence/Workflows/WorkflowDocumentReader.cs`, `src/VisionWeave.Persistence/Workflows/WorkflowDocumentWriter.cs`, `docs/adr/0004-workflow-document-and-format.md`, `docs/design/visionweave-detailed-design.md` (section 7).
+- **Owner:** VisionWeave maintainers.
+- **Review again:** Before the editor renders a placeholder node, or before the snapshot computes a resource fingerprint.
