@@ -183,6 +183,43 @@ public sealed class FileBackedWorkflowTests
     }
 
     [Fact]
+    public async Task Run_of_the_derivative_nodes_writes_what_they_produced_and_releases_every_lease()
+    {
+        using var directory = new TemporaryDirectory();
+        WriteSplitPlate(directory.File("plate.png"), width: 32, height: 24, dark: 40, bright: 200);
+        WorkflowDocument document = BuildEdgeWorkflow();
+        _ = Save(document, directory);
+
+        LeaseLedger ledger = new();
+        var observer = new ConvertingOutputObserver();
+
+        WorkflowRunSummary summary = await RunAsync(document, ledger, directory, observer);
+
+        summary.Status.ShouldBe(WorkflowRunStatus.Succeeded);
+        summary.Diagnostics.ShouldBeEmpty();
+
+        // The plate is dark on one side and bright on the other, and the node runs
+        // with the thresholds and the aperture a placed node starts with rather than
+        // with values this test chose, so the line the run writes is the one the
+        // definition's defaults produce: a single row of white down the split, and
+        // nothing anywhere the frame is flat.
+        using Mat written = Cv2.ImRead(directory.File("edges.png"), ImreadModes.Grayscale);
+        written.Cols.ShouldBe(32);
+        written.Rows.ShouldBe(24);
+        Cv2.CountNonZero(written).ShouldBe(24);
+        written.At<byte>(0, 15).ShouldBe((byte)255);
+        written.At<byte>(0, 20).ShouldBe((byte)0);
+
+        observer.Previews.Count.ShouldBe(2);
+        observer.Previews[^1].PixelFormat.ShouldBe(FramePixelFormat.Gray8);
+
+        ledger.Created.ShouldBe(2);
+        ledger.Released.ShouldBe(2);
+        ledger.Outstanding.ShouldBe(0);
+        ledger.ReservationsOutstanding.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task Run_again_leaves_the_output_alone_until_the_document_allows_replacement()
     {
         using var directory = new TemporaryDirectory();
@@ -288,6 +325,26 @@ public sealed class FileBackedWorkflowTests
     }
 
     /// <summary>
+    /// Builds the workflow of the migrated derivative nodes: read a plate, find the
+    /// edges in it with the parameters a placed node starts with, and write the map.
+    /// </summary>
+    private static WorkflowDocument BuildEdgeWorkflow()
+    {
+        WorkflowDocument document = WorkflowDocument.Create("edges");
+        NodeInstance source = document.AddNode(new NodeTypeId(OpenCvNodeIds.ImageSourceTypeId), 1, new CanvasPosition(0, 0));
+        NodeInstance canny = document.AddNode(new NodeTypeId(OpenCvNodeIds.CannyTypeId), 1, new CanvasPosition(200, 0));
+        NodeInstance save = document.AddNode(new NodeTypeId(OpenCvNodeIds.SaveImageTypeId), 1, new CanvasPosition(400, 0));
+
+        document.SetNodeParameter(source.InstanceId, OpenCvNodeIds.PathParameter, "plate.png");
+        document.SetNodeParameter(save.InstanceId, OpenCvNodeIds.PathParameter, "edges.png");
+
+        document.AddConnection(source.InstanceId, OpenCvNodeIds.ImagePortId, canny.InstanceId, OpenCvNodeIds.ImagePortId);
+        document.AddConnection(canny.InstanceId, OpenCvNodeIds.EdgesPortId, save.InstanceId, OpenCvNodeIds.ImagePortId);
+
+        return document;
+    }
+
+    /// <summary>
     /// Stores the workflow in the folder that also holds the images, because that
     /// folder is what a run resolves the document's relative paths against.
     /// </summary>
@@ -324,6 +381,19 @@ public sealed class FileBackedWorkflowTests
     private static void WritePlate(string path, int width, int height, byte value)
     {
         using var plate = new Mat(height, width, MatType.CV_8UC3, Scalar.All(value));
+
+        Cv2.ImWrite(path, plate).ShouldBeTrue();
+    }
+
+    private static void WriteSplitPlate(string path, int width, int height, byte dark, byte bright)
+    {
+        using var plate = new Mat(height, width, MatType.CV_8UC3, Scalar.All(dark));
+
+        Cv2.Rectangle(
+            plate,
+            new Rect(width / 2, 0, width - (width / 2), height),
+            Scalar.All(bright),
+            thickness: -1);
 
         Cv2.ImWrite(path, plate).ShouldBeTrue();
     }

@@ -50,6 +50,18 @@ public static class OpenCvNodeIds
     /// <summary>The node type that doubles a frame.</summary>
     public const string PyrUpTypeId = "visionweave.opencv.pyr-up";
 
+    /// <summary>The node type that reports the gradient of a frame along one or both axes.</summary>
+    public const string SobelTypeId = "visionweave.opencv.sobel";
+
+    /// <summary>The node type that reports the gradient of a frame with a three by three kernel.</summary>
+    public const string ScharrTypeId = "visionweave.opencv.scharr";
+
+    /// <summary>The node type that reports the curvature of a frame.</summary>
+    public const string LaplacianTypeId = "visionweave.opencv.laplacian";
+
+    /// <summary>The node type that reports the edges of a frame.</summary>
+    public const string CannyTypeId = "visionweave.opencv.canny";
+
     /// <summary>The executor registration of the Gaussian blur node.</summary>
     public const string GaussianBlurExecutorTypeId = "visionweave.opencv.executor.gaussian-blur";
 
@@ -89,6 +101,18 @@ public static class OpenCvNodeIds
     /// <summary>The executor registration of the pyramid up node.</summary>
     public const string PyrUpExecutorTypeId = "visionweave.opencv.executor.pyr-up";
 
+    /// <summary>The executor registration of the Sobel node.</summary>
+    public const string SobelExecutorTypeId = "visionweave.opencv.executor.sobel";
+
+    /// <summary>The executor registration of the Scharr node.</summary>
+    public const string ScharrExecutorTypeId = "visionweave.opencv.executor.scharr";
+
+    /// <summary>The executor registration of the Laplacian node.</summary>
+    public const string LaplacianExecutorTypeId = "visionweave.opencv.executor.laplacian";
+
+    /// <summary>The executor registration of the Canny node.</summary>
+    public const string CannyExecutorTypeId = "visionweave.opencv.executor.canny";
+
     /// <summary>The identifier of a node's image port, whether it receives one or publishes one.</summary>
     public const string ImagePortId = "image";
 
@@ -112,6 +136,12 @@ public static class OpenCvNodeIds
 
     /// <summary>The identifier of the larger image the pyramid up node publishes.</summary>
     public const string EnlargedPortId = "enlarged";
+
+    /// <summary>The identifier of the gradient the derivative nodes publish.</summary>
+    public const string GradientPortId = "gradient";
+
+    /// <summary>The identifier of the edge map the Canny node publishes.</summary>
+    public const string EdgesPortId = "edges";
 
     /// <summary>The Gaussian kernel size parameter.</summary>
     public const string KernelSizeParameter = "kernelSize";
@@ -169,6 +199,27 @@ public static class OpenCvNodeIds
 
     /// <summary>The offset the adaptive threshold node subtracts from the local average.</summary>
     public const string ConstantParameter = "constant";
+
+    /// <summary>The derivative order the derivative nodes apply across the columns.</summary>
+    public const string XOrderParameter = "xOrder";
+
+    /// <summary>The derivative order the derivative nodes apply down the rows.</summary>
+    public const string YOrderParameter = "yOrder";
+
+    /// <summary>The factor a derivative node applies to the result before it is reported.</summary>
+    public const string ScaleParameter = "scale";
+
+    /// <summary>The gradient below which the Canny node discards a pixel.</summary>
+    public const string ThresholdLowParameter = "thresholdLow";
+
+    /// <summary>The gradient above which the Canny node keeps a pixel.</summary>
+    public const string ThresholdHighParameter = "thresholdHigh";
+
+    /// <summary>The size of the kernel the Canny node measures the gradient with.</summary>
+    public const string ApertureSizeParameter = "apertureSize";
+
+    /// <summary>The switch that lets the Canny node measure the gradient more accurately.</summary>
+    public const string L2GradientParameter = "l2gradient";
 
     /// <summary>The nearest-neighbour interpolation option.</summary>
     public const string InterpolationNearest = "nearest";

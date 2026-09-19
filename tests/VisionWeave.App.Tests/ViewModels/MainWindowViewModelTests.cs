@@ -76,7 +76,7 @@ public sealed class MainWindowViewModelTests : IDisposable
     {
         Shell shell = Create(_directory.SaveReadableDocument(), OpenCvCatalog());
 
-        shell.ViewModel.NodeCatalogSummary.ShouldBe("13 node types available");
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("17 node types available");
         shell.ViewModel.CatalogueGroups.Select(group => group.Category)
             .ShouldBe(
             [
@@ -86,7 +86,17 @@ public sealed class MainWindowViewModelTests : IDisposable
                 OpenCvNodeIds.TransformCategory,
             ]);
         shell.ViewModel.CatalogueGroups[0].Entries.Select(entry => entry.DisplayName)
-            .ShouldBe(["Bilateral Filter", "Blur", "Gaussian Blur", "Median Blur"]);
+            .ShouldBe(
+            [
+                "Bilateral Filter",
+                "Blur",
+                "Canny",
+                "Gaussian Blur",
+                "Laplacian",
+                "Median Blur",
+                "Scharr",
+                "Sobel",
+            ]);
         shell.ViewModel.CatalogueGroups[1].Entries.Select(entry => entry.DisplayName)
             .ShouldBe(["Image Source", "Save Image"]);
         shell.ViewModel.CatalogueGroups[2].Entries.Select(entry => entry.DisplayName)
@@ -333,7 +343,7 @@ public sealed class MainWindowViewModelTests : IDisposable
             .ShouldBe([OpenCvNodeIds.FilterCategory]);
         shell.ViewModel.CatalogueGroups[0].Entries.Select(entry => entry.DisplayName)
             .ShouldBe(["Blur", "Gaussian Blur", "Median Blur"]);
-        shell.ViewModel.NodeCatalogSummary.ShouldBe("3 of 13 node types match “blur”");
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("3 of 17 node types match “blur”");
         shell.ViewModel.CatalogueNotice.ShouldBeEmpty();
     }
 
@@ -359,7 +369,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         // so the region explains itself instead.
         shell.ViewModel.CatalogueGroups.ShouldBeEmpty();
         shell.ViewModel.CatalogueNotice.ShouldBe("No node type matches this search.");
-        shell.ViewModel.NodeCatalogSummary.ShouldBe("0 of 13 node types match “nothing-like-this”");
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("0 of 17 node types match “nothing-like-this”");
     }
 
     [Fact]
@@ -371,7 +381,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         shell.ViewModel.CatalogueSearch = string.Empty;
 
         shell.ViewModel.CatalogueGroups.Count.ShouldBe(4);
-        shell.ViewModel.NodeCatalogSummary.ShouldBe("13 node types available");
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("17 node types available");
         shell.ViewModel.CatalogueNotice.ShouldBeEmpty();
     }
 

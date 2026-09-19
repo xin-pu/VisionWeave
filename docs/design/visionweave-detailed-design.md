@@ -848,19 +848,31 @@ Morphology, Contours, Draw, and Inspect.
 The catalog is filled in batches rather than at once. The first build shipped
 `Image Source` and `Save Image` in Input/Output, and `Gaussian Blur` and `Resize` as
 the Filter and Transform pair that proves the pipeline. The Aries migration then
-added the common single-image operations in two batches. The first took `Colour
+added the common single-image operations in three batches. The first took `Colour
 Conversion` and `Crop` in Transform, `Median Blur` in Filter, and `Threshold` in
 Threshold. The second took the smoothing and pyramid nodes: `Blur` and `Bilateral
 Filter` in Filter, `Adaptive Threshold` in Threshold, and `Pyramid Down` and
-`Pyramid Up` in Transform. Both batches were chosen the same way: each node says
-what it does on a frame the test writes itself, a uniform field or a step with a
-couple of marked pixels in it, so none of them needs a curated sample image to be
-regression-tested. What the batches leave out names its reason in the issue that
-migrated them — the derivative and edge nodes are a change of their own because they
-share the question of which depth a signed result is reported in, and `Filter2D`,
-`Normalize`, the point scaling node, and the channel nodes wait on a kernel
-representation, on a decision about masks and depths, on a consumer for signed
-frames, and on multi-port nodes respectively.
+`Pyramid Up` in Transform. The third took the derivative and edge nodes: `Sobel`,
+`Scharr`, and `Laplacian` in Filter, which measure how fast an image changes, and
+`Canny` beside them, which is the one of the four whose result is a map rather than a
+measurement. The first two batches were chosen the same way: each node says what it
+does on a frame the test writes itself, a uniform field or a step with a couple of
+marked pixels in it, so none of them needs a curated sample image to be
+regression-tested. The third waited on the one decision its nodes share, which is the
+depth a signed result is reported in, and it answers that by reporting the absolute
+value of the derivative in the layout the input was given: no node consumes a signed
+frame and the preview refuses to draw one, so a frame that held the sign would be a
+value nothing could read and nobody could see. With that settled the four read the
+same hand-written frames as the batches before them, a step being what a derivative is
+defined on, and each departure the batch makes from the reference — the axis the
+`Scharr` node declares, the apertures the `Sobel` and `Laplacian` nodes offer, the
+thresholds the `Canny` node refuses — is recorded in PL-2026-003.
+What the batches leave out names its reason in the issue that
+migrated them: `Filter2D`, `Normalize`, the point scaling node, and the channel nodes
+wait on a kernel representation, on a decision about masks and depths, on a consumer
+of its own, and on multi-port nodes respectively; the morphology and draw families
+wait on the batch after theirs, and the contour family waits on the `Contours` value
+ADR-0003 defers.
 The two file-backed nodes — `Image Source` and `Save Image` — are the ones that
 name a file, so they are the nodes a working directory is resolved for (5.4): each
 declares a required `path` parameter, the save node additionally declares the
@@ -868,7 +880,7 @@ declares a required `path` parameter, the save node additionally declares the
 folder that holds the document (ADR-0012). The remaining rows are the catalog this
 design aims at rather than a list of what exists, and each arrives with the curated
 regression images its own entry requires. That is also what the operations whose
-result depends on real image content — Canny, contours, and template matching above
+result depends on real image content — contours and template matching above
 all — are waiting for.
 
 Every migrated node receives output-oriented regression tests, and a node whose result

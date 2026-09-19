@@ -14,8 +14,10 @@ namespace VisionWeave.OpenCv.Nodes;
 /// workflow is built from. Gaussian blur and resize prove the pipeline end to end;
 /// the Aries migration added the common operations around them: colour conversion,
 /// crop, and the pyramids under Transform, a box blur and a bilateral filter beside
-/// the two the first build shipped, and a threshold that measures each pixel
-/// against its own neighbourhood as well as one that compares it with a number.
+/// the two the first build shipped, a threshold that measures each pixel against its
+/// own neighbourhood as well as one that compares it with a number, and the four
+/// nodes that find an edge: the two gradient measurements, the curvature, and the
+/// edge map that follows from a gradient.
 /// </para>
 /// </summary>
 public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
@@ -35,6 +37,10 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
         CreateAdaptiveThreshold(),
         CreatePyrDown(),
         CreatePyrUp(),
+        CreateSobel(),
+        CreateScharr(),
+        CreateLaplacian(),
+        CreateCanny(),
     ];
 
     /// <inheritdoc />
@@ -563,4 +569,210 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
             ],
             [],
             OpenCvNodeIds.PyrUpExecutorTypeId);
+
+    private static NodeDefinition CreateSobel()
+        => new(
+            new NodeTypeId(OpenCvNodeIds.SobelTypeId),
+            TypeVersion: 1,
+            DisplayName: "Sobel",
+            OpenCvNodeIds.FilterCategory,
+            [
+                new PortDefinition(
+                    OpenCvNodeIds.ImagePortId,
+                    PortDirection.Input,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Image"),
+                new PortDefinition(
+                    OpenCvNodeIds.GradientPortId,
+                    PortDirection.Output,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Gradient"),
+            ],
+            [
+                new ParameterDefinition(
+                    OpenCvNodeIds.XOrderParameter,
+                    ParameterKind.Integer,
+                    IsRequired: true,
+                    DisplayName: "Horizontal order",
+                    Minimum: OpenCvParameterBounds.MinDerivativeOrder,
+                    Maximum: OpenCvParameterBounds.MaxDerivativeOrder,
+                    DefaultValue: 1),
+                new ParameterDefinition(
+                    OpenCvNodeIds.YOrderParameter,
+                    ParameterKind.Integer,
+                    IsRequired: true,
+                    DisplayName: "Vertical order",
+                    Minimum: OpenCvParameterBounds.MinDerivativeOrder,
+                    Maximum: OpenCvParameterBounds.MaxDerivativeOrder,
+                    DefaultValue: 0),
+                new ParameterDefinition(
+                    OpenCvNodeIds.KernelSizeParameter,
+                    ParameterKind.Integer,
+                    IsRequired: true,
+                    DisplayName: "Kernel size",
+                    Minimum: OpenCvParameterBounds.MinKernelSize,
+                    Maximum: OpenCvParameterBounds.MaxDerivativeKernelSize,
+                    DefaultValue: 3),
+                new ParameterDefinition(
+                    OpenCvNodeIds.ScaleParameter,
+                    ParameterKind.Number,
+                    IsRequired: true,
+                    DisplayName: "Scale",
+                    Minimum: OpenCvParameterBounds.MinScale,
+                    Maximum: OpenCvParameterBounds.MaxScale,
+                    DefaultValue: 1d),
+            ],
+            OpenCvNodeIds.SobelExecutorTypeId);
+
+    private static NodeDefinition CreateScharr()
+        => new(
+            new NodeTypeId(OpenCvNodeIds.ScharrTypeId),
+            TypeVersion: 1,
+            DisplayName: "Scharr",
+            OpenCvNodeIds.FilterCategory,
+            [
+                new PortDefinition(
+                    OpenCvNodeIds.ImagePortId,
+                    PortDirection.Input,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Image"),
+                new PortDefinition(
+                    OpenCvNodeIds.GradientPortId,
+                    PortDirection.Output,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Gradient"),
+            ],
+            [
+                new ParameterDefinition(
+                    OpenCvNodeIds.XOrderParameter,
+                    ParameterKind.Integer,
+                    IsRequired: true,
+                    DisplayName: "Horizontal order",
+                    Minimum: OpenCvParameterBounds.MinDerivativeOrder,
+                    Maximum: 1,
+                    DefaultValue: 1),
+                new ParameterDefinition(
+                    OpenCvNodeIds.YOrderParameter,
+                    ParameterKind.Integer,
+                    IsRequired: true,
+                    DisplayName: "Vertical order",
+                    Minimum: OpenCvParameterBounds.MinDerivativeOrder,
+                    Maximum: 1,
+                    DefaultValue: 0),
+                new ParameterDefinition(
+                    OpenCvNodeIds.ScaleParameter,
+                    ParameterKind.Number,
+                    IsRequired: true,
+                    DisplayName: "Scale",
+                    Minimum: OpenCvParameterBounds.MinScale,
+                    Maximum: OpenCvParameterBounds.MaxScale,
+                    DefaultValue: 1d),
+            ],
+            OpenCvNodeIds.ScharrExecutorTypeId);
+
+    private static NodeDefinition CreateLaplacian()
+        => new(
+            new NodeTypeId(OpenCvNodeIds.LaplacianTypeId),
+            TypeVersion: 1,
+            DisplayName: "Laplacian",
+            OpenCvNodeIds.FilterCategory,
+            [
+                new PortDefinition(
+                    OpenCvNodeIds.ImagePortId,
+                    PortDirection.Input,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Image"),
+                new PortDefinition(
+                    OpenCvNodeIds.GradientPortId,
+                    PortDirection.Output,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Gradient"),
+            ],
+            [
+                new ParameterDefinition(
+                    OpenCvNodeIds.KernelSizeParameter,
+                    ParameterKind.Integer,
+                    IsRequired: true,
+                    DisplayName: "Kernel size",
+                    Minimum: OpenCvParameterBounds.MinKernelSize,
+                    Maximum: OpenCvParameterBounds.MaxDerivativeKernelSize,
+                    DefaultValue: 1),
+                new ParameterDefinition(
+                    OpenCvNodeIds.ScaleParameter,
+                    ParameterKind.Number,
+                    IsRequired: true,
+                    DisplayName: "Scale",
+                    Minimum: OpenCvParameterBounds.MinScale,
+                    Maximum: OpenCvParameterBounds.MaxScale,
+                    DefaultValue: 1d),
+            ],
+            OpenCvNodeIds.LaplacianExecutorTypeId);
+
+    private static NodeDefinition CreateCanny()
+        => new(
+            new NodeTypeId(OpenCvNodeIds.CannyTypeId),
+            TypeVersion: 1,
+            DisplayName: "Canny",
+            OpenCvNodeIds.FilterCategory,
+            [
+                new PortDefinition(
+                    OpenCvNodeIds.ImagePortId,
+                    PortDirection.Input,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Image"),
+                new PortDefinition(
+                    OpenCvNodeIds.EdgesPortId,
+                    PortDirection.Output,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Edges"),
+            ],
+            [
+                new ParameterDefinition(
+                    OpenCvNodeIds.ThresholdLowParameter,
+                    ParameterKind.Number,
+                    IsRequired: true,
+                    DisplayName: "Low threshold",
+                    Minimum: OpenCvParameterBounds.MinLevel,
+                    Maximum: OpenCvParameterBounds.MaxEdgeThreshold,
+                    DefaultValue: 50d),
+                new ParameterDefinition(
+                    OpenCvNodeIds.ThresholdHighParameter,
+                    ParameterKind.Number,
+                    IsRequired: true,
+                    DisplayName: "High threshold",
+                    Minimum: OpenCvParameterBounds.MinLevel,
+                    Maximum: OpenCvParameterBounds.MaxEdgeThreshold,
+                    DefaultValue: 150d),
+                new ParameterDefinition(
+                    OpenCvNodeIds.ApertureSizeParameter,
+                    ParameterKind.Integer,
+                    IsRequired: true,
+                    DisplayName: "Aperture",
+                    Minimum: OpenCvParameterBounds.MinCannyApertureSize,
+                    Maximum: OpenCvParameterBounds.MaxCannyApertureSize,
+                    DefaultValue: 3),
+                new ParameterDefinition(
+                    OpenCvNodeIds.L2GradientParameter,
+                    ParameterKind.Boolean,
+                    IsRequired: false,
+                    DisplayName: "More accurate gradient",
+                    DefaultValue: false),
+            ],
+            OpenCvNodeIds.CannyExecutorTypeId);
 }
