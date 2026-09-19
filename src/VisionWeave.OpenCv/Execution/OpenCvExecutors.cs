@@ -28,6 +28,10 @@ public static class OpenCvExecutors
             [OpenCvNodeIds.SaveImageExecutorTypeId] = new SaveImageExecutor(),
             [OpenCvNodeIds.GaussianBlurExecutorTypeId] = new GaussianBlurExecutor(ledger),
             [OpenCvNodeIds.ResizeExecutorTypeId] = new ResizeExecutor(ledger),
+            [OpenCvNodeIds.CvtColorExecutorTypeId] = new CvtColorExecutor(ledger),
+            [OpenCvNodeIds.CropExecutorTypeId] = new CropExecutor(ledger),
+            [OpenCvNodeIds.MedianBlurExecutorTypeId] = new MedianBlurExecutor(ledger),
+            [OpenCvNodeIds.ThresholdExecutorTypeId] = new ThresholdExecutor(ledger),
         }.ToFrozenDictionary(StringComparer.Ordinal);
     }
 }

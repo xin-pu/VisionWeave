@@ -76,13 +76,22 @@ public sealed class MainWindowViewModelTests : IDisposable
     {
         Shell shell = Create(_directory.SaveReadableDocument(), OpenCvCatalog());
 
-        shell.ViewModel.NodeCatalogSummary.ShouldBe("4 node types available");
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("8 node types available");
         shell.ViewModel.CatalogueGroups.Select(group => group.Category)
-            .ShouldBe([OpenCvNodeIds.FilterCategory, OpenCvNodeIds.InputOutputCategory, OpenCvNodeIds.TransformCategory]);
-        shell.ViewModel.CatalogueGroups[0].Entries.Select(entry => entry.DisplayName).ShouldBe(["Gaussian Blur"]);
+            .ShouldBe(
+            [
+                OpenCvNodeIds.FilterCategory,
+                OpenCvNodeIds.InputOutputCategory,
+                OpenCvNodeIds.ThresholdCategory,
+                OpenCvNodeIds.TransformCategory,
+            ]);
+        shell.ViewModel.CatalogueGroups[0].Entries.Select(entry => entry.DisplayName)
+            .ShouldBe(["Gaussian Blur", "Median Blur"]);
         shell.ViewModel.CatalogueGroups[1].Entries.Select(entry => entry.DisplayName)
             .ShouldBe(["Image Source", "Save Image"]);
-        shell.ViewModel.CatalogueGroups[2].Entries.Select(entry => entry.DisplayName).ShouldBe(["Resize"]);
+        shell.ViewModel.CatalogueGroups[2].Entries.Select(entry => entry.DisplayName).ShouldBe(["Threshold"]);
+        shell.ViewModel.CatalogueGroups[3].Entries.Select(entry => entry.DisplayName)
+            .ShouldBe(["Colour Conversion", "Crop", "Resize"]);
     }
 
     [Fact]
@@ -321,8 +330,9 @@ public sealed class MainWindowViewModelTests : IDisposable
 
         shell.ViewModel.CatalogueGroups.Select(group => group.Category)
             .ShouldBe([OpenCvNodeIds.FilterCategory]);
-        shell.ViewModel.CatalogueGroups[0].Entries.Select(entry => entry.DisplayName).ShouldBe(["Gaussian Blur"]);
-        shell.ViewModel.NodeCatalogSummary.ShouldBe("1 of 4 node types match “blur”");
+        shell.ViewModel.CatalogueGroups[0].Entries.Select(entry => entry.DisplayName)
+            .ShouldBe(["Gaussian Blur", "Median Blur"]);
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("2 of 8 node types match “blur”");
         shell.ViewModel.CatalogueNotice.ShouldBeEmpty();
     }
 
@@ -348,7 +358,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         // so the region explains itself instead.
         shell.ViewModel.CatalogueGroups.ShouldBeEmpty();
         shell.ViewModel.CatalogueNotice.ShouldBe("No node type matches this search.");
-        shell.ViewModel.NodeCatalogSummary.ShouldBe("0 of 4 node types match “nothing-like-this”");
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("0 of 8 node types match “nothing-like-this”");
     }
 
     [Fact]
@@ -359,8 +369,8 @@ public sealed class MainWindowViewModelTests : IDisposable
 
         shell.ViewModel.CatalogueSearch = string.Empty;
 
-        shell.ViewModel.CatalogueGroups.Count.ShouldBe(3);
-        shell.ViewModel.NodeCatalogSummary.ShouldBe("4 node types available");
+        shell.ViewModel.CatalogueGroups.Count.ShouldBe(4);
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("8 node types available");
         shell.ViewModel.CatalogueNotice.ShouldBeEmpty();
     }
 

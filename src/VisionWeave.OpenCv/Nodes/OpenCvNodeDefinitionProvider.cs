@@ -8,11 +8,12 @@ namespace VisionWeave.OpenCv.Nodes;
 /// built-in nodes and a future plugin are registered through the same path and
 /// the composition root cannot treat one of them specially.
 /// <para>
-/// The first release contributes two pairs: the frames a file produces and
-/// consumes — an image source and a save image, which are the nodes that name a
-/// file and therefore the nodes a working directory is resolved for — and the two
-/// transforms that prove the pipeline without touching the file system, Gaussian
-/// blur and resize.
+/// The catalog holds the nodes a file produces and consumes — an image source
+/// and a save image, which are the nodes that name a file and therefore the nodes
+/// a working directory is resolved for — and the single-image operations a
+/// workflow is built from: the two transforms that prove the pipeline, Gaussian
+/// blur and resize, and the common operations migrated from Aries: colour
+/// conversion, crop, median blur, and threshold.
 /// </para>
 /// </summary>
 public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
@@ -23,6 +24,10 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
         CreateSaveImage(),
         CreateGaussianBlur(),
         CreateResize(),
+        CreateCvtColor(),
+        CreateCrop(),
+        CreateMedianBlur(),
+        CreateThreshold(),
     ];
 
     /// <inheritdoc />
@@ -179,4 +184,178 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
                     DefaultValue: OpenCvNodeIds.InterpolationArea),
             ],
             OpenCvNodeIds.ResizeExecutorTypeId);
+
+    private static NodeDefinition CreateCvtColor()
+        => new(
+            new NodeTypeId(OpenCvNodeIds.CvtColorTypeId),
+            TypeVersion: 1,
+            DisplayName: "Colour Conversion",
+            OpenCvNodeIds.TransformCategory,
+            [
+                new PortDefinition(
+                    OpenCvNodeIds.ImagePortId,
+                    PortDirection.Input,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Image"),
+                new PortDefinition(
+                    OpenCvNodeIds.ConvertedPortId,
+                    PortDirection.Output,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Image"),
+            ],
+            [
+                new ParameterDefinition(
+                    OpenCvNodeIds.ConversionParameter,
+                    ParameterKind.Option,
+                    IsRequired: false,
+                    DisplayName: "Conversion",
+                    Options: OpenCvNodeIds.ConversionOptions,
+                    DefaultValue: OpenCvNodeIds.ConversionGray),
+            ],
+            OpenCvNodeIds.CvtColorExecutorTypeId);
+
+    private static NodeDefinition CreateCrop()
+        => new(
+            new NodeTypeId(OpenCvNodeIds.CropTypeId),
+            TypeVersion: 1,
+            DisplayName: "Crop",
+            OpenCvNodeIds.TransformCategory,
+            [
+                new PortDefinition(
+                    OpenCvNodeIds.ImagePortId,
+                    PortDirection.Input,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Image"),
+                new PortDefinition(
+                    OpenCvNodeIds.CroppedPortId,
+                    PortDirection.Output,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Image"),
+            ],
+            [
+                new ParameterDefinition(
+                    OpenCvNodeIds.XParameter,
+                    ParameterKind.Integer,
+                    IsRequired: true,
+                    DisplayName: "Left",
+                    Minimum: OpenCvParameterBounds.MinOrigin,
+                    Maximum: OpenCvParameterBounds.MaxDimension,
+                    DefaultValue: 0),
+                new ParameterDefinition(
+                    OpenCvNodeIds.YParameter,
+                    ParameterKind.Integer,
+                    IsRequired: true,
+                    DisplayName: "Top",
+                    Minimum: OpenCvParameterBounds.MinOrigin,
+                    Maximum: OpenCvParameterBounds.MaxDimension,
+                    DefaultValue: 0),
+                new ParameterDefinition(
+                    OpenCvNodeIds.WidthParameter,
+                    ParameterKind.Integer,
+                    IsRequired: true,
+                    DisplayName: "Width",
+                    Minimum: OpenCvParameterBounds.MinDimension,
+                    Maximum: OpenCvParameterBounds.MaxDimension,
+                    DefaultValue: 640),
+                new ParameterDefinition(
+                    OpenCvNodeIds.HeightParameter,
+                    ParameterKind.Integer,
+                    IsRequired: true,
+                    DisplayName: "Height",
+                    Minimum: OpenCvParameterBounds.MinDimension,
+                    Maximum: OpenCvParameterBounds.MaxDimension,
+                    DefaultValue: 480),
+            ],
+            OpenCvNodeIds.CropExecutorTypeId);
+
+    private static NodeDefinition CreateMedianBlur()
+        => new(
+            new NodeTypeId(OpenCvNodeIds.MedianBlurTypeId),
+            TypeVersion: 1,
+            DisplayName: "Median Blur",
+            OpenCvNodeIds.FilterCategory,
+            [
+                new PortDefinition(
+                    OpenCvNodeIds.ImagePortId,
+                    PortDirection.Input,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Image"),
+                new PortDefinition(
+                    OpenCvNodeIds.BlurredPortId,
+                    PortDirection.Output,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Image"),
+            ],
+            [
+                new ParameterDefinition(
+                    OpenCvNodeIds.KernelSizeParameter,
+                    ParameterKind.Integer,
+                    IsRequired: true,
+                    DisplayName: "Kernel size",
+                    Minimum: OpenCvParameterBounds.MinMedianKernelSize,
+                    Maximum: OpenCvParameterBounds.MaxKernelSize,
+                    DefaultValue: 3),
+            ],
+            OpenCvNodeIds.MedianBlurExecutorTypeId);
+
+    private static NodeDefinition CreateThreshold()
+        => new(
+            new NodeTypeId(OpenCvNodeIds.ThresholdTypeId),
+            TypeVersion: 1,
+            DisplayName: "Threshold",
+            OpenCvNodeIds.ThresholdCategory,
+            [
+                new PortDefinition(
+                    OpenCvNodeIds.ImagePortId,
+                    PortDirection.Input,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Image"),
+                new PortDefinition(
+                    OpenCvNodeIds.ThresholdedPortId,
+                    PortDirection.Output,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Image"),
+            ],
+            [
+                new ParameterDefinition(
+                    OpenCvNodeIds.ThresholdParameter,
+                    ParameterKind.Number,
+                    IsRequired: true,
+                    DisplayName: "Threshold",
+                    Minimum: OpenCvParameterBounds.MinLevel,
+                    Maximum: OpenCvParameterBounds.MaxLevel,
+                    DefaultValue: 122d),
+                new ParameterDefinition(
+                    OpenCvNodeIds.MaxValueParameter,
+                    ParameterKind.Number,
+                    IsRequired: true,
+                    DisplayName: "Value above the threshold",
+                    Minimum: OpenCvParameterBounds.MinLevel,
+                    Maximum: OpenCvParameterBounds.MaxLevel,
+                    DefaultValue: 255d),
+                new ParameterDefinition(
+                    OpenCvNodeIds.ThresholdTypeParameter,
+                    ParameterKind.Option,
+                    IsRequired: false,
+                    DisplayName: "Rule",
+                    Options: OpenCvNodeIds.ThresholdTypeOptions,
+                    DefaultValue: OpenCvNodeIds.ThresholdBinary),
+            ],
+            OpenCvNodeIds.ThresholdExecutorTypeId);
 }
