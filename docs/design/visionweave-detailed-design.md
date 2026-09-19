@@ -892,7 +892,8 @@ diagnostic.
 
 Plugins are disabled by default in the first release. `PluginSdk` is still
 implemented as a small stable contract so built-in providers exercise the same
-registration path. External loading is not exposed until its dedicated ADR and
+registration path, and the host does not reference it while nothing loads a
+plugin. External loading is not exposed until its dedicated ADR and
 integration tests are accepted.
 
 The future plugin manifest must declare plugin ID, version, node type IDs,

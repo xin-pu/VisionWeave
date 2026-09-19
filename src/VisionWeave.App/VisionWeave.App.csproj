@@ -26,7 +26,6 @@
     <ProjectReference Include="..\VisionWeave.Application\VisionWeave.Application.csproj" />
     <ProjectReference Include="..\VisionWeave.OpenCv\VisionWeave.OpenCv.csproj" />
     <ProjectReference Include="..\VisionWeave.Persistence\VisionWeave.Persistence.csproj" />
-    <ProjectReference Include="..\VisionWeave.PluginSdk\VisionWeave.PluginSdk.csproj" />
   </ItemGroup>
 
 </Project>
