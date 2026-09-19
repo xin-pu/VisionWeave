@@ -1,4 +1,5 @@
 ﻿using VisionWeave.Contracts.Nodes;
+using VisionWeave.Contracts.Workflows;
 
 namespace VisionWeave.Domain.Workflows;
 
@@ -13,6 +14,7 @@ public sealed class WorkflowDocument
 {
     private readonly Dictionary<Guid, NodeInstance> _nodes = [];
     private readonly List<WorkflowConnection> _connections = [];
+    private readonly List<ResourceReference> _resources = [];
     private readonly Dictionary<string, string> _extensionData = new(StringComparer.Ordinal);
     private readonly HashSet<string> _requiredPlugins = new(StringComparer.Ordinal);
     private bool _isHydrating;
@@ -76,6 +78,13 @@ public sealed class WorkflowDocument
     /// Gets the plugin identifiers the document depends on.
     /// </summary>
     public IReadOnlyCollection<string> RequiredPlugins => _requiredPlugins;
+
+    /// <summary>
+    /// Gets the resources the document declares that a node depends on, in the
+    /// order the document records them. A resource is a reference, never a machine
+    /// fingerprint, so the same workflow stays portable between machines.
+    /// </summary>
+    public IReadOnlyList<ResourceReference> Resources => _resources;
 
     /// <summary>
     /// Gets unknown fields preserved from a loaded document, keyed by field name.
@@ -363,6 +372,19 @@ public sealed class WorkflowDocument
     }
 
     /// <summary>
+    /// Declares a resource the document depends on. Unlike a remembered port
+    /// schema, a resource is document state the user controls: adding one is an
+    /// edit, so it marks the document as changed and moves the revision.
+    /// </summary>
+    /// <param name="resource">The reference to add.</param>
+    public void AddResource(ResourceReference resource)
+    {
+        ArgumentNullException.ThrowIfNull(resource);
+        _resources.Add(resource);
+        Commit(semantic: true);
+    }
+
+    /// <summary>
     /// Preserves an unknown field read from a saved document.
     /// </summary>
     /// <param name="name">The field name.</param>
@@ -387,6 +409,21 @@ public sealed class WorkflowDocument
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(json);
         GetNode(instanceId).SetExtensionData(name, json);
+        Commit(semantic: false);
+    }
+
+    /// <summary>
+    /// Records the ports a node was saved with, which a later session renders the
+    /// node from when its definition is unavailable. This is remembered rendering
+    /// data rather than an edit, so it does not move the revision.
+    /// </summary>
+    /// <param name="instanceId">The instance the snapshot belongs to.</param>
+    /// <param name="snapshot">The remembered ports, in the order the document recorded them.</param>
+    /// <exception cref="KeyNotFoundException">The instance is not present.</exception>
+    public void SetNodePortSchemaSnapshot(Guid instanceId, IReadOnlyList<PortSchemaEntry> snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        GetNode(instanceId).SetPortSchemaSnapshot(snapshot);
         Commit(semantic: false);
     }
 
@@ -439,6 +476,7 @@ public sealed class WorkflowDocument
         }
 
         clone._connections.AddRange(_connections);
+        clone._resources.AddRange(_resources);
 
         foreach (KeyValuePair<string, string> extension in _extensionData)
         {

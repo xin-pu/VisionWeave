@@ -444,9 +444,10 @@ absolute user-machine assumptions.
 ```
 
 Load occurs in two phases. First, the reader validates JSON and schema
-integrity while preserving unknown fields, node `extensionData`, and each
-node's `portSchemaSnapshot` (port ID, direction, type, multiplicity, and
-display metadata). Second, catalog-based executable validation resolves known
+integrity while preserving unknown fields and node `extensionData`, and reads
+each node's `portSchemaSnapshot` (port ID, direction, and, when the saving build
+recorded them, type, multiplicity, optionality, and display metadata) into the
+node model. Second, catalog-based executable validation resolves known
 node types, validates current parameters and ports, and checks graph rules. A
 missing plugin node becomes a non-executable placeholder rendered from its
 snapshot; its raw JSON and connections remain intact so it can be restored when
@@ -455,18 +456,30 @@ without destructive rewrite.
 
 The implemented version 1 writer stores `schemaVersion`, `documentId`, `name`,
 `createdUtc`, `modifiedUtc`, `revision`, the optional `appVersion`,
-`requiredPlugins`, `nodes`, `connections`, and every field the build does not
-model. A node entry records `id`, `typeId`, `typeVersion`, `parameters`,
-`layout`, and `extensionData`, plus `label` and `enabled` when they differ from
-their defaults; a connection records its own `id`. A file is read when it
-declares `documentId`, `name`, `createdUtc`, and `revision`; otherwise it
-reports `VW-FILE-001` and yields no document. A schema version this build
-cannot migrate reports `VW-FILE-002` and opens read-only, and an entry or field
-that cannot be represented is skipped with `VW-FILE-003` rather than failing
+`requiredPlugins`, `resources`, `nodes`, `connections`, and every field the build
+does not model. A node entry records `id`, `typeId`, `typeVersion`, `parameters`,
+`portSchemaSnapshot`, `layout`, and `extensionData`, plus `label` and `enabled`
+when they differ from their defaults; a connection records its own `id`. A file is
+read when it declares `documentId`, `name`, `createdUtc`, and `revision`;
+otherwise it reports `VW-FILE-001` and yields no document. A schema version this
+build cannot migrate reports `VW-FILE-002` and opens read-only, and an entry or
+field that cannot be represented is skipped with `VW-FILE-003` rather than failing
 the load. Reading never changes the stored revision or modification instant,
-because a load is not an edit. The `resources` list and each node's
-`portSchemaSnapshot` are preserved verbatim but are not modeled yet, which
-PL-2026-011 tracks.
+because a load is not an edit.
+
+A resource is a typed reference: a `file` kind with a path and an optional digest
+the user supplied, or a kind this build does not model, kept verbatim so a later
+build still finds it. Because a resource is user-editable data a run will read,
+adding one counts as an edit — it changes the revision and makes the session
+report the document dirty. A remembered port schema is a rendering fallback
+rather than a second source of truth: refreshing it changes no revision, and a
+member this build cannot read is treated as one that was never recorded. Both
+contracts, and the read and write policy for an entry that cannot be represented,
+are recorded in
+[ADR-0011](../adr/0011-resource-references-and-port-schema-snapshots.md). The
+machine fingerprint of a resource stays runtime-only, because a document stores a
+reference and not a fingerprint, and no migration is required to read either
+field: both are version 1 fields that the format already defines.
 
 Migrations are explicit `IWorkflowMigration` implementations keyed by source
 schema version. They are forward-only, idempotent, preserve unknown extension
@@ -629,6 +642,7 @@ Implementation starts only after these records exist and link back here:
 | [ADR-0008](../adr/0008-async-ui-command-boundary.md) | The single asynchronous command and error boundary: expected failures as diagnostics, cancellation as an outcome, one presenter for user-facing messages, and the message-box exception at startup. | Accepted |
 | [ADR-0009](../adr/0009-editor-session-orchestration.md) | The host-layer editing session that composes the document session, the command history, the selection, and the validation projection, and the transitions it owns. | Accepted |
 | [ADR-0010](../adr/0010-diagnostic-targets.md) | The closed hierarchy of diagnostic targets narrower than a node, how the validator attributes them, and how the projection answers per port, parameter, and connection. | Accepted |
+| [ADR-0011](../adr/0011-resource-references-and-port-schema-snapshots.md) | Resource references and remembered port schemas as typed contracts: what a document edit they are, what the constructors guarantee, and how the reader and writer treat an entry they cannot represent. | Accepted |
 | [docs/ledger/standards-deviations.md](../ledger/standards-deviations.md) | Each approved exception to the adopted standards, or an explicit "none" baseline. | No deviations |
 
 ## 13. Alternatives considered

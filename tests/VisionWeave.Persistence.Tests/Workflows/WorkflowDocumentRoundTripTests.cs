@@ -1,5 +1,6 @@
 ﻿using Shouldly;
 using VisionWeave.Contracts.Nodes;
+using VisionWeave.Contracts.Workflows;
 using VisionWeave.Domain.Workflows;
 using VisionWeave.Persistence.Tests.Support;
 using VisionWeave.Persistence.Workflows;
@@ -33,6 +34,7 @@ public sealed class WorkflowDocumentRoundTripTests
         loaded.ModifiedUtc.ShouldBe(saved.ModifiedUtc);
         loaded.AppVersion.ShouldBe(saved.AppVersion);
         loaded.RequiredPlugins.ShouldBe(saved.RequiredPlugins, ignoreOrder: true);
+        loaded.Resources.ShouldBe(saved.Resources);
         loaded.ExtensionData["futureField"].ShouldBe("""{"a":1}""");
         loaded.Nodes.Count.ShouldBe(2);
 
@@ -42,6 +44,7 @@ public sealed class WorkflowDocumentRoundTripTests
         blur.Label.ShouldBe("Blur A");
         blur.IsEnabled.ShouldBeFalse();
         blur.ExtensionData["futureNodeField"].ShouldBe("""{"b":[1,2]}""");
+        blur.PortSchemaSnapshot.ShouldBe(saved.GetNode(blur.InstanceId).PortSchemaSnapshot);
 
         NodeParameterSet parameters = new(blur.Parameters);
         parameters.GetInt32("kernelSize").ShouldBe(5);
@@ -81,6 +84,27 @@ public sealed class WorkflowDocumentRoundTripTests
         WorkflowConnection connection = loaded.Connections.ShouldHaveSingleItem();
         connection.SourcePortId.ShouldBe("gone");
         connection.TargetPortId.ShouldBe("missing");
+    }
+
+    [Fact]
+    public void Save_and_load_round_trip_a_resource_of_a_kind_this_build_does_not_model()
+    {
+        using var directory = new TemporaryDirectory();
+        string path = directory.File("unmodelled-resource.vwflow");
+        WorkflowDocument document = WorkflowDocument.Create("unmodelled resource");
+        document.AddResource(new UnknownResourceReference("camera", """{"kind":"camera","index":2}"""));
+
+        WorkflowDocumentWriter.Save(document, path);
+        WorkflowDocument loaded = WorkflowDocumentReader.Load(path).Document!;
+
+        UnknownResourceReference resource = loaded.Resources.ShouldHaveSingleItem()
+            .ShouldBeOfType<UnknownResourceReference>();
+        resource.Kind.ShouldBe("camera");
+        resource.Json.ShouldBe("""{"kind":"camera","index":2}""");
+
+        // A declared resource is stored state, so it survives at the revision the
+        // document had when it was saved.
+        loaded.Revision.ShouldBe(document.Revision);
     }
 
     [Fact]

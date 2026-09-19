@@ -21,6 +21,7 @@ internal static class WorkflowJson
     internal const string Extensions = "extensions";
     internal const string Nodes = "nodes";
     internal const string Connections = "connections";
+    internal const string Resources = "resources";
 
     internal const string NodeId = "id";
     internal const string NodeTypeId = "typeId";
@@ -30,6 +31,21 @@ internal static class WorkflowJson
     internal const string NodeLayout = "layout";
     internal const string NodeLabel = "label";
     internal const string NodeEnabled = "enabled";
+    internal const string NodePortSchemaSnapshot = "portSchemaSnapshot";
+
+    internal const string ResourceKind = "kind";
+    internal const string ResourcePath = "path";
+    internal const string ResourceExpectedSha256 = "expectedSha256";
+
+    /// <summary>The resource kind whose members the format defines.</summary>
+    internal const string FileResourceKind = "file";
+
+    internal const string SnapshotPortId = "portId";
+    internal const string SnapshotDirection = "direction";
+    internal const string SnapshotTypeId = "typeId";
+    internal const string SnapshotMultiplicity = "multiplicity";
+    internal const string SnapshotIsOptional = "isOptional";
+    internal const string SnapshotDisplayName = "displayName";
 
     internal const string LayoutX = "x";
     internal const string LayoutY = "y";

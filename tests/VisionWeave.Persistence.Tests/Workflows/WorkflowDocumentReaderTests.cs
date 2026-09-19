@@ -1,6 +1,8 @@
 ﻿using System.Globalization;
 using Shouldly;
 using VisionWeave.Contracts.Diagnostics;
+using VisionWeave.Contracts.Ports;
+using VisionWeave.Contracts.Workflows;
 using VisionWeave.Domain.Workflows;
 using VisionWeave.Persistence.Tests.Support;
 using VisionWeave.Persistence.Workflows;
@@ -63,25 +65,23 @@ public sealed class WorkflowDocumentReaderTests
           "typeId": "visionweave.opencv.gaussian-blur",
           "typeVersion": 1,
           "parameters": { "kernelSize": 5 },
-          "portSchemaSnapshot": [{"portId":"image","direction":"Output"}],
           "extensionData": { "futureNodeField": {"b":[1,2]} },
           "futureLayoutHint": "pinned"
         }]
         """;
         const string extra = """
-            "resources": [{"kind":"file","path":"a.png"}], "futureField": {"a":1}
+            "futureField": {"a":1}
             """;
         string path = Write(directory, Document(nodes: nodes, extra: extra));
 
         WorkflowLoadResult result = WorkflowDocumentReader.Load(path);
 
         result.Succeeded.ShouldBeTrue();
+        result.Diagnostics.ShouldBeEmpty();
         WorkflowDocument document = result.Document!;
-        document.ExtensionData["resources"].ShouldBe("""[{"kind":"file","path":"a.png"}]""");
         document.ExtensionData["futureField"].ShouldBe("""{"a":1}""");
 
         NodeInstance node = document.GetNode(NodeId);
-        node.ExtensionData["portSchemaSnapshot"].ShouldBe("""[{"portId":"image","direction":"Output"}]""");
         node.ExtensionData["futureNodeField"].ShouldBe("""{"b":[1,2]}""");
         node.ExtensionData["futureLayoutHint"].ShouldBe("\"pinned\"");
 
@@ -89,15 +89,234 @@ public sealed class WorkflowDocumentReaderTests
         WorkflowDocumentWriter.Save(document, saved);
         string content = File.ReadAllText(saved);
 
-        content.ShouldContain("\"resources\"");
         content.ShouldContain("\"futureField\"");
-        content.ShouldContain("portSchemaSnapshot");
+        content.ShouldContain("futureNodeField");
         content.ShouldContain("futureLayoutHint");
 
         WorkflowDocument reloaded = WorkflowDocumentReader.Load(saved).Document!;
-        reloaded.ExtensionData["resources"].ShouldBe("""[{"kind":"file","path":"a.png"}]""");
-        reloaded.GetNode(NodeId).ExtensionData["portSchemaSnapshot"]
-            .ShouldBe("""[{"portId":"image","direction":"Output"}]""");
+        reloaded.ExtensionData["futureField"].ShouldBe("""{"a":1}""");
+        reloaded.GetNode(NodeId).ExtensionData["futureLayoutHint"].ShouldBe("\"pinned\"");
+    }
+
+    [Fact]
+    public void Load_reads_a_file_resource_reference_with_its_digest()
+    {
+        using var directory = new TemporaryDirectory();
+        const string extra = """
+            "resources": [{"kind":"file","path":"assets/plate.png","expectedSha256":"9f2c1a"}]
+            """;
+        string path = Write(directory, Document(extra: extra));
+
+        WorkflowLoadResult result = WorkflowDocumentReader.Load(path);
+
+        result.Succeeded.ShouldBeTrue();
+        result.Diagnostics.ShouldBeEmpty();
+        result.Document!.Resources.ShouldHaveSingleItem()
+            .ShouldBe(new FileResourceReference("assets/plate.png", "9f2c1a"));
+    }
+
+    [Fact]
+    public void Load_reads_a_file_resource_reference_that_pins_no_digest()
+    {
+        using var directory = new TemporaryDirectory();
+        const string extra = """
+            "resources": [{"kind":"file","path":"assets/plate.png"}]
+            """;
+        string path = Write(directory, Document(extra: extra));
+
+        WorkflowLoadResult result = WorkflowDocumentReader.Load(path);
+
+        result.Diagnostics.ShouldBeEmpty();
+        result.Document!.Resources.ShouldHaveSingleItem()
+            .ShouldBe(new FileResourceReference("assets/plate.png"));
+    }
+
+    [Fact]
+    public void Load_preserves_a_resource_of_a_kind_this_build_does_not_model()
+    {
+        using var directory = new TemporaryDirectory();
+        const string extra = """
+            "resources": [{"kind":"camera","index":2}]
+            """;
+        string path = Write(directory, Document(extra: extra));
+
+        WorkflowLoadResult result = WorkflowDocumentReader.Load(path);
+
+        // An unmodelled kind is not an incoherent document, so nothing is reported
+        // and the entry is kept exactly as it was stored.
+        result.Diagnostics.ShouldBeEmpty();
+        UnknownResourceReference resource = result.Document!.Resources.ShouldHaveSingleItem()
+            .ShouldBeOfType<UnknownResourceReference>();
+        resource.Kind.ShouldBe("camera");
+        resource.Json.ShouldBe("""{"kind":"camera","index":2}""");
+
+        string saved = directory.File("preserved.vwflow");
+        WorkflowDocumentWriter.Save(result.Document!, saved);
+
+        UnknownResourceReference rewritten = WorkflowDocumentReader.Load(saved)
+            .Document!.Resources.ShouldHaveSingleItem().ShouldBeOfType<UnknownResourceReference>();
+        rewritten.Kind.ShouldBe("camera");
+        rewritten.Json.ShouldBe("""{"kind":"camera","index":2}""");
+    }
+
+    [Fact]
+    public void Load_resources_that_are_not_an_array_are_skipped_with_vw_file_003()
+    {
+        using var directory = new TemporaryDirectory();
+        const string extra = """
+            "resources": {"kind":"file","path":"assets/plate.png"}
+            """;
+        string path = Write(directory, Document(extra: extra));
+
+        WorkflowLoadResult result = WorkflowDocumentReader.Load(path);
+
+        result.Succeeded.ShouldBeTrue();
+        result.Document!.Resources.ShouldBeEmpty();
+        result.Diagnostics.ShouldHaveSingleItem().Code.ShouldBe(DiagnosticCodes.DroppedDocumentEntry);
+    }
+
+    [Fact]
+    public void Load_skips_a_file_resource_without_a_path_with_vw_file_003()
+    {
+        using var directory = new TemporaryDirectory();
+        const string extra = """
+            "resources": [{"kind":"file","expectedSha256":"9f2c1a"}]
+            """;
+        string path = Write(directory, Document(extra: extra));
+
+        WorkflowLoadResult result = WorkflowDocumentReader.Load(path);
+
+        result.Document!.Resources.ShouldBeEmpty();
+        result.Diagnostics.ShouldHaveSingleItem().Code.ShouldBe(DiagnosticCodes.DroppedDocumentEntry);
+    }
+
+    [Fact]
+    public void Load_reads_a_port_schema_snapshot_with_every_member()
+    {
+        using var directory = new TemporaryDirectory();
+        string nodes = $$"""
+        [{
+          "id": "{{NodeId}}",
+          "typeId": "visionweave.missing.enhance",
+          "typeVersion": 4,
+          "portSchemaSnapshot": [{
+            "portId": "image",
+            "direction": "Input",
+            "typeId": "{{BuiltInPortTypeIds.ImageFrame.Value}}",
+            "multiplicity": "Single",
+            "isOptional": false,
+            "displayName": "Image"
+          }]
+        }]
+        """;
+        string path = Write(directory, Document(nodes: nodes));
+
+        WorkflowLoadResult result = WorkflowDocumentReader.Load(path);
+
+        result.Succeeded.ShouldBeTrue();
+        result.Diagnostics.ShouldBeEmpty();
+        PortSchemaEntry port = result.Document!.GetNode(NodeId).PortSchemaSnapshot.ShouldHaveSingleItem();
+        port.PortId.ShouldBe("image");
+        port.Direction.ShouldBe(PortDirection.Input);
+        port.TypeId.ShouldBe(BuiltInPortTypeIds.ImageFrame);
+        port.Multiplicity.ShouldBe(PortMultiplicity.Single);
+        port.IsOptional.ShouldBe(false);
+        port.DisplayName.ShouldBe("Image");
+    }
+
+    [Fact]
+    public void Load_reads_a_snapshot_entry_that_records_only_a_port_and_direction()
+    {
+        using var directory = new TemporaryDirectory();
+        string nodes = $$"""
+        [{
+          "id": "{{NodeId}}",
+          "typeId": "visionweave.missing.enhance",
+          "typeVersion": 4,
+          "portSchemaSnapshot": [{"portId":"mask","direction":"Output"}]
+        }]
+        """;
+        string path = Write(directory, Document(nodes: nodes));
+
+        WorkflowLoadResult result = WorkflowDocumentReader.Load(path);
+
+        result.Diagnostics.ShouldBeEmpty();
+        PortSchemaEntry port = result.Document!.GetNode(NodeId).PortSchemaSnapshot.ShouldHaveSingleItem();
+        port.PortId.ShouldBe("mask");
+        port.Direction.ShouldBe(PortDirection.Output);
+        port.TypeId.ShouldBeNull();
+        port.Multiplicity.ShouldBeNull();
+        port.IsOptional.ShouldBeNull();
+        port.DisplayName.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Load_treats_a_snapshot_member_it_cannot_read_as_one_that_was_never_recorded()
+    {
+        using var directory = new TemporaryDirectory();
+        string nodes = $$"""
+        [{
+          "id": "{{NodeId}}",
+          "typeId": "visionweave.missing.enhance",
+          "typeVersion": 4,
+          "portSchemaSnapshot": [{"portId":"image","direction":"Input","multiplicity":"Occasionally"}]
+        }]
+        """;
+        string path = Write(directory, Document(nodes: nodes));
+
+        WorkflowLoadResult result = WorkflowDocumentReader.Load(path);
+
+        // The port and its direction identify the port, so the entry survives; a
+        // descriptive member this build cannot read is treated as absent.
+        result.Diagnostics.ShouldBeEmpty();
+        PortSchemaEntry port = result.Document!.GetNode(NodeId).PortSchemaSnapshot.ShouldHaveSingleItem();
+        port.PortId.ShouldBe("image");
+        port.Multiplicity.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Load_skips_a_snapshot_entry_without_a_port_or_direction_with_vw_file_003()
+    {
+        using var directory = new TemporaryDirectory();
+        string nodes = $$"""
+        [{
+          "id": "{{NodeId}}",
+          "typeId": "visionweave.missing.enhance",
+          "typeVersion": 4,
+          "portSchemaSnapshot": [
+            {"portId":"image","direction":"Input"},
+            {"direction":"Input"},
+            {"portId":"mask","direction":"Sideways"}
+          ]
+        }]
+        """;
+        string path = Write(directory, Document(nodes: nodes));
+
+        WorkflowLoadResult result = WorkflowDocumentReader.Load(path);
+
+        result.Document!.GetNode(NodeId).PortSchemaSnapshot.ShouldHaveSingleItem().PortId.ShouldBe("image");
+        result.Diagnostics.Count.ShouldBe(2);
+        result.Diagnostics.ShouldAllBe(item => item.Code == DiagnosticCodes.DroppedDocumentEntry);
+    }
+
+    [Fact]
+    public void Load_skips_a_snapshot_that_is_not_an_array_with_vw_file_003()
+    {
+        using var directory = new TemporaryDirectory();
+        string nodes = $$"""
+        [{
+          "id": "{{NodeId}}",
+          "typeId": "visionweave.missing.enhance",
+          "typeVersion": 4,
+          "portSchemaSnapshot": {"portId":"image","direction":"Input"}
+        }]
+        """;
+        string path = Write(directory, Document(nodes: nodes));
+
+        WorkflowLoadResult result = WorkflowDocumentReader.Load(path);
+
+        result.Document!.GetNode(NodeId).PortSchemaSnapshot.ShouldBeEmpty();
+        result.Diagnostics.ShouldHaveSingleItem().Code.ShouldBe(DiagnosticCodes.DroppedDocumentEntry);
     }
 
     [Fact]

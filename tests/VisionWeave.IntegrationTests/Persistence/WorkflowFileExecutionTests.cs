@@ -1,6 +1,7 @@
 ﻿using Shouldly;
 using VisionWeave.Application.Execution;
 using VisionWeave.Contracts.Diagnostics;
+using VisionWeave.Contracts.Ports;
 using VisionWeave.Domain.Workflows;
 using VisionWeave.IntegrationTests.Support;
 using VisionWeave.OpenCv.Nodes;
@@ -74,8 +75,8 @@ public sealed class WorkflowFileExecutionTests
         document.Nodes.Count.ShouldBe(2);
         document.Connections.Count.ShouldBe(1);
         document.GetNode(unknownNodeId).TypeVersion.ShouldBe(4);
-        document.GetNode(unknownNodeId).ExtensionData["portSchemaSnapshot"]
-            .ShouldBe("""[{"portId":"image","direction":"Input"}]""");
+        document.GetNode(unknownNodeId).PortSchemaSnapshot.ShouldHaveSingleItem()
+            .Direction.ShouldBe(PortDirection.Input);
 
         SnapshotBuildResult captured = new WorkflowSnapshotFactory(NativeWorkflow.Catalog()).Build(document);
 
@@ -86,6 +87,8 @@ public sealed class WorkflowFileExecutionTests
         WorkflowDocument rewritten = WorkflowDocumentReader.Load(file.Path).Document!;
         rewritten.Nodes.Count.ShouldBe(2);
         rewritten.GetNode(unknownNodeId).Parameters["strength"].ShouldBe(2L);
+        rewritten.GetNode(unknownNodeId).PortSchemaSnapshot.ShouldHaveSingleItem()
+            .PortId.ShouldBe("image");
         rewritten.Connections.Count.ShouldBe(1);
         rewritten.GetNode(knownNodeId).NodeTypeId.ShouldBe(NativeWorkflow.SourceType);
     }

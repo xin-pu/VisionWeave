@@ -1,5 +1,6 @@
 ﻿using Shouldly;
 using VisionWeave.Contracts.Diagnostics;
+using VisionWeave.Contracts.Workflows;
 using VisionWeave.Domain.Workflows;
 using VisionWeave.Persistence.Tests.Support;
 using VisionWeave.Persistence.Workflows;
@@ -52,6 +53,31 @@ public sealed class WorkflowSessionTests : IDisposable
         session.Document.MoveNode(node.InstanceId, new CanvasPosition(10, 10));
 
         session.IsDirty.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Adding_a_resource_marks_the_document_dirty_and_changes_the_revision()
+    {
+        WorkflowSession session = WorkflowSession.New("workflow");
+        session.Document.AddNode(SampleDocument.SourceType, 1, new CanvasPosition(0, 0));
+        string path = _directory.File("resources.vwflow");
+        session.Save(path);
+        long revision = session.Document.Revision;
+
+        // A resource is user data a run will read, not a rendering hint, so adding
+        // one has to count as an edit that autosave is willing to write.
+        session.Document.AddResource(new FileResourceReference("assets/plate.png"));
+
+        session.IsDirty.ShouldBeTrue();
+        session.Document.Revision.ShouldBe(revision + 1);
+
+        session.TryAutosave().ShouldBeTrue();
+
+        WorkflowDocument recovered = WorkflowDocumentReader
+            .Load(WorkflowDocumentWriter.GetWorkingCopyPath(path))
+            .Document!;
+        recovered.Resources.ShouldHaveSingleItem()
+            .ShouldBe(new FileResourceReference("assets/plate.png"));
     }
 
     [Fact]

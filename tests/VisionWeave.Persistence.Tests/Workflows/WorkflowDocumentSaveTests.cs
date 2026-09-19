@@ -1,4 +1,6 @@
-﻿using Shouldly;
+﻿using System.Text.Json;
+using Shouldly;
+using VisionWeave.Contracts.Nodes;
 using VisionWeave.Domain.Workflows;
 using VisionWeave.Persistence.Tests.Support;
 using VisionWeave.Persistence.Workflows;
@@ -48,6 +50,47 @@ public sealed class WorkflowDocumentSaveTests
         WorkflowDocumentWriter.Save(SampleDocument.Build(), path);
 
         File.Exists(path).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Save_emits_resources_and_a_port_schema_snapshot_under_their_own_fields()
+    {
+        using var directory = new TemporaryDirectory();
+        string path = directory.File("typed-fields.vwflow");
+
+        WorkflowDocumentWriter.Save(SampleDocument.Build(), path);
+
+        using JsonDocument stored = JsonDocument.Parse(File.ReadAllText(path));
+        JsonElement root = stored.RootElement;
+        JsonElement resources = root.GetProperty("resources");
+        resources.GetArrayLength().ShouldBe(1);
+        resources[0].GetProperty("kind").GetString().ShouldBe("file");
+        resources[0].GetProperty("path").GetString().ShouldBe("assets/plate.png");
+
+        JsonElement node = root.GetProperty("nodes")
+            .EnumerateArray()
+            .Single(item => item.GetProperty("typeId").GetString() == "visionweave.opencv.gaussian-blur");
+
+        // The snapshot belongs to the node entry, where the format declares it, and
+        // not inside the node's extension data, which holds what this build does not
+        // model.
+        node.GetProperty("portSchemaSnapshot").GetArrayLength().ShouldBe(2);
+        node.GetProperty("extensionData").TryGetProperty("portSchemaSnapshot", out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Save_omits_a_resource_list_and_a_snapshot_that_are_empty()
+    {
+        using var directory = new TemporaryDirectory();
+        string path = directory.File("empty-fields.vwflow");
+        WorkflowDocument document = WorkflowDocument.Create("empty");
+        document.AddNode(new NodeTypeId("visionweave.test.unknown"), 1, new CanvasPosition(0, 0));
+
+        WorkflowDocumentWriter.Save(document, path);
+
+        string content = File.ReadAllText(path);
+        content.ShouldNotContain("\"resources\"");
+        content.ShouldNotContain("portSchemaSnapshot");
     }
 
     [Fact]
