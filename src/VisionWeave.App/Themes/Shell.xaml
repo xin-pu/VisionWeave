@@ -141,14 +141,29 @@
     -->
     <Style x:Key="Shell.CanvasConnector" TargetType="nodify:Connector">
         <Setter Property="IsConnected" Value="True" />
-        <Setter Property="Width" Value="12" />
-        <Setter Property="Height" Value="12" />
-        <Setter Property="Background" Value="{DynamicResource Brush.Text.Secondary}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Background.SurfaceRaised}" />
-        <Setter Property="BorderThickness" Value="2" />
+        <Setter Property="Width" Value="16" />
+        <Setter Property="Height" Value="16" />
+        <Setter Property="Background" Value="{DynamicResource Brush.Accent.Primary}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Background.Canvas}" />
         <Setter Property="Cursor" Value="Cross" />
         <Setter Property="ToolTip" Value="{Binding Summary}" />
         <Setter Property="FocusVisualStyle" Value="{StaticResource Shell.FocusVisual}" />
+        <!--
+            Nodify's stock connector has no guaranteed visible chrome under every
+            host theme. Draw the port in the required PART_Connector element so a
+            connection endpoint is always discoverable and remains interactive.
+        -->
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="nodify:Connector">
+                    <Ellipse x:Name="PART_Connector"
+                             Fill="{TemplateBinding Background}"
+                             SnapsToDevicePixels="True"
+                             Stroke="{TemplateBinding BorderBrush}"
+                             StrokeThickness="2" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
         <Style.Triggers>
             <DataTrigger Binding="{Binding Severity}" Value="Warning">
                 <Setter Property="Background" Value="{DynamicResource Brush.State.Warning}" />

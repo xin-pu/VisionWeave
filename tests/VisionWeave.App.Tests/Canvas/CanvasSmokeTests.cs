@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Shapes;
 using System.Windows.Threading;
 using Nodify;
 using OpenCvSharp;
@@ -186,6 +187,13 @@ public sealed class CanvasSmokeTests
         Connector[] blurPorts = [.. Descendants<Connector>(blurContainer)];
         blurPorts.Length.ShouldBe(2);
         blurPorts.ShouldAllBe(port => port.Anchor != default);
+        foreach (Connector port in blurPorts)
+        {
+            Ellipse indicator = Descendants<Ellipse>(port).Single(ellipse => ellipse.Stroke is not null);
+            indicator.Fill.ShouldNotBeNull();
+            indicator.Stroke.ShouldNotBeNull();
+            port.Template.FindName("PART_Connector", port).ShouldBeOfType<Ellipse>();
+        }
 
         canvas.AddNodeCommand.Execute(OpenCvNodeIds.ResizeTypeId);
         Lay(window);
