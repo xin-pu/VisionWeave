@@ -105,12 +105,13 @@ depending on Application or forcing OpenCvSharp into Domain.
 Specifically, `NodeTypeId`, `NodeDefinition`, `PortDefinition`, parameter
 schemas, `INodeDefinitionProvider`, `INodeExecutor`, execution requests/results,
 `NodeDiagnostic`, and `DiagnosticCodes` are all declared in `Contracts`.
-`Domain` declares only `NodeInstance`, `WorkflowConnection`, `WorkflowGraph`,
-and their structural invariants.
-
-`Domain` has no WPF, Nodify, OpenCvSharp, file-system, or dependency-injection
-reference. `Application` has no WPF or Nodify reference. Architecture tests
-assert every row of the table.
+`Domain` declares only `NodeInstance`, `WorkflowConnection`, `WorkflowDocument`,
+and the referential integrity and revision accounting of those collections.
+Connection legality — direction, type, multiplicity, and cycles — is decided by
+the Application validator, so a loaded document can be non-executable, displayed,
+and repaired. `Domain` has no WPF, Nodify, OpenCvSharp, file-system, or
+dependency-injection reference. `Application` has no WPF or Nodify reference.
+Architecture tests assert every row of the table.
 
 Each project explicitly sets its `RootNamespace`. Every source file uses the
 root namespace plus all directory segments relative to its `.csproj` file. For
@@ -133,7 +134,7 @@ and allows the catalog to evolve deliberately.
 | `NodeInstance` | Instance ID, type ID, parameter JSON, enabled state, canvas-neutral annotations. |
 | `PortDefinition` | ID, direction, data type, multiplicity, optionality, and display name. |
 | `WorkflowConnection` | Source instance/port and destination instance/port. |
-| `WorkflowGraph` | Node instances and connections; validates structural invariants. |
+| `WorkflowDocument` | Node instances, connections, revisions, metadata; guarantees referential integrity only, so a non-executable document stays loadable ([ADR-0004](../adr/0004-workflow-document-and-format.md)). |
 | `NodeDiagnostic` | Stable code, severity, safe user message, node ID, and optional exception details for logs. |
 
 `INodeDefinitionProvider`, `INodeExecutor`, `NodeExecutionRequest`, and

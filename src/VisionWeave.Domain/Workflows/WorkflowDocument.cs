@@ -1,22 +1,386 @@
-﻿namespace VisionWeave.Domain.Workflows;
+﻿using VisionWeave.Contracts.Nodes;
 
+namespace VisionWeave.Domain.Workflows;
+
+/// <summary>
+/// The editable, persisted form of a workflow. A document is always loadable,
+/// renderable, and savable, even when it is not executable: connection legality
+/// is decided by the application validator, not here. This type enforces only the
+/// coherence of its own collections and the revision accounting that execution
+/// invalidation depends on.
+/// </summary>
 public sealed class WorkflowDocument
 {
-    private WorkflowDocument(Guid id, string name)
+    private readonly Dictionary<Guid, NodeInstance> _nodes = [];
+    private readonly List<WorkflowConnection> _connections = [];
+    private readonly Dictionary<string, string> _extensionData = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _requiredPlugins = new(StringComparer.Ordinal);
+
+    private WorkflowDocument(Guid id, string name, long revision, DateTimeOffset createdUtc, TimeProvider timeProvider)
     {
         Id = id;
         Name = name;
+        Revision = revision;
+        CreatedUtc = createdUtc;
+        ModifiedUtc = createdUtc;
+        TimeProvider = timeProvider;
     }
 
+    /// <summary>
+    /// Gets the document identifier.
+    /// </summary>
     public Guid Id { get; }
 
-    public string Name { get; }
+    /// <summary>
+    /// Gets the workflow name.
+    /// </summary>
+    public string Name { get; private set; }
 
+    /// <summary>
+    /// Gets the revision that execution invalidation is keyed on. Semantic edits
+    /// increment it; layout-only edits do not.
+    /// </summary>
     public long Revision { get; private set; }
 
-    public static WorkflowDocument Create(string name)
+    /// <summary>
+    /// Gets the instant the document was created.
+    /// </summary>
+    public DateTimeOffset CreatedUtc { get; }
+
+    /// <summary>
+    /// Gets the instant the document was last changed.
+    /// </summary>
+    public DateTimeOffset ModifiedUtc { get; private set; }
+
+    /// <summary>
+    /// Gets the placed node instances.
+    /// </summary>
+    public IReadOnlyCollection<NodeInstance> Nodes => _nodes.Values;
+
+    /// <summary>
+    /// Gets the saved connections.
+    /// </summary>
+    public IReadOnlyList<WorkflowConnection> Connections => _connections;
+
+    /// <summary>
+    /// Gets the plugin identifiers the document depends on.
+    /// </summary>
+    public IReadOnlyCollection<string> RequiredPlugins => _requiredPlugins;
+
+    /// <summary>
+    /// Gets unknown fields preserved from a loaded document, keyed by field name.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> ExtensionData => _extensionData;
+
+    /// <summary>
+    /// Gets the application version that last wrote the document, when known.
+    /// </summary>
+    public string? AppVersion { get; private set; }
+
+    private TimeProvider TimeProvider { get; }
+
+    /// <summary>
+    /// Creates an empty document.
+    /// </summary>
+    /// <param name="name">The workflow name.</param>
+    /// <param name="timeProvider">The clock used for timestamps.</param>
+    /// <returns>The new document.</returns>
+    public static WorkflowDocument Create(string name, TimeProvider? timeProvider = null)
+    {
+        TimeProvider clock = timeProvider ?? TimeProvider.System;
+        return new WorkflowDocument(Guid.NewGuid(), RequireName(name), 0, clock.GetUtcNow(), clock);
+    }
+
+    /// <summary>
+    /// Rehydrates a document that was loaded from storage, including its
+    /// revision, so that cached results keyed on the revision stay coherent.
+    /// </summary>
+    /// <param name="id">The stored document identifier.</param>
+    /// <param name="name">The stored workflow name.</param>
+    /// <param name="revision">The stored revision.</param>
+    /// <param name="createdUtc">The stored creation instant.</param>
+    /// <param name="timeProvider">The clock used for timestamps.</param>
+    /// <returns>The restored document.</returns>
+    public static WorkflowDocument Restore(
+        Guid id,
+        string name,
+        long revision,
+        DateTimeOffset createdUtc,
+        TimeProvider? timeProvider = null)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(revision);
+        return new WorkflowDocument(id, RequireName(name), revision, createdUtc, timeProvider ?? TimeProvider.System);
+    }
+
+    /// <summary>
+    /// Adds a node instance to the document.
+    /// </summary>
+    /// <param name="nodeTypeId">The node type to place.</param>
+    /// <param name="typeVersion">The definition version the instance is saved with.</param>
+    /// <param name="position">The canvas position.</param>
+    /// <param name="instanceId">An explicit instance identifier, or a new one.</param>
+    /// <returns>The added instance.</returns>
+    public NodeInstance AddNode(
+        NodeTypeId nodeTypeId,
+        int typeVersion,
+        CanvasPosition position,
+        Guid? instanceId = null)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(typeVersion);
+
+        Guid id = instanceId ?? Guid.NewGuid();
+        if (_nodes.ContainsKey(id))
+        {
+            throw new InvalidOperationException($"Node instance '{id}' already exists in the document.");
+        }
+
+        var node = new NodeInstance(id, nodeTypeId, typeVersion, position);
+        _nodes.Add(id, node);
+        Commit(semantic: true);
+        return node;
+    }
+
+    /// <summary>
+    /// Removes a node instance and every connection attached to it.
+    /// </summary>
+    /// <param name="instanceId">The instance identifier.</param>
+    public void RemoveNode(Guid instanceId)
+    {
+        if (!_nodes.Remove(instanceId))
+        {
+            throw new KeyNotFoundException($"Node instance '{instanceId}' is not present in the document.");
+        }
+
+        _connections.RemoveAll(connection =>
+            connection.SourceNodeId == instanceId || connection.TargetNodeId == instanceId);
+
+        Commit(semantic: true);
+    }
+
+    /// <summary>
+    /// Moves a node on the canvas. Layout is document state but it does not
+    /// invalidate execution.
+    /// </summary>
+    /// <param name="instanceId">The instance identifier.</param>
+    /// <param name="position">The new canvas position.</param>
+    public void MoveNode(Guid instanceId, CanvasPosition position)
+    {
+        GetNode(instanceId).SetPosition(position);
+        Commit(semantic: false);
+    }
+
+    /// <summary>
+    /// Sets or clears a display label. Labels do not affect execution.
+    /// </summary>
+    /// <param name="instanceId">The instance identifier.</param>
+    /// <param name="label">The label, or <see langword="null"/> to clear it.</param>
+    public void SetNodeLabel(Guid instanceId, string? label)
+    {
+        GetNode(instanceId).SetLabel(label);
+        Commit(semantic: false);
+    }
+
+    /// <summary>
+    /// Enables or disables a node instance.
+    /// </summary>
+    /// <param name="instanceId">The instance identifier.</param>
+    /// <param name="isEnabled">Whether the node takes part in a run.</param>
+    public void SetNodeEnabled(Guid instanceId, bool isEnabled)
+    {
+        GetNode(instanceId).SetEnabled(isEnabled);
+        Commit(semantic: true);
+    }
+
+    /// <summary>
+    /// Sets a validated parameter value on a node instance.
+    /// </summary>
+    /// <param name="instanceId">The instance identifier.</param>
+    /// <param name="name">The parameter name.</param>
+    /// <param name="value">The parameter value.</param>
+    public void SetNodeParameter(Guid instanceId, string name, object? value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        return new WorkflowDocument(Guid.NewGuid(), name);
+        GetNode(instanceId).SetParameter(name, value);
+        Commit(semantic: true);
+    }
+
+    /// <summary>
+    /// Records the definition version a migrated node instance now conforms to.
+    /// </summary>
+    /// <param name="instanceId">The instance identifier.</param>
+    /// <param name="typeVersion">The new definition version.</param>
+    public void SetNodeTypeVersion(Guid instanceId, int typeVersion)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(typeVersion);
+        GetNode(instanceId).SetTypeVersion(typeVersion);
+        Commit(semantic: true);
+    }
+
+    /// <summary>
+    /// Renames the workflow.
+    /// </summary>
+    /// <param name="name">The new name.</param>
+    public void Rename(string name)
+    {
+        Name = RequireName(name);
+        Commit(semantic: true);
+    }
+
+    /// <summary>
+    /// Adds a connection between two existing node instances. Whether the pairing
+    /// is legal is decided by the application validator.
+    /// </summary>
+    /// <param name="sourceNodeId">The producing node instance.</param>
+    /// <param name="sourcePortId">The output port identifier.</param>
+    /// <param name="targetNodeId">The consuming node instance.</param>
+    /// <param name="targetPortId">The input port identifier.</param>
+    /// <param name="connectionId">An explicit connection identifier, or a new one.</param>
+    /// <returns>The added connection.</returns>
+    public WorkflowConnection AddConnection(
+        Guid sourceNodeId,
+        string sourcePortId,
+        Guid targetNodeId,
+        string targetPortId,
+        Guid? connectionId = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourcePortId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(targetPortId);
+        RequireNode(sourceNodeId);
+        RequireNode(targetNodeId);
+
+        Guid id = connectionId ?? Guid.NewGuid();
+        if (_connections.Any(connection => connection.ConnectionId == id))
+        {
+            throw new InvalidOperationException($"Connection '{id}' already exists in the document.");
+        }
+
+        var connection = new WorkflowConnection(id, sourceNodeId, sourcePortId, targetNodeId, targetPortId);
+        _connections.Add(connection);
+        Commit(semantic: true);
+        return connection;
+    }
+
+    /// <summary>
+    /// Removes a connection.
+    /// </summary>
+    /// <param name="connectionId">The connection identifier.</param>
+    public void RemoveConnection(Guid connectionId)
+    {
+        int removed = _connections.RemoveAll(connection => connection.ConnectionId == connectionId);
+        if (removed == 0)
+        {
+            throw new KeyNotFoundException($"Connection '{connectionId}' is not present in the document.");
+        }
+
+        Commit(semantic: true);
+    }
+
+    /// <summary>
+    /// Registers a plugin the document depends on.
+    /// </summary>
+    /// <param name="pluginId">The plugin identifier.</param>
+    public void RequirePlugin(string pluginId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(pluginId);
+        _requiredPlugins.Add(pluginId);
+    }
+
+    /// <summary>
+    /// Preserves an unknown field read from a saved document.
+    /// </summary>
+    /// <param name="name">The field name.</param>
+    /// <param name="json">The raw JSON fragment.</param>
+    public void PreserveExtension(string name, string json)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(json);
+        _extensionData[name] = json;
+        Commit(semantic: false);
+    }
+
+    /// <summary>
+    /// Records the application version that wrote the document. This is file
+    /// metadata and does not change the workflow revision.
+    /// </summary>
+    /// <param name="appVersion">The application version, or <see langword="null"/>.</param>
+    public void RecordAppVersion(string? appVersion)
+    {
+        AppVersion = appVersion;
+    }
+
+    /// <summary>
+    /// Gets a node instance.
+    /// </summary>
+    /// <param name="instanceId">The instance identifier.</param>
+    /// <returns>The node instance.</returns>
+    /// <exception cref="KeyNotFoundException">The instance is not present.</exception>
+    public NodeInstance GetNode(Guid instanceId)
+        => _nodes.TryGetValue(instanceId, out NodeInstance? node)
+            ? node
+            : throw new KeyNotFoundException($"Node instance '{instanceId}' is not present in the document.");
+
+    /// <summary>
+    /// Tries to get a node instance.
+    /// </summary>
+    /// <param name="instanceId">The instance identifier.</param>
+    /// <param name="node">The node instance when it is present.</param>
+    /// <returns><see langword="true"/> when the instance is present.</returns>
+    public bool TryGetNode(Guid instanceId, out NodeInstance? node) => _nodes.TryGetValue(instanceId, out node);
+
+    /// <summary>
+    /// Creates a deep copy that shares no mutable state with this document, which
+    /// undo, redo, and snapshot construction rely on.
+    /// </summary>
+    /// <returns>The copy.</returns>
+    public WorkflowDocument Clone()
+    {
+        var clone = new WorkflowDocument(Id, Name, Revision, CreatedUtc, TimeProvider)
+        {
+            ModifiedUtc = ModifiedUtc,
+            AppVersion = AppVersion,
+        };
+
+        foreach (NodeInstance node in _nodes.Values)
+        {
+            clone._nodes.Add(node.InstanceId, node.Copy());
+        }
+
+        clone._connections.AddRange(_connections);
+
+        foreach (KeyValuePair<string, string> extension in _extensionData)
+        {
+            clone._extensionData[extension.Key] = extension.Value;
+        }
+
+        foreach (string plugin in _requiredPlugins)
+        {
+            clone._requiredPlugins.Add(plugin);
+        }
+
+        return clone;
+    }
+
+    private static string RequireName(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        return name;
+    }
+
+    private void RequireNode(Guid instanceId)
+    {
+        if (!_nodes.ContainsKey(instanceId))
+        {
+            throw new KeyNotFoundException($"Node instance '{instanceId}' is not present in the document.");
+        }
+    }
+
+    private void Commit(bool semantic)
+    {
+        if (semantic)
+        {
+            Revision++;
+        }
+
+        ModifiedUtc = TimeProvider.GetUtcNow();
     }
 }
