@@ -1,10 +1,13 @@
 ﻿using Microsoft.Extensions.Logging;
 using Shouldly;
 using VisionWeave.App.Commands;
+using VisionWeave.App.Sessions;
 using VisionWeave.App.Tests.Support;
 using VisionWeave.App.ViewModels;
 using VisionWeave.Application.Definitions;
-using VisionWeave.Persistence.Workflows;
+using VisionWeave.Application.Editing;
+using VisionWeave.Contracts.Nodes;
+using VisionWeave.Domain.Workflows;
 
 namespace VisionWeave.App.Tests.ViewModels;
 
@@ -17,8 +20,8 @@ public sealed class MainWindowViewModelTests : IDisposable
     [Fact]
     public async Task OpenDocument_opened_document_replaces_the_session_and_refreshes_the_presentation()
     {
-        OpenDocumentCommand openDocument = Create(_directory.SaveReadableDocument());
-        MainWindowViewModel viewModel = new(WorkflowSession.New("Untitled"), NodeDefinitionCatalog.Empty, openDocument);
+        (OpenDocumentCommand openDocument, EditorSession session) = Create(_directory.SaveReadableDocument());
+        MainWindowViewModel viewModel = new(session, NodeDefinitionCatalog.Empty, openDocument);
         List<string?> raised = [];
         viewModel.PropertyChanged += (_, args) => raised.Add(args.PropertyName);
 
@@ -38,24 +41,39 @@ public sealed class MainWindowViewModelTests : IDisposable
     [Fact]
     public async Task OpenDocument_unreadable_file_leaves_the_current_session_in_place()
     {
-        OpenDocumentCommand openDocument = Create(_directory.PathOf("absent.vwflow"));
-        MainWindowViewModel viewModel = new(WorkflowSession.New("Untitled"), NodeDefinitionCatalog.Empty, openDocument);
-        WorkflowSession original = viewModel.Session;
+        (OpenDocumentCommand openDocument, EditorSession session) = Create(_directory.PathOf("absent.vwflow"));
+        MainWindowViewModel viewModel = new(session, NodeDefinitionCatalog.Empty, openDocument);
 
         await openDocument.Command.ExecuteAsync(null);
 
-        viewModel.Session.ShouldBeSameAs(original);
-        viewModel.DocumentTitle.ShouldBe("Untitled");
+        viewModel.Session.Path.ShouldBeNull();
+        viewModel.DocumentTitle.ShouldBe(EditorSession.UntitledDocumentName);
         _presenter.Presented.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task OpenDocument_committed_edit_marks_the_document_summary_unsaved()
+    {
+        (OpenDocumentCommand openDocument, EditorSession session) = Create(_directory.SaveReadableDocument());
+        MainWindowViewModel viewModel = new(session, NodeDefinitionCatalog.Empty, openDocument);
+        await openDocument.Command.ExecuteAsync(null);
+        List<string?> raised = [];
+        viewModel.PropertyChanged += (_, args) => raised.Add(args.PropertyName);
+
+        session.Execute(new AddNodeCommand(new NodeTypeId("visionweave.test.unknown"), 1, new CanvasPosition(0, 0)));
+
+        viewModel.DocumentSummary.ShouldContain("unsaved changes");
+        raised.ShouldContain(nameof(MainWindowViewModel.DocumentSummary));
     }
 
     /// <inheritdoc />
     public void Dispose() => _directory.Dispose();
 
-    private OpenDocumentCommand Create(string path)
+    private (OpenDocumentCommand Command, EditorSession Session) Create(string path)
     {
-        OpenDocumentCommand command = new(new AsyncCommandBoundary(_presenter, _logger), new DocumentLoader());
+        EditorSession session = TestSessions.Create();
+        OpenDocumentCommand command = new(new AsyncCommandBoundary(_presenter, _logger), session);
         command.Path = path;
-        return command;
+        return (command, session);
     }
 }

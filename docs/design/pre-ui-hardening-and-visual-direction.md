@@ -138,4 +138,5 @@ facts are demonstrably true:
 - [ADR-0006: editor and UI commit protocol](../adr/0006-editor-and-ui-commit-protocol.md)
 - [ADR-0007: host composition, configuration, and logging stack](../adr/0007-host-composition-and-configuration.md)
 - [ADR-0008: async command and error boundary](../adr/0008-async-ui-command-boundary.md)
+- [ADR-0009: editor session orchestration](../adr/0009-editor-session-orchestration.md)
 - [Project improvements ledger](../ledger/project-improvements.md)

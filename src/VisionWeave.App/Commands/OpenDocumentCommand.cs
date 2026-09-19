@@ -1,13 +1,14 @@
 ﻿using CommunityToolkit.Mvvm.Input;
+using VisionWeave.App.Sessions;
 using VisionWeave.Persistence.Workflows;
 
 namespace VisionWeave.App.Commands;
 
 /// <summary>
-/// The representative document command: it opens the file named by
-/// <see cref="Path"/> and hands the loaded session to whoever subscribed. It
-/// exists to prove the command and error boundary end to end before the canvas
-/// adds commands of its own.
+/// Opens the file named by <see cref="Path"/> into the editing session. It is the
+/// shell's entry point to the session: the session itself decides what an opened
+/// file means, and it announces the result, so this command only carries the
+/// running state and the failure boundary around the read.
 /// </summary>
 internal sealed class OpenDocumentCommand
 {
@@ -15,18 +16,18 @@ internal sealed class OpenDocumentCommand
     internal const string OperationName = "OpenDocument";
 
     private readonly AsyncCommandBoundary _boundary;
-    private readonly IDocumentLoader _loader;
+    private readonly EditorSession _session;
 
     /// <summary>Creates the command.</summary>
     /// <param name="boundary">The boundary that runs the operation and reports its outcome.</param>
-    /// <param name="loader">The loader that turns a path into a session.</param>
-    internal OpenDocumentCommand(AsyncCommandBoundary boundary, IDocumentLoader loader)
+    /// <param name="session">The session the opened document replaces.</param>
+    internal OpenDocumentCommand(AsyncCommandBoundary boundary, EditorSession session)
     {
         ArgumentNullException.ThrowIfNull(boundary);
-        ArgumentNullException.ThrowIfNull(loader);
+        ArgumentNullException.ThrowIfNull(session);
 
         _boundary = boundary;
-        _loader = loader;
+        _session = session;
 
         // The toolkit owns the command's state: IsRunning, CanExecute, the token
         // source behind Cancel, and the notifications that report them. Concurrent
@@ -45,47 +46,35 @@ internal sealed class OpenDocumentCommand
     /// </summary>
     internal string? Path { get; set; }
 
-    /// <summary>Raised with the loaded session once a document was opened.</summary>
-    internal event EventHandler<WorkflowSession>? Opened;
-
     /// <summary>
-    /// Opens the file and reports the session. The boundary is the only path to the
-    /// loader, so the task this returns cannot fault, and the final await
-    /// deliberately returns to the context that asked for the command: every state
-    /// change — the toolkit's IsRunning and CanExecute notifications and the
-    /// <see cref="Opened"/> event — is then raised on the thread that owns that
-    /// context, and a <c>ConfigureAwait(false)</c> here would move them onto a
-    /// worker thread where a binding cannot use them.
+    /// Opens the file into the session. The boundary is the only path to the read,
+    /// so the task this returns cannot fault, and the final await deliberately
+    /// returns to the context that asked for the command: the session's change
+    /// notifications are then raised on the thread that owns that context, and a
+    /// <c>ConfigureAwait(false)</c> here would move them onto a worker thread where
+    /// a binding cannot use them.
     /// </summary>
     private async Task OpenFromPathAsync(CancellationToken cancellationToken)
     {
-        WorkflowSession? opened = null;
         string path = Path ?? string.Empty;
 
-        CommandExecutionResult result = await _boundary
+        await _boundary
             .RunAsync(
                 OperationName,
                 async token =>
                 {
                     // Reading a file is blocking work, so it runs off the calling
                     // thread and the shell keeps responding to input while it waits.
-                    WorkflowSessionResult loaded = await Task
-                        .Run(() => _loader.Open(path), token)
+                    // The session refuses the result when this command has been
+                    // stopped, so a cancelled open cannot replace the document the
+                    // shell is editing.
+                    WorkflowSessionResult opened = await Task
+                        .Run(() => _session.Open(path, token), token)
                         .ConfigureAwait(false);
 
-                    // A stopped command must not go on to replace the document the
-                    // shell is editing, and the read itself cannot be interrupted.
-                    token.ThrowIfCancellationRequested();
-
-                    opened = loaded.Session;
-                    return loaded.Diagnostics;
+                    return opened.Diagnostics;
                 },
                 cancellationToken)
             .ConfigureAwait(true);
-
-        if (result.Succeeded && opened is not null)
-        {
-            Opened?.Invoke(this, opened);
-        }
     }
 }

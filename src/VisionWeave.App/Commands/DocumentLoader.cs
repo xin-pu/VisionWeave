@@ -34,12 +34,37 @@ internal sealed class DocumentLoader : IDocumentLoader
         }
     }
 
+    /// <inheritdoc />
+    public WorkflowSessionResult Recover(string path)
+    {
+        try
+        {
+            return WorkflowSession.Recover(path);
+        }
+        catch (Exception exception) when (IsUnusablePath(exception))
+        {
+            return new WorkflowSessionResult(
+                null,
+                [
+                    new NodeDiagnostic(
+                        DiagnosticCodes.UnreadableDocument,
+                        DiagnosticSeverity.Error,
+                        "The recovered workflow file could not be opened. Check that you are allowed to read it.",
+                        null,
+                        exception),
+                ]);
+        }
+    }
+
+    /// <inheritdoc />
+    public bool HasWorkingCopy(string path) => WorkflowSession.HasWorkingCopy(path);
+
     /// <summary>
-    /// The failures a path produces before any content is read. They are expected
-    /// outcomes of asking to open a file, so they are reported as a diagnostic
-    /// rather than as an unanticipated failure.
+    /// The failures a path produces before any content is read or written. They are
+    /// expected outcomes of naming a file, so both opening and saving report them as
+    /// a diagnostic rather than as an unanticipated failure.
     /// </summary>
-    private static bool IsUnusablePath(Exception exception)
+    internal static bool IsUnusablePath(Exception exception)
         => exception is System.IO.IOException
             or UnauthorizedAccessException
             or ArgumentException

@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using Shouldly;
 using VisionWeave.App.Commands;
+using VisionWeave.App.Sessions;
 using VisionWeave.App.Tests.Support;
 using VisionWeave.Contracts.Diagnostics;
 using VisionWeave.Persistence.Workflows;
@@ -14,17 +15,14 @@ public sealed class OpenDocumentCommandTests : IDisposable
     private readonly TemporaryWorkflowDirectory _directory = new();
 
     [Fact]
-    public async Task OpenCommand_readable_document_raises_opened_with_the_loaded_session()
+    public async Task OpenCommand_readable_document_opens_it_into_the_session()
     {
-        OpenDocumentCommand command = Create(new DocumentLoader(), _directory.SaveReadableDocument());
-        WorkflowSession? opened = null;
-        command.Opened += (_, session) => opened = session;
+        (OpenDocumentCommand command, EditorSession session) = Create(new DocumentLoader(), _directory.SaveReadableDocument());
 
         await command.Command.ExecuteAsync(null);
 
-        opened.ShouldNotBeNull();
-        opened.Document.Name.ShouldBe("Saved workflow");
-        opened.Path.ShouldBe(System.IO.Path.GetFullPath(_directory.PathOf("workflow.vwflow")));
+        session.Document.Name.ShouldBe("Saved workflow");
+        session.Path.ShouldBe(System.IO.Path.GetFullPath(_directory.PathOf("workflow.vwflow")));
         _presenter.Presented.ShouldBeEmpty();
         _logger.Count(LogLevel.Error).ShouldBe(0);
     }
@@ -32,9 +30,7 @@ public sealed class OpenDocumentCommandTests : IDisposable
     [Fact]
     public async Task OpenCommand_missing_file_reports_vw_file_001_without_logging_a_defect()
     {
-        OpenDocumentCommand command = Create(new DocumentLoader(), _directory.PathOf("absent.vwflow"));
-        bool opened = false;
-        command.Opened += (_, _) => opened = true;
+        (OpenDocumentCommand command, EditorSession session) = Create(new DocumentLoader(), _directory.PathOf("absent.vwflow"));
 
         await command.Command.ExecuteAsync(null);
 
@@ -42,25 +38,26 @@ public sealed class OpenDocumentCommandTests : IDisposable
         reported.Code.ShouldBe(DiagnosticCodes.UnreadableDocument);
         reported.Severity.ShouldBe(DiagnosticSeverity.Error);
         reported.Exception.ShouldNotBeNull();
-        opened.ShouldBeFalse();
+        session.Path.ShouldBeNull();
         _logger.Count(LogLevel.Error).ShouldBe(0);
     }
 
     [Fact]
     public async Task OpenCommand_malformed_file_reports_the_readers_own_diagnostic()
     {
-        OpenDocumentCommand command = Create(new DocumentLoader(), _directory.SaveUnreadableDocument());
+        (OpenDocumentCommand command, EditorSession session) = Create(new DocumentLoader(), _directory.SaveUnreadableDocument());
 
         await command.Command.ExecuteAsync(null);
 
         _presenter.Presented.ShouldHaveSingleItem().Code.ShouldBe(DiagnosticCodes.UnreadableDocument);
+        session.Document.Name.ShouldBe(EditorSession.UntitledDocumentName);
         _logger.Count(LogLevel.Error).ShouldBe(0);
     }
 
     [Fact]
     public async Task OpenCommand_blank_path_is_reported_as_an_unreadable_document()
     {
-        OpenDocumentCommand command = Create(new DocumentLoader(), string.Empty);
+        (OpenDocumentCommand command, _) = Create(new DocumentLoader(), string.Empty);
 
         await command.Command.ExecuteAsync(null);
 
@@ -79,7 +76,7 @@ public sealed class OpenDocumentCommandTests : IDisposable
             release.Task.Wait();
             return new WorkflowSessionResult(null, []);
         });
-        OpenDocumentCommand command = Create(loader, "any.vwflow");
+        (OpenDocumentCommand command, _) = Create(loader, "any.vwflow");
 
         Task execution = command.Command.ExecuteAsync(null);
         await started.Task;
@@ -106,9 +103,8 @@ public sealed class OpenDocumentCommandTests : IDisposable
             release.Task.Wait();
             return new WorkflowSessionResult(WorkflowSession.New("Loaded"), []);
         });
-        OpenDocumentCommand command = Create(loader, "any.vwflow");
-        bool opened = false;
-        command.Opened += (_, _) => opened = true;
+        (OpenDocumentCommand command, EditorSession session) = Create(loader, "any.vwflow");
+        WorkflowSession original = session.Session;
 
         Task execution = command.Command.ExecuteAsync(null);
         await started.Task;
@@ -118,7 +114,7 @@ public sealed class OpenDocumentCommandTests : IDisposable
         release.SetResult();
         await execution;
 
-        opened.ShouldBeFalse();
+        session.Session.ShouldBeSameAs(original);
         _presenter.Presented.ShouldBeEmpty();
         _logger.Count(LogLevel.Error).ShouldBe(0);
         command.Command.IsRunning.ShouldBeFalse();
@@ -129,7 +125,7 @@ public sealed class OpenDocumentCommandTests : IDisposable
     {
         StubDocumentLoader loader = new(
             _ => throw new InvalidOperationException(@"The document at C:\private\workflow.vwflow could not be parsed."));
-        OpenDocumentCommand command = Create(loader, "any.vwflow");
+        (OpenDocumentCommand command, _) = Create(loader, "any.vwflow");
 
         await Should.NotThrowAsync(() => command.Command.ExecuteAsync(null));
 
@@ -144,10 +140,11 @@ public sealed class OpenDocumentCommandTests : IDisposable
     /// <inheritdoc />
     public void Dispose() => _directory.Dispose();
 
-    private OpenDocumentCommand Create(IDocumentLoader loader, string path)
+    private (OpenDocumentCommand Command, EditorSession Session) Create(IDocumentLoader loader, string path)
     {
-        OpenDocumentCommand command = new(new AsyncCommandBoundary(_presenter, _logger), loader);
+        EditorSession session = TestSessions.Create(loader);
+        OpenDocumentCommand command = new(new AsyncCommandBoundary(_presenter, _logger), session);
         command.Path = path;
-        return command;
+        return (command, session);
     }
 }
