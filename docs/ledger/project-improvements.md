@@ -250,3 +250,51 @@
 - **Evidence:** `src/VisionWeave.Contracts/Workflows/ResourceReference.cs`, `src/VisionWeave.Contracts/Workflows/FileResourceReference.cs`, `src/VisionWeave.Domain/Workflows/WorkflowDocument.cs` (`Resources`), `src/VisionWeave.OpenCv/Nodes/OpenCvNodeDefinitionProvider.cs` (`Path` parameters), `docs/adr/0011-resource-references-and-port-schema-snapshots.md`, `docs/adr/0012-file-access-and-the-working-directory.md`.
 - **Owner:** VisionWeave maintainers.
 - **Review again:** Before implementing a resource editor or picker, resource integrity validation, result caching keyed by input resources, or a node that reuses an existing document resource.
+
+### PL-2026-020 - Remove inactive PluginSdk coupling from the application host
+
+- **Status:** Open
+- **Priority:** P2
+- **Recorded on:** 2026-09-19
+- **Scope:** The direct `VisionWeave.App -> VisionWeave.PluginSdk` project reference and the boundary that will eventually host plugin discovery.
+- **Observation:** `VisionWeave.App.csproj` directly references `VisionWeave.PluginSdk`, but no production App source or App test currently imports or uses a PluginSdk type. The current composition root registers the built-in OpenCV definition provider directly. Keeping an unused compile-time reference broadens the host dependency surface and makes it unclear whether the host already has a plugin-loading responsibility.
+- **Decision or next step:** Remove the direct App-to-PluginSdk reference while no plugin capability is consumed. Reintroduce it only in the issue that defines plugin discovery, loading, lifecycle, failure isolation, and provider registration; that issue must use the existing `INodeDefinitionProvider` contribution path rather than create a parallel catalog path. Verify the App build, architecture tests, and plugin-sdk tests after removal.
+- **Evidence:** `src/VisionWeave.App/VisionWeave.App.csproj`, `src/VisionWeave.App/Composition/VisionWeaveServices.cs`, `src/VisionWeave.PluginSdk/`, `tests/VisionWeave.ArchitectureTests/Dependencies/AssemblyDependencyTests.cs`.
+- **Owner:** VisionWeave maintainers.
+- **Review again:** Before a plugin discovery mechanism, a plugin settings screen, or a runtime executor plugin is introduced.
+
+### PL-2026-021 - Eliminate residual wall-clock polling from the test suite
+
+- **Status:** Open
+- **Priority:** P2
+- **Recorded on:** 2026-09-19
+- **Scope:** Remaining tests that use `Thread.Sleep`, real `Task.Delay`, or `Stopwatch` polling to synchronize asynchronous behavior.
+- **Observation:** PL-2026-010 made cancellation grace and runner durations deterministic with `TimeProvider`, `TestClock`, and `SignalledLedger`. Some tests still depend on host scheduling: the canvas smoke helper repeatedly lays out a WPF window and sleeps for 5 ms until a ten-second `Stopwatch` timeout, while runner tests wait 30 ms or 50 ms for another task to probably have progressed. These waits pass locally but are sensitive to loaded CI agents and obscure the event whose completion the test actually needs.
+- **Decision or next step:** Replace each real-time wait with the narrowest deterministic signal. Use `TaskCompletionSource` or a ledger/executor completion signal for execution ordering; use a dispatcher-frame or explicit dispatcher-idle helper for WPF binding/layout work; retain a bounded diagnostic timeout only as a test-hang safeguard, not as the mechanism that makes behavior correct. Extend `TestClock` only for runtime time semantics, not as a general-purpose UI scheduler. Run the affected tests repeatedly in CI evidence before closing the entry.
+- **Evidence:** `tests/VisionWeave.App.Tests/Canvas/CanvasSmokeTests.cs` (`Settle`), `tests/VisionWeave.Application.Tests/Execution/WorkflowRunnerTests.cs`, `tests/VisionWeave.Application.Tests/Support/TestClock.cs`, `tests/VisionWeave.Application.Tests/Support/SignalledLedger.cs`, `docs/ledger/project-improvements.md` (PL-2026-010).
+- **Owner:** VisionWeave maintainers.
+- **Review again:** Before adding another asynchronous UI smoke flow, parallel execution scenario, or a test that proposes a new sleep-based synchronization step.
+
+### PL-2026-022 - Define one execution-duration ownership policy
+
+- **Status:** Open
+- **Priority:** P2
+- **Recorded on:** 2026-09-19
+- **Scope:** The relationship between executor-supplied `NodeExecutionResult.Duration`, the `WorkflowRunner` `TimeProvider`, and the duration exposed in node and run summaries.
+- **Observation:** The runner now measures run and fallback node elapsed time using its injected `TimeProvider`, but it prefers a non-zero duration an executor returned. The built-in OpenCV executors measure their durations with `Stopwatch`, so one summary can combine a deterministic runner clock with real wall-clock executor durations. The behavior is safe, but it makes the meaning of a node duration ambiguous and prevents a fully deterministic duration assertion for built-in executors.
+- **Decision or next step:** Choose and document one contract before duration-driven UX, telemetry, or policy is added: either executors own operation timing and the runner treats their duration as authoritative, or the runner owns all reported timing and executors stop measuring it. Preserve the ability to report a meaningful duration for executors that complete synchronously. If a clock reaches executors, introduce it through an execution-context contract owned by `Contracts`; do not couple OpenCV to Application or to a test-only clock. Add contract tests for zero, executor-reported, cancellation, and exception paths.
+- **Evidence:** `src/VisionWeave.Application/Execution/WorkflowRunner.cs` (`RunNodeAsync`, `CompleteNodeAsync`), `src/VisionWeave.Contracts/Execution/NodeExecutionResult.cs`, `src/VisionWeave.OpenCv/Execution/ImageSourceExecutor.cs`, `src/VisionWeave.OpenCv/Execution/ResizeExecutor.cs`, `src/VisionWeave.OpenCv/Execution/GaussianBlurExecutor.cs`, `src/VisionWeave.OpenCv/Execution/SaveImageExecutor.cs`, `docs/ledger/project-improvements.md` (PL-2026-010).
+- **Owner:** VisionWeave maintainers.
+- **Review again:** Before displaying performance telemetry, adding execution time limits, or making executor duration part of a plugin contract.
+
+### PL-2026-023 - Evolve large orchestration classes at their next feature boundary
+
+- **Status:** Monitoring
+- **Priority:** P3
+- **Recorded on:** 2026-09-19
+- **Scope:** Readability and change isolation in the largest production classes: validation, document reading, execution orchestration, and editor session coordination.
+- **Observation:** The repository has clear layering and focused public facades, but several implementation classes now combine enough policy to make unrelated changes expensive to review: `WorkflowValidator` combines definition resolution, parameter validation, port legality, required-input checks, and cycle detection; `WorkflowDocumentReader` combines JSON structure, forward-compatibility preservation, and every field reader; `WorkflowRunner` combines scheduling, cancellation grace, output ownership, preview fences, and reporting; `EditorSession` combines lifecycle transitions, persistence translation, history, selection, and notifications. Their size alone is not a defect, and a broad mechanical split would risk diagnostic order, ownership, and UI notification regressions.
+- **Decision or next step:** Do not create a cosmetic refactor branch. When a future feature changes one of these areas, extract the smallest cohesive collaborator behind the existing facade and prove behavior unchanged with characterization tests. Preferred seams are definition/parameter/graph validation beneath `WorkflowValidator`; resource/node/connection readers beneath `WorkflowDocumentReader`; cancellation-wait policy beneath `WorkflowRunner`; and lifecycle/persistence result translation beneath `EditorSession`. Preserve deterministic diagnostic order, existing public contracts, and current layer dependencies. At the same maintenance opportunity, evaluate enabling warnings-as-errors in Release CI after confirming WPF-generated code and package analyzers remain clean.
+- **Evidence:** `src/VisionWeave.Application/Validation/WorkflowValidator.cs`, `src/VisionWeave.Persistence/Workflows/WorkflowDocumentReader.cs`, `src/VisionWeave.Application/Execution/WorkflowRunner.cs`, `src/VisionWeave.App/Sessions/EditorSession.cs`, `Directory.Build.props`, `tests/VisionWeave.ArchitectureTests/`.
+- **Owner:** VisionWeave maintainers.
+- **Review again:** When one of the named classes changes for a feature, when a pull request changes more than one of its policy areas, or before adding a new cross-cutting host service to it.
