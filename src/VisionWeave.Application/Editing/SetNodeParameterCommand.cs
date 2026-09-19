@@ -6,14 +6,15 @@ namespace VisionWeave.Application.Editing;
 /// Sets a parameter value on a node instance. The undo data is the value the
 /// parameter held before the first edit of the current undo unit, which is what
 /// lets successive edits of one parameter share a single undo step: the history
-/// keeps the earliest command of the unit and the command restores the value it
-/// captured.
+/// keeps the earliest command of the unit, that command restores the value it
+/// captured, and it takes over the value of every edit that joins the unit so it can
+/// also restore where the user ended.
 /// </summary>
 public sealed class SetNodeParameterCommand : IDocumentCommand, ICoalescingCommand
 {
     private readonly Guid _instanceId;
     private readonly string _parameterName;
-    private readonly object? _value;
+    private object? _value;
     private bool _captured;
     private bool _hadValue;
     private object? _previousValue;
@@ -71,4 +72,20 @@ public sealed class SetNodeParameterCommand : IDocumentCommand, ICoalescingComma
         => next is SetNodeParameterCommand other
             && other._instanceId == _instanceId
             && string.Equals(other._parameterName, _parameterName, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    void ICoalescingCommand.ContinueWith(IDocumentCommand next)
+    {
+        // The edit that joined this unit has already been applied, so the document
+        // holds its value while the history keeps this command. Taking the value over
+        // is what lets this command redo the unit: without it, redoing a merged unit
+        // would write the value its first edit set rather than the one the user
+        // settled on.
+        if (next is SetNodeParameterCommand other
+            && other._instanceId == _instanceId
+            && string.Equals(other._parameterName, _parameterName, StringComparison.Ordinal))
+        {
+            _value = other._value;
+        }
+    }
 }

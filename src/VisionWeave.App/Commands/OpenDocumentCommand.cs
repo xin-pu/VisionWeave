@@ -56,16 +56,24 @@ internal sealed class OpenDocumentCommand
     internal string? Path { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether the recoverable working copy beside
+    /// the file is opened instead of the file. Which of the two the user wants is a
+    /// question the shell asks; this command carries the answer.
+    /// </summary>
+    internal bool Recover { get; set; }
+
+    /// <summary>
     /// Opens the file into the session. The boundary is the only path to the read,
-    /// so the task this returns cannot fault, and the final await deliberately
-    /// returns to the context that asked for the command: the session's change
-    /// notifications are then raised on the thread that owns that context, and a
-    /// <c>ConfigureAwait(false)</c> here would move them onto a worker thread where
-    /// a binding cannot use them.
+    /// so the task this returns cannot fault. Reading is the part that runs away
+    /// from the shell, because reading a file blocks; the session then takes the
+    /// result over on the thread this command was started on, because that is the
+    /// thread the window's bindings belong to, and a notification raised anywhere
+    /// else is one they refuse to apply.
     /// </summary>
     private async Task OpenFromPathAsync(CancellationToken cancellationToken)
     {
         string path = Path ?? string.Empty;
+        bool recover = Recover;
 
         _status.Begin(OpeningText);
 
@@ -74,16 +82,14 @@ internal sealed class OpenDocumentCommand
                 OperationName,
                 async token =>
                 {
-                    // Reading a file is blocking work, so it runs off the calling
-                    // thread and the shell keeps responding to input while it waits.
+                    WorkflowSessionResult opened = await Task
+                        .Run(() => recover ? _session.ReadWorkingCopy(path) : _session.Read(path), token)
+                        .ConfigureAwait(true);
+
                     // The session refuses the result when this command has been
                     // stopped, so a cancelled open cannot replace the document the
                     // shell is editing.
-                    WorkflowSessionResult opened = await Task
-                        .Run(() => _session.Open(path, token), token)
-                        .ConfigureAwait(false);
-
-                    return opened.Diagnostics;
+                    return _session.Adopt(opened, token).Diagnostics;
                 },
                 cancellationToken)
             .ConfigureAwait(true);

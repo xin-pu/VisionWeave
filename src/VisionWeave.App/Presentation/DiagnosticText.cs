@@ -23,4 +23,28 @@ internal static class DiagnosticText
 
         return $"{SeverityText.Of(diagnostic.Severity)}: {diagnostic.Code} {diagnostic.Message}";
     }
+
+    /// <summary>
+    /// Names the element a condition points at, so the inspector can group and
+    /// describe its rows without reading the message or knowing what a target is.
+    /// A condition that names no target describes the document, which is the scope
+    /// it keeps when the element it named is one this build does not model.
+    /// </summary>
+    /// <param name="target">The element a condition points at, or <see langword="null"/>.</param>
+    /// <returns>The phrase the shell shows, such as <c>parameter kernelSize</c>.</returns>
+    internal static string TargetOf(DiagnosticTarget? target)
+        => target switch
+        {
+            ParameterTarget parameter => $"parameter {parameter.ParameterName}",
+            PortTarget port => $"port {port.PortId}",
+            ConnectionTarget connection => $"connection {Short(connection.ConnectionId)}",
+            _ => "the document",
+        };
+
+    /// <summary>
+    /// Shortens an identifier to the part of it a reader can compare by eye. It is
+    /// the same prefix the rest of the shell shows, because a full identifier would
+    /// only be copied into a message nobody can check.
+    /// </summary>
+    private static string Short(Guid id) => id.ToString("N")[..8];
 }

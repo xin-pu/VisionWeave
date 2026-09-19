@@ -44,8 +44,22 @@ internal sealed class TemporaryWorkflowDirectory : IDisposable
     /// <param name="name">The file name to write.</param>
     /// <returns>The path of the written document.</returns>
     internal string SaveUnsupportedSchemaDocument(string name = "newer.vwflow")
+        => SaveUnsupportedSchemaDocument(WorkflowDocument.Create("Saved workflow"), name);
+
+    /// <summary>
+    /// Writes the given document and then declares a schema version newer than the
+    /// reader supports, so a caller can hold a read-only document that carries the
+    /// content its test drives.
+    /// </summary>
+    /// <param name="document">The document to store.</param>
+    /// <param name="name">The file name to write.</param>
+    /// <returns>The path of the written document.</returns>
+    internal string SaveUnsupportedSchemaDocument(WorkflowDocument document, string name = "newer.vwflow")
     {
-        string path = SaveReadableDocument(name);
+        ArgumentNullException.ThrowIfNull(document);
+
+        string path = PathOf(name);
+        WorkflowDocumentWriter.Save(document, path);
         string content = System.IO.File.ReadAllText(path);
 
         // The stored key and the version this build writes, so the file declares the

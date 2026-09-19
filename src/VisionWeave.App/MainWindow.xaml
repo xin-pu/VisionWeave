@@ -21,6 +21,9 @@
         <KeyBinding Key="O"
                     Command="{Binding OpenCommand}"
                     Modifiers="Control" />
+        <KeyBinding Key="S"
+                    Command="{Binding SaveCommand}"
+                    Modifiers="Control" />
         <KeyBinding Key="Z"
                     Command="{Binding Canvas.UndoCommand}"
                     Modifiers="Control" />
@@ -76,6 +79,16 @@
                                Text="Ctrl+O" />
 
                     <Button Margin="16,0,0,0"
+                            Command="{Binding SaveCommand}"
+                            Content="_Save"
+                            Style="{StaticResource Shell.ActionButton}"
+                            ToolTip="Write the document to its file (Ctrl+S)" />
+                    <TextBlock Margin="8,0,0,0"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource Brush.Text.Secondary}"
+                               Text="Ctrl+S" />
+
+                    <Button Margin="16,0,0,0"
                             Command="{Binding Canvas.UndoCommand}"
                             Content="_Undo"
                             Style="{StaticResource Shell.ActionButton}"
@@ -115,12 +128,28 @@
                                Style="{StaticResource Shell.RegionHeader}"
                                Text="Node catalogue" />
                     <TextBlock DockPanel.Dock="Top"
+                               Margin="0,8,0,0"
+                               Style="{StaticResource Shell.FieldLabel}"
+                               Text="Search" />
+                    <!--
+                        The search filters what exists rather than changing it, so it
+                        is a query over the catalog and never an edit of anything.
+                    -->
+                    <TextBox DockPanel.Dock="Top"
+                             Margin="0,4,0,0"
+                             Style="{StaticResource Shell.InputField}"
+                             Text="{Binding CatalogueSearch, UpdateSourceTrigger=PropertyChanged}"
+                             ToolTip="Match the name a node type is shown under, or its identifier" />
+                    <TextBlock DockPanel.Dock="Top"
                                Style="{StaticResource Shell.RegionNote}"
                                Text="{Binding NodeCatalogSummary}" />
                     <TextBlock DockPanel.Dock="Bottom"
                                Style="{StaticResource Shell.RegionNote}"
-                               Text="Search arrives with the inspector package. Choosing a type adds it to the middle of the canvas." />
-                    <ScrollViewer Margin="0,12,0,0" VerticalScrollBarVisibility="Auto">
+                               Text="{Binding CatalogueNotice}" />
+                    <TextBlock DockPanel.Dock="Bottom"
+                               Style="{StaticResource Shell.RegionNote}"
+                               Text="Choosing a type adds it to the middle of the canvas." />
+                    <ScrollViewer Margin="0,8,0,0" VerticalScrollBarVisibility="Auto">
                         <ItemsControl ItemsSource="{Binding CatalogueGroups}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
@@ -134,13 +163,16 @@
                                                     <!--
                                                         Choosing a type is the catalogue's one
                                                         gesture: it reaches the canvas command
-                                                        rather than editing anything here.
+                                                        rather than editing anything here. A
+                                                        document this build cannot write back
+                                                        offers no addable type at all.
                                                     -->
                                                     <Button Margin="0,1"
                                                             HorizontalContentAlignment="Left"
                                                             Command="{Binding DataContext.Canvas.AddNodeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                             CommandParameter="{Binding TypeId}"
                                                             Content="{Binding DisplayName}"
+                                                            IsEnabled="{Binding DataContext.Canvas.IsEditable, RelativeSource={RelativeSource AncestorType=Window}}"
                                                             Style="{StaticResource Shell.CatalogueEntry}"
                                                             ToolTip="Add this node type to the middle of the canvas" />
                                                 </DataTemplate>
@@ -181,6 +213,27 @@
                                     Style="{StaticResource Shell.ActionButton}"
                                     ToolTip="Delete the selected nodes and the wires attached to them (Delete)" />
                         </Grid>
+                    </Border>
+
+                    <!--
+                        A document this build cannot write back is shown and not
+                        edited, so the surface says why rather than leaving the user
+                        to discover it from controls that do nothing.
+                    -->
+                    <Border DockPanel.Dock="Top">
+                        <Border.Style>
+                            <Style BasedOn="{StaticResource Shell.Notice}" TargetType="Border">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsReadOnly}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <TextBlock Foreground="{DynamicResource Brush.Text.Primary}"
+                                   Text="{Binding ReadOnlyNote}"
+                                   TextWrapping="Wrap" />
                     </Border>
 
                     <Grid>
@@ -239,19 +292,153 @@
                                Style="{StaticResource Shell.RegionHeader}"
                                Text="Inspector" />
                     <TextBlock DockPanel.Dock="Top"
+                               Style="{StaticResource Shell.InspectorTitle}"
+                               Text="{Binding Inspector.NodeTitle}" />
+                    <TextBlock DockPanel.Dock="Top"
+                               Style="{StaticResource Shell.RegionNote}"
+                               Text="{Binding Inspector.NodeCaption}" />
+
+                    <!-- What a document this build cannot write back holds still, and
+                         why nothing here can be edited. -->
+                    <Border DockPanel.Dock="Top">
+                        <Border.Style>
+                            <Style BasedOn="{StaticResource Shell.Notice}" TargetType="Border">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsReadOnly}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <TextBlock Foreground="{DynamicResource Brush.Text.Primary}"
+                                   Text="{Binding ReadOnlyNote}"
+                                   TextWrapping="Wrap" />
+                    </Border>
+
+                    <TextBlock DockPanel.Dock="Bottom"
                                Style="{StaticResource Shell.RegionNote}"
                                Text="{Binding SelectionSummary}" />
-                    <TextBlock DockPanel.Dock="Top"
+                    <TextBlock DockPanel.Dock="Bottom"
                                Style="{StaticResource Shell.RegionNote}"
                                Text="{Binding SelectionConditionSummary}" />
                     <TextBlock DockPanel.Dock="Bottom"
-                               Style="{StaticResource Shell.RegionNote}"
-                               Text="Parameter editors and the diagnostics panel arrive with the inspector package." />
+                               Margin="0,12,0,0"
+                               Style="{StaticResource Shell.RegionHeader}"
+                               Text="{Binding Inspector.DiagnosticCountText}" />
 
-                    <!-- The last child fills what the docked lines leave, so the note
-                         above stays on the floor of the region instead of floating
-                         under the selection summary. -->
-                    <Border />
+                    <ScrollViewer Margin="0,12,0,0" VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <!--
+                                One field per parameter the definition declares. The
+                                field reports what the user committed; the inspector
+                                command turns it into a document command, so nothing
+                                here edits the document itself.
+                            -->
+                            <ItemsControl IsEnabled="{Binding Inspector.IsEditable}"
+                                          ItemsSource="{Binding Inspector.Parameters}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Margin="0,0,0,12" ToolTip="{Binding Summary}">
+                                            <TextBlock Style="{StaticResource Shell.FieldLabel}"
+                                                       Text="{Binding DisplayName}" />
+
+                                            <Grid Margin="0,4,0,0">
+                                                <TextBox Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}">
+                                                    <!--
+                                                        Typing a value is not a whole gesture
+                                                        the way toggling a switch is, so the
+                                                        field says how the text it holds is
+                                                        applied. The binding resolves against
+                                                        the templated item, which is the field
+                                                        itself.
+                                                    -->
+                                                    <TextBox.InputBindings>
+                                                        <KeyBinding Command="{Binding ApplyCommand}" Key="Enter" />
+                                                    </TextBox.InputBindings>
+                                                    <TextBox.Style>
+                                                        <Style BasedOn="{StaticResource Shell.InputField}" TargetType="TextBox">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsBoolean}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding HasOptions}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBox.Style>
+                                                </TextBox>
+
+                                                <ui:ToggleSwitch IsChecked="{Binding IsChecked}">
+                                                    <ui:ToggleSwitch.Style>
+                                                        <Style TargetType="ui:ToggleSwitch">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsBoolean}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </ui:ToggleSwitch.Style>
+                                                </ui:ToggleSwitch>
+
+                                                <ComboBox Background="{DynamicResource Brush.Background.SurfaceRaised}"
+                                                          BorderBrush="{DynamicResource Brush.Border.Subtle}"
+                                                          Foreground="{DynamicResource Brush.Text.Primary}"
+                                                          ItemsSource="{Binding Options}"
+                                                          SelectedItem="{Binding SelectedOption}">
+                                                    <ComboBox.Style>
+                                                        <Style TargetType="ComboBox">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding HasOptions}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </ComboBox.Style>
+                                                </ComboBox>
+                                            </Grid>
+
+                                            <TextBlock Style="{StaticResource Shell.RegionNote}"
+                                                       Text="{Binding Caption}" />
+                                            <TextBlock Style="{StaticResource Shell.FieldCondition}"
+                                                       Text="{Binding Condition}" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Style="{StaticResource Shell.RegionNote}"
+                                       Text="{Binding Inspector.ParameterNote}" />
+
+                            <!--
+                                Every condition the selection carries, each naming the
+                                element it points at, so a marked node and a marked
+                                parameter are told apart without reading the message.
+                            -->
+                            <ItemsControl ItemsSource="{Binding Inspector.Diagnostics}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Style="{StaticResource Shell.DiagnosticRow}"
+                                                ToolTip="{Binding Summary}">
+                                            <StackPanel>
+                                                <TextBlock Style="{StaticResource Shell.FieldCondition}"
+                                                           Text="{Binding SeverityWord}" />
+                                                <TextBlock Foreground="{DynamicResource Brush.Text.Primary}"
+                                                           Text="{Binding Code}" />
+                                                <TextBlock Style="{StaticResource Shell.RegionNote}"
+                                                           Text="{Binding Message}" />
+                                                <TextBlock Style="{StaticResource Shell.RegionNote}"
+                                                           Text="{Binding Target}" />
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
                 </DockPanel>
             </Border>
         </Grid>
@@ -322,5 +509,51 @@
                               Margin="0,0,24,24"
                               HorizontalAlignment="Right"
                               VerticalAlignment="Bottom" />
+
+        <!--
+            A question about the document, asked over the work surface rather than in
+            a window of its own. The scrim dims the shell so the question reads as
+            the thing to answer, and the card is opaque on top of it.
+        -->
+        <Grid x:Name="PromptOverlay"
+              Grid.Row="0"
+              Grid.RowSpan="3">
+            <Grid.Style>
+                <Style TargetType="Grid">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding Prompt.IsOpen}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Grid.Style>
+
+            <Border Background="{DynamicResource Brush.Background.Canvas}" Opacity="0.85" />
+
+            <Border Style="{StaticResource Shell.PromptCard}">
+                <StackPanel>
+                    <TextBlock Foreground="{DynamicResource Brush.Text.Primary}"
+                               Text="{Binding Prompt.Question}"
+                               TextWrapping="Wrap" />
+
+                    <StackPanel Margin="0,16,0,0"
+                                HorizontalAlignment="Right"
+                                Orientation="Horizontal">
+                        <Button Command="{Binding Prompt.AcceptCommand}"
+                                Content="{Binding Prompt.AcceptText}"
+                                Style="{StaticResource Shell.ActionButton}" />
+                        <Button Margin="8,0,0,0"
+                                Command="{Binding Prompt.RefuseCommand}"
+                                Content="{Binding Prompt.RefuseText}"
+                                Style="{StaticResource Shell.ActionButton}" />
+                        <Button Margin="8,0,0,0"
+                                Command="{Binding Prompt.DismissCommand}"
+                                Content="{Binding Prompt.CancelText}"
+                                Style="{StaticResource Shell.ActionButton}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
     </Grid>
 </Window>

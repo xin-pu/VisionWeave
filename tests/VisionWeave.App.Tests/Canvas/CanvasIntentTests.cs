@@ -262,6 +262,26 @@ public sealed class CanvasIntentTests
     }
 
     [Fact]
+    public void Opening_a_document_leaves_the_selection_of_the_document_it_replaced_behind()
+    {
+        using TemporaryWorkflowDirectory directory = new();
+
+        Guid blur = Add(OpenCvNodeIds.GaussianBlurTypeId, 0, 0);
+        string path = directory.PathOf("sketch.vwflow");
+        _session.SaveAs(path).ShouldBeEmpty();
+
+        // The file holds the node under the same identifier, so opening it again is
+        // the case where a selection could outlive the document it was made in.
+        Node(blur).IsSelected = true;
+        _session.Selection.ShouldBe([blur]);
+
+        _session.Open(path);
+
+        _session.Selection.ShouldBeEmpty();
+        _canvas.Nodes.ShouldHaveSingleItem().IsSelected.ShouldBeFalse();
+    }
+
+    [Fact]
     public void Undo_and_redo_redraw_the_canvas_from_what_the_document_holds()
     {
         List<string?> raised = [];

@@ -101,6 +101,14 @@ internal sealed partial class CanvasViewModel : ObservableObject
     public bool IsEmpty => Nodes.Count == 0;
 
     /// <summary>
+    /// Gets a value indicating whether the surface may be edited. A document this
+    /// build cannot write back is shown but not edited: the gesture layer stops
+    /// offering the gestures, so a control the user cannot use is disabled rather
+    /// than answering with a refusal.
+    /// </summary>
+    public bool IsEditable => !_session.IsReadOnly;
+
+    /// <summary>
     /// Gets or sets the graph-space point the viewport starts at. The editor owns
     /// this and writes it back, so the canvas can place a node where the user is
     /// looking rather than somewhere off the screen.
@@ -120,7 +128,7 @@ internal sealed partial class CanvasViewModel : ObservableObject
     [RelayCommand]
     private void AddNode(string? typeId)
     {
-        if (string.IsNullOrWhiteSpace(typeId))
+        if (!IsEditable || string.IsNullOrWhiteSpace(typeId))
         {
             return;
         }
@@ -150,7 +158,7 @@ internal sealed partial class CanvasViewModel : ObservableObject
     private void DeleteSelection()
     {
         Guid[] instances = [.. Nodes.Where(node => node.IsSelected).Select(node => node.InstanceId)];
-        if (instances.Length == 0)
+        if (!IsEditable || instances.Length == 0)
         {
             return;
         }
@@ -170,7 +178,8 @@ internal sealed partial class CanvasViewModel : ObservableObject
     [RelayCommand]
     private void Connect(object? connection)
     {
-        if (connection is not Tuple<object, object> pair
+        if (!IsEditable
+            || connection is not Tuple<object, object> pair
             || pair.Item1 is not PortViewModel first
             || pair.Item2 is not PortViewModel second)
         {
@@ -197,7 +206,7 @@ internal sealed partial class CanvasViewModel : ObservableObject
     [RelayCommand]
     private void Disconnect(WorkflowConnectionViewModel? connector)
     {
-        if (connector is null)
+        if (!IsEditable || connector is null)
         {
             return;
         }
@@ -216,6 +225,11 @@ internal sealed partial class CanvasViewModel : ObservableObject
     [RelayCommand]
     private void Move()
     {
+        if (!IsEditable)
+        {
+            return;
+        }
+
         List<(Guid InstanceId, CanvasPosition Position)> moves = [];
         foreach (WorkflowNodeViewModel node in Nodes)
         {
@@ -235,7 +249,7 @@ internal sealed partial class CanvasViewModel : ObservableObject
         Report(_session.Execute(new MoveNodesCommand(moves)).Diagnostics);
     }
 
-    private bool HasSelection() => Nodes.Any(node => node.IsSelected);
+    private bool HasSelection() => IsEditable && Nodes.Any(node => node.IsSelected);
 
     /// <summary>
     /// Reverses the most recent edit. The session owns the undo stack and the
@@ -279,6 +293,7 @@ internal sealed partial class CanvasViewModel : ObservableObject
         OnPropertyChanged(nameof(Nodes));
         OnPropertyChanged(nameof(Connectors));
         OnPropertyChanged(nameof(IsEmpty));
+        OnPropertyChanged(nameof(IsEditable));
         DeleteSelectionCommand.NotifyCanExecuteChanged();
     }
 

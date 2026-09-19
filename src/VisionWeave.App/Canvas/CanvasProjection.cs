@@ -63,8 +63,8 @@ internal static class CanvasProjection
 
             var node = new WorkflowNodeViewModel(
                 instance.InstanceId,
-                Title(instance, definition),
-                Caption(instance, definition),
+                NodeText.Title(instance, definition),
+                NodeText.Caption(instance, definition),
                 instance.Position,
                 inputs,
                 outputs,
@@ -137,18 +137,6 @@ internal static class CanvasProjection
         {
             yield return (entry.PortId, entry.DisplayName ?? entry.PortId, entry.Direction);
         }
-    }
-
-    private static string Title(NodeInstance instance, NodeDefinition? definition)
-        => string.IsNullOrWhiteSpace(instance.Label)
-            ? definition?.DisplayName ?? "Unknown node type"
-            : instance.Label;
-
-    private static string Caption(NodeInstance instance, NodeDefinition? definition)
-    {
-        string identified = $"{instance.NodeTypeId.Value} v{instance.TypeVersion}";
-
-        return definition is null ? $"{identified} · not installed" : identified;
     }
 
     /// <summary>

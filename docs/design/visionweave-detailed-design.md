@@ -7,8 +7,11 @@
   boundaries, the port, document, ownership, and editor decisions of ADR-0003
   to ADR-0006, and a runnable path from a workflow document to native frames.
   The maintainer accepted those ADRs on 2026-09-19 after the review remediation
-  of issues #1 and #2. The editor, `.vwflow` persistence, and the remaining node
-  families are not implemented.
+  of issues #1 and #2. On top of that foundation the shell theme, the projected
+  Nodify canvas, `.vwflow` read/write, and the inspector and document commands of
+  sections 6.5 to 6.7 are implemented; the run, cancel, and preview path, the
+  remaining node families, and the minimap, copy and paste, and automatic layout
+  are not.
 - **Owner:** VisionWeave maintainers.
 - **Scope:** New WPF desktop application. This document does not prescribe an
   in-place migration of the legacy Aries solution.
@@ -357,7 +360,7 @@ The view model maps property-change actions into application commands:
 | Drag node | `MoveNode` | Update persisted canvas position; no execution invalidation. |
 | Create wire | `ConnectPorts` | Validate types, multiplicity, and cycle; update graph or show diagnostic. |
 | Delete wire | `DisconnectPorts` | Remove connection and invalidate downstream output. |
-| Edit parameter | `SetNodeParameter` | Validate, persist dirty state, invalidate downstream graph. |
+| Edit parameter | `SetNodeParameter` | Validate, persist dirty state, invalidate downstream graph; one parameter is one undo unit, and a refused value changes nothing (see 6.7). |
 | Run node / graph | `RunWorkflow` | Start a cancellable execution operation. |
 
 Nodify's pending connection is visual-only until `ConnectPorts` accepts it.
@@ -564,9 +567,81 @@ made. Edits made anywhere else in the shell redraw the surface, because the canv
 learns about the document and the selection from the session rather than from its
 own gestures.
 
-Parameter editors, per-node preview, the minimap, copy and paste, automatic
-layout, run-state presentation, and the diagnostics panel are not part of this
-slice.
+Parameter editors and the diagnostics panel arrive with 6.7. Per-node preview,
+the minimap, copy and paste, automatic layout, and run-state presentation are not
+part of this slice.
+
+### 6.7 Inspector, document commands, and read-only presentation as built
+
+The inspector presents the selected node: its title and caption, one field per
+parameter the definition declares, and the conditions that selection owns. A field
+is picked from the parameter's declared kind rather than from a template selector —
+a switch for a boolean, a list of the declared options for an option parameter, and
+a text field for everything else — so one value is edited one way and the surface
+never shows two ways at once. Section 6.3 describes the per-kind template selector
+that takes over once nodes contribute editors of their own, which is package 8's
+work rather than this slice's.
+
+A field holds three things: what the document stores for that parameter, the
+severity the validation projection attributes to it, and the condition in the words
+the status area uses. It commits through the inspector instead of the document: a
+typed value is applied with Enter, which the field's own caption says, because
+typing is not a whole gesture the way toggling a switch is; a switch and an option
+commit the change itself, and an option that has chosen nothing is refused rather
+than sent as a value.
+
+Three outcomes stay distinguishable at a field. An accepted value becomes a
+`SetNodeParameterCommand` through the session, so it is one edit, and the history
+merges later edits of the same parameter into that unit while they are within
+`ParameterCoalescingWindow` — one parameter is the unit a user thinks in, and a
+keystroke is not. A merged unit keeps the value the user settled on, so redoing it
+restores where the edit ended rather than where it began. A value the definition
+refuses is reported as a condition and changes nothing: the field marks itself with
+the diagnostic it earned, the document keeps the value it had, and the same
+diagnostic travels to the status area. A commit that cannot be made at all — no node
+selected, or a document that may not be edited — is not offered: the whole field
+list is disabled and the inspector says why.
+
+The diagnostics panel is the same projection read a second way. It lists the
+conditions of the current selection, each with its severity as a word, its stable
+code, and its safe message, so a marked node, port, parameter, or wire can be read
+as text rather than only as a colour.
+
+Document commands are the shell's, and the session remains the authority. New, open,
+save, and save-as run through the command boundary of ADR-0008, so a running
+operation is reported, a cancellation is a stop rather than a failure, and an
+unexpected failure becomes one safe diagnostic and one log entry. Opening a file
+asks first when the document holds changes its file does not — save, discard, or
+cancel, with the file named in the question — and a working copy beside the file is
+offered as a recovery when one exists. A recovered session starts with unsaved
+changes, because its content is not yet the content of its file.
+
+Reading a file and adopting what it produced are two steps on purpose, and they run
+on different threads. Reading blocks, so it runs away from the shell and the window
+keeps answering; the session then adopts the result on the thread the command was
+started on, which is the thread the window's bindings belong to. That is not a
+detail: adopting announces the new document, and a binding refuses a notification
+raised on another thread — the notification walk stops there, so the window keeps the
+projection of the document it replaced and never learns that the selection of that
+document has to go. `EditorSession.Read` and `EditorSession.ReadWorkingCopy` are the
+reading half, `EditorSession.Adopt` is the half that replaces the document and
+announces it, and `EditorSession.Open` and `EditorSession.Recover` pair the two for a
+caller with no window. Adopting a document also empties the selection, because a
+selection names instances of the document it was made in.
+
+A document this build does not understand — one whose schema version is newer — is
+opened read-only: it is shown, with its nodes, ports, and stored parameters drawn
+from what the file holds, and nothing about it may be edited, because writing it back
+would discard content this build cannot see. The reason is drawn on both surfaces the
+document would be edited on, the catalogue offers no addable type, the header's
+delete stays disabled even with a node selected, the field list is disabled as one
+list, and the rule belongs to the session rather than to the markup: a gesture that
+reaches the canvas, or the session directly, changes nothing and reports
+`VW-FILE-002`.
+
+The catalogue is searchable by display name and by type identifier, because the
+identifier is what a document, a diagnostic, and a stored parameter name a node by. A
+search that matches nothing says so instead of showing an empty list.
 
 ## 7. Persistence and compatibility
 
@@ -740,8 +815,8 @@ trusted code; sandboxing is a future feature, not an implied security boundary.
 | OpenCV integration tests | Expected pixels / geometry for each migrated node, disposal and cache behavior, preview limit validation. |
 | Persistence integration tests | Save/load round trip, malformed document rejection, migrations, missing-node placeholders, autosave policy validation. |
 | Architecture tests | Dependency direction, no WPF/OpenCV/host stack reference in Domain, and no host stack reference in any core assembly. |
-| Shell tests | The five documented regions and their named elements, token values and brush aliases, contrast of text and of the focus ring, no colour literal outside the token dictionary, every bound path resolvable through a public member, every declared key used and declared before it is reached for, the canvas wiring of items, wires, commands, and shortcuts, status transitions, and announcements by severity. |
-| UI smoke tests | The real window, drawn with the shipped theme: placing a node from the catalogue, connecting two ports, selecting, deleting, undo, redo, and the surface a refused connection leaves unchanged. |
+| Shell tests | The five documented regions and their named elements, token values and brush aliases, contrast of text and of the focus ring, no colour literal outside the token dictionary, every bound path resolvable through a public member, every declared key used and declared before it is reached for, the canvas wiring of items, wires, commands, and shortcuts, the inspector's field per declared kind and the gesture that applies what was typed, prompt questions and their three answers, status transitions, and announcements by severity. |
+| UI smoke tests | The real window, drawn with the shipped theme: placing a node from the catalogue, connecting two ports, selecting, deleting, undo, redo, and the surface a refused connection leaves unchanged; editing a parameter, reading the condition a refused value earned, undoing and redoing one parameter edit as one unit, saving, opening the file again over unsaved changes and answering the prompt; and opening a document this build must not write back, which is shown read-only and changes nothing when a gesture reaches it. |
 
 Tests use xUnit and Shouldly. Test names use the form
 `Member_condition_expected_result`, e.g.
@@ -753,7 +828,11 @@ creating a window; a WPF element that a test genuinely needs is built on a
 single-threaded-apartment thread, the way the shell builds it. The smoke test goes
 one step further and builds the real window over the application's own resources,
 so the templates, the bindings, and Nodify's containers and connectors are covered
-as they are drawn rather than as they are declared.
+as they are drawn rather than as they are declared. It is also the only place a
+document change can be checked against a binding's thread affinity: a window is a
+dispatcher object, so an open that announced its document from a worker thread would
+leave the surface showing the document it replaced, which is a failure no headless
+test can see.
 
 The composition root is covered by `VisionWeave.App.Tests`, which resolves every
 registered service headlessly and refuses to start on a rejected setting. The

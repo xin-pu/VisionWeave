@@ -7,6 +7,7 @@ using VisionWeave.Application.Editing;
 using VisionWeave.Contracts.Diagnostics;
 using VisionWeave.Contracts.Nodes;
 using VisionWeave.Domain.Workflows;
+using VisionWeave.OpenCv.Nodes;
 using VisionWeave.Persistence.Workflows;
 
 namespace VisionWeave.App.Tests.Sessions;
@@ -29,6 +30,74 @@ public sealed class EditorSessionTests : IDisposable
         session.IsDirty.ShouldBeFalse();
         session.IsReadOnly.ShouldBeFalse();
         session.Document.Nodes.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Read_leaves_the_document_being_edited_in_place()
+    {
+        EditorSession session = TestSessions.Create();
+        NodeInstance node = session.Document.AddNode(
+            new NodeTypeId(OpenCvNodeIds.GaussianBlurTypeId),
+            1,
+            new CanvasPosition(0, 0));
+        session.Select([node.InstanceId]);
+        WorkflowSession original = session.Session;
+        List<string?> raised = [];
+        session.PropertyChanged += (_, args) => raised.Add(args.PropertyName);
+
+        WorkflowSessionResult read = session.Read(_directory.SaveReadableDocument());
+
+        // Reading produces a document, and saying nothing about it is what lets a
+        // shell run the read off the thread its bindings belong to: nothing the
+        // window is watching moves until the read is adopted there.
+        read.Session.ShouldNotBeNull();
+        session.Session.ShouldBeSameAs(original);
+        session.Document.Name.ShouldBe(EditorSession.UntitledDocumentName);
+        session.Document.Nodes.ShouldHaveSingleItem();
+        session.Selection.ShouldBe([node.InstanceId]);
+        raised.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Adopt_replaces_the_document_and_clears_the_selection_the_old_one_held()
+    {
+        EditorSession session = TestSessions.Create();
+        NodeInstance node = session.Document.AddNode(
+            new NodeTypeId(OpenCvNodeIds.GaussianBlurTypeId),
+            1,
+            new CanvasPosition(0, 0));
+        session.Select([node.InstanceId]);
+        List<string?> raised = [];
+        session.PropertyChanged += (_, args) => raised.Add(args.PropertyName);
+
+        WorkflowSessionResult result = session.Adopt(session.Read(_directory.SaveReadableDocument()));
+
+        result.Session.ShouldNotBeNull();
+        session.Document.Name.ShouldBe("Saved workflow");
+        session.Path.ShouldBe(System.IO.Path.GetFullPath(_directory.PathOf("workflow.vwflow")));
+
+        // A selection names instances of the document it was made in, so adopting a
+        // document leaves none of it behind, and the change reaches the shell under
+        // every name it reads the document through.
+        session.Selection.ShouldBeEmpty();
+        raised.ShouldContain(nameof(EditorSession.Session));
+        raised.ShouldContain(nameof(EditorSession.Document));
+        raised.ShouldContain(nameof(EditorSession.Path));
+        raised.ShouldContain(nameof(EditorSession.Projection));
+    }
+
+    [Fact]
+    public void Adopt_cancelled_after_the_read_keeps_the_current_document()
+    {
+        EditorSession session = TestSessions.Create();
+        WorkflowSession original = session.Session;
+        WorkflowSessionResult read = session.Read(_directory.SaveReadableDocument());
+        using CancellationTokenSource cancellation = new();
+        cancellation.Cancel();
+
+        Should.Throw<OperationCanceledException>(() => session.Adopt(read, cancellation.Token));
+
+        session.Session.ShouldBeSameAs(original);
     }
 
     [Fact]

@@ -5,6 +5,7 @@ using System.Xml.Linq;
 using Shouldly;
 using VisionWeave.App;
 using VisionWeave.App.Canvas;
+using VisionWeave.App.Inspector;
 using VisionWeave.App.ViewModels;
 
 namespace VisionWeave.App.Tests.Markup;
@@ -30,13 +31,18 @@ public sealed class ShellMarkupTests
 
     /// <summary>
     /// The objects the shell's markup binds against: the window's view model, the
-    /// status area it presents, the records the catalogue is drawn from, and the
-    /// three types the canvas templates take as their data context.
+    /// regions it presents — the status area, the inspector, and the prompt — the
+    /// records the catalogue is drawn from, and the types the canvas and inspector
+    /// templates take as their data context.
     /// </summary>
     private static readonly Type[] BindingRoots =
     [
         typeof(MainWindowViewModel),
         typeof(ShellStatus),
+        typeof(InspectorViewModel),
+        typeof(ParameterEditorViewModel),
+        typeof(DiagnosticEntryViewModel),
+        typeof(ShellPromptViewModel),
         typeof(ShellCatalogueGroup),
         typeof(ShellCatalogueEntry),
         typeof(WorkflowNodeViewModel),
@@ -155,9 +161,10 @@ public sealed class ShellMarkupTests
                 element => (string)element.Attribute("Key")!,
                 element => ((string?)element.Attribute("Modifiers"), (string?)element.Attribute("Command")));
 
-        // The window's own shortcuts: opening a file, and the two history steps
-        // every editor offers.
+        // The window's own shortcuts: opening a file, writing it, and the two history
+        // steps every editor offers.
         shortcuts["O"].ShouldBe(("Control", "{Binding OpenCommand}"));
+        shortcuts["S"].ShouldBe(("Control", "{Binding SaveCommand}"));
         shortcuts["Z"].ShouldBe(("Control", "{Binding Canvas.UndoCommand}"));
         shortcuts["Y"].ShouldBe(("Control", "{Binding Canvas.RedoCommand}"));
 
@@ -165,6 +172,172 @@ public sealed class ShellMarkupTests
         // rather than on the window.
         shortcuts["Delete"].ShouldBe((null, "{Binding Canvas.DeleteSelectionCommand}"));
     }
+
+    [Fact]
+    public void The_catalogue_offers_a_search_and_says_what_it_matched()
+    {
+        XElement catalogue = Region("NodeCatalogueRegion");
+
+        // The search is a query over the catalog, so it is bound to the state the view
+        // model derives rather than to a filtered copy the region keeps, and it reports
+        // every keystroke as it is typed.
+        XElement search = catalogue
+            .Descendants()
+            .Single(element => ((string?)element.Attribute("Text"))?.StartsWith("{Binding CatalogueSearch", StringComparison.Ordinal) == true);
+        AttributeText(search, "Text").ShouldBe("{Binding CatalogueSearch, UpdateSourceTrigger=PropertyChanged}");
+
+        Texts(catalogue).ShouldContain("{Binding NodeCatalogSummary}");
+        Texts(catalogue).ShouldContain("{Binding CatalogueNotice}");
+
+        // Choosing a type reaches the canvas command, and a document this build cannot
+        // write back offers no addable type at all.
+        XElement entry = catalogue
+            .Descendants()
+            .Single(element => element.Name.LocalName == "Button" && (string?)element.Attribute("Command") is not null);
+        AttributeText(entry, "Command").ShouldContain("Canvas.AddNodeCommand");
+        AttributeText(entry, "IsEnabled").ShouldContain("Canvas.IsEditable");
+    }
+
+    [Fact]
+    public void The_inspector_presents_the_selection_its_fields_and_its_conditions()
+    {
+        XElement inspector = Region("InspectorRegion");
+
+        Texts(inspector).ShouldContain("{Binding Inspector.NodeTitle}");
+        Texts(inspector).ShouldContain("{Binding Inspector.NodeCaption}");
+        Texts(inspector).ShouldContain("{Binding Inspector.ParameterNote}");
+        Texts(inspector).ShouldContain("{Binding Inspector.DiagnosticCountText}");
+
+        // The fields are the declaration's, so the region repeats one template rather
+        // than naming a parameter, and the whole list is disabled at once when the
+        // document may not be edited.
+        AttributeText(List(inspector, "{Binding Inspector.Parameters}"), "IsEnabled")
+            .ShouldBe("{Binding Inspector.IsEditable}");
+        List(inspector, "{Binding Inspector.Diagnostics}").ShouldNotBeNull();
+    }
+
+    [Fact]
+    public void A_parameter_field_offers_one_projection_for_the_kind_it_was_declared_with()
+    {
+        XElement inspector = Region("InspectorRegion");
+
+        // Text, a switch, and a list of options are three projections of one
+        // parameter; the declared kind picks one of them, so the region never shows
+        // two ways of editing the same value.
+        string markup = inspector.ToString();
+
+        markup.ShouldContain("IsBoolean");
+        markup.ShouldContain("HasOptions");
+        markup.ShouldContain("{Binding IsChecked}");
+        markup.ShouldContain("{Binding SelectedOption}");
+        markup.ShouldContain("{Binding Options}");
+
+        // A value that has to be typed in is applied with Enter. The gesture is
+        // written inside the field's own template, so it resolves against the field
+        // rather than against the window, and it asks the field — not the inspector —
+        // to commit what it holds.
+        XElement keys = inspector
+            .Descendants()
+            .Single(element => element.Name.LocalName.EndsWith(".InputBindings", StringComparison.Ordinal));
+
+        keys.Name.LocalName.ShouldBe("TextBox.InputBindings");
+
+        XElement gesture = keys.Elements().ShouldHaveSingleItem();
+        gesture.Name.LocalName.ShouldBe("KeyBinding");
+        AttributeText(gesture, "Key").ShouldBe("Enter");
+        AttributeText(gesture, "Command").ShouldBe("{Binding ApplyCommand}");
+        gesture.Attribute("Modifiers").ShouldBeNull();
+    }
+
+    [Fact]
+    public void The_shell_shows_why_a_document_it_cannot_write_back_reads_only()
+    {
+        // Both the surface the document is edited on and the panel its parameters are
+        // edited in say the same thing, because both refuse the same edits: the notice
+        // is drawn while the document is read-only and stays out of the way otherwise.
+        foreach (string region in new[] { "CanvasRegion", "InspectorRegion" })
+        {
+            string notice = Region(region)
+                .Descendants()
+                .Single(element => element.Name.LocalName == "TextBlock"
+                    && (string?)element.Attribute("Text") == "{Binding ReadOnlyNote}")
+                .Parent!
+                .ToString();
+
+            notice.ShouldContain("{Binding IsReadOnly}");
+            notice.ShouldContain("Collapsed");
+        }
+    }
+
+    [Fact]
+    public void The_shell_asks_a_question_over_the_work_surface()
+    {
+        XElement overlay = XDocument
+            .Load(PathOf("MainWindow.xaml"))
+            .Descendants()
+            .Single(element => (string?)element.Attribute(Xaml + "Name") == "PromptOverlay");
+
+        // The question is drawn over the shell rather than in a window of its own, so
+        // the flow that asks and the surface that shows are the same object.
+        overlay.ToString().ShouldContain("{Binding Prompt.IsOpen}");
+        overlay.ToString().ShouldContain("{Binding Prompt.Question}");
+
+        string[] buttons =
+        [
+            .. overlay
+                .Descendants()
+                .Where(element => element.Name.LocalName == "Button")
+                .Select(element => AttributeText(element, "Command")),
+        ];
+
+        buttons.ShouldBe(
+        [
+            "{Binding Prompt.AcceptCommand}",
+            "{Binding Prompt.RefuseCommand}",
+            "{Binding Prompt.DismissCommand}",
+        ]);
+
+        // The three buttons carry the words the question offered rather than words the
+        // markup chose, because which answer means what is the asking flow's decision.
+        string[] labels =
+        [
+            .. overlay
+                .Descendants()
+                .Where(element => element.Name.LocalName == "Button")
+                .Select(element => AttributeText(element, "Content")),
+        ];
+
+        labels.ShouldBe(
+        [
+            "{Binding Prompt.AcceptText}",
+            "{Binding Prompt.RefuseText}",
+            "{Binding Prompt.CancelText}",
+        ]);
+    }
+
+    /// <summary>The named region whose contents a test reads.</summary>
+    /// <param name="name">The region's name.</param>
+    /// <returns>The element.</returns>
+    private static XElement Region(string name)
+        => XDocument
+            .Load(PathOf("MainWindow.xaml"))
+            .Descendants()
+            .Single(element => (string?)element.Attribute(Xaml + "Name") == name);
+
+    /// <summary>Reads the text a region's elements show, so a test names what is presented.</summary>
+    /// <param name="region">The region to read.</param>
+    /// <returns>The Text attribute of every element that carries one.</returns>
+    private static string[] Texts(XElement region)
+        => [.. region.Descendants().Select(element => (string?)element.Attribute("Text")).OfType<string>()];
+
+    /// <summary>Reads the control a region presents a binding path as its ItemsSource.</summary>
+    /// <param name="region">The region to read.</param>
+    /// <param name="path">The binding path the control presents.</param>
+    /// <returns>The element.</returns>
+    private static XElement List(XElement region, string path)
+        => region
+            .Descendants()
+            .Single(element => (string?)element.Attribute("ItemsSource") == path);
 
     [Fact]
     public void The_canvas_presents_the_projection_and_reports_every_gesture_as_a_command()
