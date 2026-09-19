@@ -76,10 +76,11 @@ public sealed class MainWindowViewModelTests : IDisposable
     {
         Shell shell = Create(_directory.SaveReadableDocument(), OpenCvCatalog());
 
-        shell.ViewModel.NodeCatalogSummary.ShouldBe("20 node types available");
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("23 node types available");
         shell.ViewModel.CatalogueGroups.Select(group => group.Category)
             .ShouldBe(
             [
+                OpenCvNodeIds.DrawCategory,
                 OpenCvNodeIds.FilterCategory,
                 OpenCvNodeIds.InputOutputCategory,
                 OpenCvNodeIds.MorphologyCategory,
@@ -87,6 +88,8 @@ public sealed class MainWindowViewModelTests : IDisposable
                 OpenCvNodeIds.TransformCategory,
             ]);
         shell.ViewModel.CatalogueGroups[0].Entries.Select(entry => entry.DisplayName)
+            .ShouldBe(["Draw Circle", "Draw Line", "Draw Rectangle"]);
+        shell.ViewModel.CatalogueGroups[1].Entries.Select(entry => entry.DisplayName)
             .ShouldBe(
             [
                 "Bilateral Filter",
@@ -98,13 +101,13 @@ public sealed class MainWindowViewModelTests : IDisposable
                 "Scharr",
                 "Sobel",
             ]);
-        shell.ViewModel.CatalogueGroups[1].Entries.Select(entry => entry.DisplayName)
-            .ShouldBe(["Image Source", "Save Image"]);
         shell.ViewModel.CatalogueGroups[2].Entries.Select(entry => entry.DisplayName)
-            .ShouldBe(["Dilate", "Erode", "Morphology Ex"]);
+            .ShouldBe(["Image Source", "Save Image"]);
         shell.ViewModel.CatalogueGroups[3].Entries.Select(entry => entry.DisplayName)
-            .ShouldBe(["Adaptive Threshold", "Threshold"]);
+            .ShouldBe(["Dilate", "Erode", "Morphology Ex"]);
         shell.ViewModel.CatalogueGroups[4].Entries.Select(entry => entry.DisplayName)
+            .ShouldBe(["Adaptive Threshold", "Threshold"]);
+        shell.ViewModel.CatalogueGroups[5].Entries.Select(entry => entry.DisplayName)
             .ShouldBe(["Colour Conversion", "Crop", "Pyramid Down", "Pyramid Up", "Resize"]);
     }
 
@@ -346,7 +349,7 @@ public sealed class MainWindowViewModelTests : IDisposable
             .ShouldBe([OpenCvNodeIds.FilterCategory]);
         shell.ViewModel.CatalogueGroups[0].Entries.Select(entry => entry.DisplayName)
             .ShouldBe(["Blur", "Gaussian Blur", "Median Blur"]);
-        shell.ViewModel.NodeCatalogSummary.ShouldBe("3 of 20 node types match “blur”");
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("3 of 23 node types match “blur”");
         shell.ViewModel.CatalogueNotice.ShouldBeEmpty();
     }
 
@@ -372,7 +375,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         // so the region explains itself instead.
         shell.ViewModel.CatalogueGroups.ShouldBeEmpty();
         shell.ViewModel.CatalogueNotice.ShouldBe("No node type matches this search.");
-        shell.ViewModel.NodeCatalogSummary.ShouldBe("0 of 20 node types match “nothing-like-this”");
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("0 of 23 node types match “nothing-like-this”");
     }
 
     [Fact]
@@ -383,8 +386,8 @@ public sealed class MainWindowViewModelTests : IDisposable
 
         shell.ViewModel.CatalogueSearch = string.Empty;
 
-        shell.ViewModel.CatalogueGroups.Count.ShouldBe(5);
-        shell.ViewModel.NodeCatalogSummary.ShouldBe("20 node types available");
+        shell.ViewModel.CatalogueGroups.Count.ShouldBe(6);
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("23 node types available");
         shell.ViewModel.CatalogueNotice.ShouldBeEmpty();
     }
 

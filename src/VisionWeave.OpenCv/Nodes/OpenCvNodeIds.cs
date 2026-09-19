@@ -71,6 +71,15 @@ public static class OpenCvNodeIds
     /// <summary>The node type that opens, closes, or outlines bright regions.</summary>
     public const string MorphologyExTypeId = "visionweave.opencv.morphology-ex";
 
+    /// <summary>The node type that marks a rectangle on a frame.</summary>
+    public const string DrawRectangleTypeId = "visionweave.opencv.draw-rectangle";
+
+    /// <summary>The node type that marks a line on a frame.</summary>
+    public const string DrawLineTypeId = "visionweave.opencv.draw-line";
+
+    /// <summary>The node type that marks a circle on a frame.</summary>
+    public const string DrawCircleTypeId = "visionweave.opencv.draw-circle";
+
     /// <summary>The executor registration of the Gaussian blur node.</summary>
     public const string GaussianBlurExecutorTypeId = "visionweave.opencv.executor.gaussian-blur";
 
@@ -131,6 +140,15 @@ public static class OpenCvNodeIds
     /// <summary>The executor registration of the morphology ex node.</summary>
     public const string MorphologyExExecutorTypeId = "visionweave.opencv.executor.morphology-ex";
 
+    /// <summary>The executor registration of the draw rectangle node.</summary>
+    public const string DrawRectangleExecutorTypeId = "visionweave.opencv.executor.draw-rectangle";
+
+    /// <summary>The executor registration of the draw line node.</summary>
+    public const string DrawLineExecutorTypeId = "visionweave.opencv.executor.draw-line";
+
+    /// <summary>The executor registration of the draw circle node.</summary>
+    public const string DrawCircleExecutorTypeId = "visionweave.opencv.executor.draw-circle";
+
     /// <summary>The identifier of a node's image port, whether it receives one or publishes one.</summary>
     public const string ImagePortId = "image";
 
@@ -170,16 +188,19 @@ public static class OpenCvNodeIds
     /// <summary>The identifier of the image the morphology ex node publishes.</summary>
     public const string MorphedPortId = "morphed";
 
+    /// <summary>The identifier of the image a draw node publishes.</summary>
+    public const string DrawnPortId = "drawn";
+
     /// <summary>The Gaussian kernel size parameter.</summary>
     public const string KernelSizeParameter = "kernelSize";
 
     /// <summary>The Gaussian sigma parameter.</summary>
     public const string SigmaParameter = "sigma";
 
-    /// <summary>The target width parameter of the resize node.</summary>
+    /// <summary>The width a node produces or marks.</summary>
     public const string WidthParameter = "width";
 
-    /// <summary>The target height parameter of the resize node.</summary>
+    /// <summary>The height a node produces or marks.</summary>
     public const string HeightParameter = "height";
 
     /// <summary>The interpolation parameter of the resize node.</summary>
@@ -194,10 +215,10 @@ public static class OpenCvNodeIds
     /// <summary>The colour conversion the colour conversion node performs.</summary>
     public const string ConversionParameter = "conversion";
 
-    /// <summary>The left edge of the rectangle the crop node keeps.</summary>
+    /// <summary>The left edge of a rectangle the node keeps or marks.</summary>
     public const string XParameter = "x";
 
-    /// <summary>The top edge of the rectangle the crop node keeps.</summary>
+    /// <summary>The top edge of a rectangle the node keeps or marks.</summary>
     public const string YParameter = "y";
 
     /// <summary>The threshold the threshold node compares against.</summary>
@@ -256,6 +277,36 @@ public static class OpenCvNodeIds
 
     /// <summary>The morphological operation the morphology ex node applies.</summary>
     public const string OperationParameter = "operation";
+
+    /// <summary>The left end of the line the line node draws.</summary>
+    public const string StartXParameter = "startX";
+
+    /// <summary>The top end of the line the line node draws.</summary>
+    public const string StartYParameter = "startY";
+
+    /// <summary>The right end of the line the line node draws.</summary>
+    public const string EndXParameter = "endX";
+
+    /// <summary>The bottom end of the line the line node draws.</summary>
+    public const string EndYParameter = "endY";
+
+    /// <summary>The radius of the circle the circle node draws.</summary>
+    public const string RadiusParameter = "radius";
+
+    /// <summary>The blue component of the colour a draw node marks with.</summary>
+    public const string BlueParameter = "blue";
+
+    /// <summary>The green component of the colour a draw node marks with.</summary>
+    public const string GreenParameter = "green";
+
+    /// <summary>The red component of the colour a draw node marks with.</summary>
+    public const string RedParameter = "red";
+
+    /// <summary>The width of the outline a draw node marks with.</summary>
+    public const string ThicknessParameter = "thickness";
+
+    /// <summary>The switch that makes a draw node mark the inside of its shape as well as its outline.</summary>
+    public const string FilledParameter = "filled";
 
     /// <summary>The nearest-neighbour interpolation option.</summary>
     public const string InterpolationNearest = "nearest";
@@ -325,6 +376,9 @@ public static class OpenCvNodeIds
 
     /// <summary>The operation that reports what the closing filled.</summary>
     public const string MorphologyBlackHat = "black-hat";
+
+    /// <summary>The category of nodes that mark a shape on a frame.</summary>
+    public const string DrawCategory = "Draw";
 
     /// <summary>The category of nodes that reshape a frame by a structuring element.</summary>
     public const string MorphologyCategory = "Morphology";

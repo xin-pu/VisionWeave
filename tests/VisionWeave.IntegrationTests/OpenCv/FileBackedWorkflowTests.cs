@@ -259,6 +259,53 @@ public sealed class FileBackedWorkflowTests
     }
 
     [Fact]
+    public async Task Run_of_the_draw_nodes_writes_what_they_produced_and_releases_every_lease()
+    {
+        using var directory = new TemporaryDirectory();
+        WritePlate(directory.File("plate.png"), width: 32, height: 24, value: 40);
+        WorkflowDocument document = BuildDrawWorkflow();
+        string workflowPath = Save(document, directory);
+
+        WorkflowLoadResult loaded = WorkflowDocumentReader.Load(workflowPath);
+        loaded.Succeeded.ShouldBeTrue();
+        loaded.IsReadOnly.ShouldBeFalse();
+
+        LeaseLedger ledger = new();
+        var observer = new ConvertingOutputObserver();
+
+        WorkflowRunSummary summary = await RunAsync(loaded.Document!, ledger, directory, observer);
+
+        summary.Status.ShouldBe(WorkflowRunStatus.Succeeded);
+        summary.Diagnostics.ShouldBeEmpty();
+
+        // The rectangle the document states is outlined where it is, in the white a
+        // placed node starts with, and everything the outline does not cover keeps the
+        // value the plate was read with.
+        using Mat written = Cv2.ImRead(directory.File("marked.png"), ImreadModes.Color);
+        written.Cols.ShouldBe(32);
+        written.Rows.ShouldBe(24);
+
+        Vec3b corner = written.At<Vec3b>(6, 8);
+        corner.Item0.ShouldBe((byte)255);
+        corner.Item1.ShouldBe((byte)255);
+        corner.Item2.ShouldBe((byte)255);
+        written.At<Vec3b>(6, 23).Item0.ShouldBe((byte)255);
+        written.At<Vec3b>(17, 8).Item0.ShouldBe((byte)255);
+        written.At<Vec3b>(17, 23).Item0.ShouldBe((byte)255);
+        written.At<Vec3b>(7, 8).Item0.ShouldBe((byte)255);
+        written.At<Vec3b>(7, 9).Item0.ShouldBe((byte)40);
+        written.At<Vec3b>(0, 0).Item0.ShouldBe((byte)40);
+
+        observer.Previews.Count.ShouldBe(2);
+        observer.Previews[^1].PixelFormat.ShouldBe(FramePixelFormat.Bgr24);
+
+        ledger.Created.ShouldBe(2);
+        ledger.Released.ShouldBe(2);
+        ledger.Outstanding.ShouldBe(0);
+        ledger.ReservationsOutstanding.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task Run_again_leaves_the_output_alone_until_the_document_allows_replacement()
     {
         using var directory = new TemporaryDirectory();
@@ -399,6 +446,30 @@ public sealed class FileBackedWorkflowTests
 
         document.AddConnection(source.InstanceId, OpenCvNodeIds.ImagePortId, erode.InstanceId, OpenCvNodeIds.ImagePortId);
         document.AddConnection(erode.InstanceId, OpenCvNodeIds.ErodedPortId, save.InstanceId, OpenCvNodeIds.ImagePortId);
+
+        return document;
+    }
+
+    /// <summary>
+    /// Builds the workflow of the migrated draw node: read a plate, outline a
+    /// rectangle on it in the colour a placed node starts with, and write the result.
+    /// </summary>
+    private static WorkflowDocument BuildDrawWorkflow()
+    {
+        WorkflowDocument document = WorkflowDocument.Create("marked");
+        NodeInstance source = document.AddNode(new NodeTypeId(OpenCvNodeIds.ImageSourceTypeId), 1, new CanvasPosition(0, 0));
+        NodeInstance draw = document.AddNode(new NodeTypeId(OpenCvNodeIds.DrawRectangleTypeId), 1, new CanvasPosition(200, 0));
+        NodeInstance save = document.AddNode(new NodeTypeId(OpenCvNodeIds.SaveImageTypeId), 1, new CanvasPosition(400, 0));
+
+        document.SetNodeParameter(source.InstanceId, OpenCvNodeIds.PathParameter, "plate.png");
+        document.SetNodeParameter(draw.InstanceId, OpenCvNodeIds.XParameter, 8);
+        document.SetNodeParameter(draw.InstanceId, OpenCvNodeIds.YParameter, 6);
+        document.SetNodeParameter(draw.InstanceId, OpenCvNodeIds.WidthParameter, 16);
+        document.SetNodeParameter(draw.InstanceId, OpenCvNodeIds.HeightParameter, 12);
+        document.SetNodeParameter(save.InstanceId, OpenCvNodeIds.PathParameter, "marked.png");
+
+        document.AddConnection(source.InstanceId, OpenCvNodeIds.ImagePortId, draw.InstanceId, OpenCvNodeIds.ImagePortId);
+        document.AddConnection(draw.InstanceId, OpenCvNodeIds.DrawnPortId, save.InstanceId, OpenCvNodeIds.ImagePortId);
 
         return document;
     }

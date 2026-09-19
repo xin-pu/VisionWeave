@@ -7,7 +7,9 @@ namespace VisionWeave.IntegrationTests.Support;
 /// across the columns or down the rows, a single brighter pixel in a flat frame, and
 /// a single darker one. A node that reads a neighbourhood has to be tested against a
 /// frame with something in it, and these are the features a test can state the result
-/// of by hand.
+/// of by hand. A frame of one value is the fourth, and it is what a node that marks a
+/// shape rather than measures one is tested against: every pixel that is not the value
+/// after the run is a pixel the node wrote.
 /// </summary>
 internal static class FeatureFrame
 {
@@ -54,6 +56,15 @@ internal static class FeatureFrame
     /// <returns>The frame, which the caller owns.</returns>
     internal static Mat Hole(byte value, byte field = 255, int size = DefaultSize)
         => WithCentrePixel(value, field, size);
+
+    /// <summary>
+    /// Builds a frame of one value, which holds nothing for a node to measure.
+    /// </summary>
+    /// <param name="value">The value of every pixel.</param>
+    /// <param name="size">The width and height of the frame, which is square.</param>
+    /// <returns>The frame, which the caller owns.</returns>
+    internal static Mat Flat(byte value = 0, int size = DefaultSize)
+        => new(size, size, MatType.CV_8UC1, Scalar.All(value));
 
     private static Mat Stepped(byte bright, byte dark, int size, bool reachesDown)
     {
