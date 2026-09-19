@@ -81,7 +81,7 @@ src/
   VisionWeave.OpenCv/          OpenCvSharp node definitions and executors
   VisionWeave.Persistence/     .vwflow serialization and schema migrations
   VisionWeave.PluginSdk/       public extension contracts
-  VisionWeave.App/             WPF shell, view models, theme, composition root
+  VisionWeave.App/             WPF shell, canvas projection, view models, theme, composition root
 tests/
   VisionWeave.Domain.Tests/
   VisionWeave.Application.Tests/
@@ -364,7 +364,10 @@ Nodify's pending connection is visual-only until `ConnectPorts` accepts it.
 Rejected connections are removed through the interaction completion callback
 and surfaced as a port diagnostic. Node drag captures a start position, maps
 canvas coordinates using the current editor transform, applies optional grid
-quantization, and submits one move command when the drag ends. Multi-move,
+quantization, and submits one move command when the drag ends. (As built, no
+transform math is needed: `ItemContainer.Location` is already graph space, so the
+rounded location a completed drag leaves is what is submitted — see 6.6.)
+Multi-move,
 paste, and delete are each a single atomic application command and one undo
 unit. When Application emits a graph delta, the projection updates node and
 connection collections in one dispatcher transaction; transient editor visuals
@@ -423,7 +426,7 @@ a document will be edited on; an inspector for the current selection; and a stat
 area for durable state. Each region is named in the markup — `TopBarRegion`,
 `NodeCatalogueRegion`, `CanvasRegion`, `InspectorRegion`, `StatusRegion` — so a
 test can hold the layout to the documented architecture, and the canvas region
-presents a placeholder until the projection package puts the editor there.
+presents the editor the projection package put there (6.6).
 
 The shell carries no business rule in code-behind: the window initializes its
 markup, hands its view model to the data context, and attaches the region a
@@ -431,7 +434,7 @@ snackbar is drawn in. Everything else the user sees is derived from the editing
 session by `MainWindowViewModel` and `ShellStatus`, and a test refuses any further
 member in the code-behind.
 
-Two rules hold the visual system together.
+Three rules hold the visual system together.
 
 **A colour is named once.** `Themes/Tokens.xaml` is the only file in the shell
 that carries a colour literal. Each token declares a `Color.*` value, a `Brush.*`
@@ -447,6 +450,12 @@ ratios the direction requires.
 **Status is never colour alone.** The status area names a severity in words beside
 the colour it paints with, and an announcement carries the same word. Colour is
 the second signal, not the only one.
+
+**A key is declared before the template that reaches for it.** A `StaticResource`
+is resolved against what the dictionary has already declared, so a template that
+reaches for a key declared below it fails when the template is applied — while the
+shell draws its first node, not at build time. A test walks the shell dictionary in
+document order and refuses a reference to a key that is not yet declared.
 
 The status area reports what lasts: the document state (never saved, unsaved,
 saved), the operation the shell is running or the state it returned to, the last
@@ -475,6 +484,89 @@ keep it that way. The XAML designer shows the shell with sample content built fr
 the real node catalog, the real validator, and real document commands
 (`ShellDesignData`), so it cannot present a shell the application would never
 produce.
+
+### 6.6 Canvas projection as built
+
+`CanvasProjection.Project` turns committed state into what the surface draws:
+`CanvasProjectedDocument` holds the node presentations in drawing order and the
+wire presentations. It reads the document, the catalog, the validation projection
+and the selection, and writes nothing, so the same document always draws the same
+way and a gesture that was refused simply leaves the answer it produced. The
+canvas keeps no incremental state: the session reports a new document or a new
+projection and the whole surface is rebuilt from it, so no node presentation
+outlives the document that produced it and pan and zoom survive because they
+belong to the editor rather than to the projection.
+
+`WorkflowDocument.Nodes` is a dictionary, so the order it enumerates in is not
+part of its contract. Nodes are drawn ordered by position — row, then column,
+then instance identifier — which keeps the surface stable and puts a node nearer
+the top-left behind one laid over it. A node shows its label when it has one, the
+definition's display name when it does not, and `Unknown node type` when the
+definition does not resolve; its caption names the type and version, with
+`· not installed` appended in the last case. Ports come from the definition, or
+from the schema a document remembered when the definition does not resolve, where
+a port that carries no label is named by its identifier. A node whose ports are
+unknown presents no connectors: a connector that accepted a wire the document
+cannot describe would be a promise the shell cannot keep.
+
+Each presentation carries the worst condition its element owns, taken from the
+validation projection for that revision, and the condition's first diagnostic in
+the same words the status area uses — severity named, stable code, safe message.
+The severity also travels as a word, so a marked node, port, or wire reads as
+marked without relying on its colour. A wire is drawn only when both of its ports
+can be named; a wire to a port this build cannot name has nothing to attach to and
+is left out, while the nodes it belonged to are still shown, and deleting one of
+them removes the wire with it.
+
+The connector contract is worth stating because it is invisible in the markup.
+`Connector.Anchor` is a graph-space `Point`, not a reference to an element, and
+the connector control is what publishes it: the port presentation binds it
+`OneWayToSource`, and a wire binds `Source.Anchor` and `Target.Anchor`, so a wire
+follows the ports it joins instead of a copy of where they were. Nodify stops
+publishing the anchor once `IsConnected` is false, and its default is false, so
+the connector style sets it true — a connector left at the default would keep the
+point it started at and every wire would hang in the wrong place. The wire a drag
+is drawing is a `PendingConnection`, visual only, drawn backwards when the drag
+began at an input so the curve follows the pointer whichever end it started at.
+
+Every gesture becomes an application command.
+
+- **Add** places the catalog's latest version of the type at the middle of what
+  the viewport shows, stepped aside in fixed increments until the spot is free, or
+  at the origin before the editor has reported a viewport. A type this build does
+  not hold is refused with `VW-NODE-001` and adds nothing.
+- **Connect** turns the two ports a drag joined around when the drag began at an
+  input, because the document's convention is that a wire leaves an output.
+  Direction, type, multiplicity, and cycle rules stay the validator's, so a pair
+  that cannot be joined is passed on and refused there.
+- **Disconnect** removes the wire the gesture named, which is one edit and one
+  undo unit.
+- **Move** commits the positions a completed drag left, rounded to whole
+  graph-space units so a document holds no sub-pixel noise from a pointer. A drag
+  that ended where the node started differs nowhere and is not an edit, and a
+  movement of nothing is not a history step.
+- **Delete** removes the whole selection as one command and one undo unit —
+  `RemoveNodesCommand`, which resolves every named instance before removing any of
+  them — so an undo brings the nodes and the wires between them back together. A
+  delete with an empty selection cannot execute, so it never becomes a step with
+  nothing in it.
+- **Undo and redo** are the session's, and the canvas only reports whether they
+  are available.
+
+A refused gesture needs no rollback of its own. The projection it was drawn from
+is committed state, and a refused command leaves that state untouched, so the
+surface is already what the user should see; the reason travels to the status area
+as the validator's diagnostics rather than as a completion of its own. Selection
+is one selection: it lives in the session, the canvas mirrors it onto the node
+presentations and turns a container's flag back into the session's selection
+behind a guard, so a selection the canvas applied is not read back as one the user
+made. Edits made anywhere else in the shell redraw the surface, because the canvas
+learns about the document and the selection from the session rather than from its
+own gestures.
+
+Parameter editors, per-node preview, the minimap, copy and paste, automatic
+layout, run-state presentation, and the diagnostics panel are not part of this
+slice.
 
 ## 7. Persistence and compatibility
 
@@ -648,8 +740,8 @@ trusted code; sandboxing is a future feature, not an implied security boundary.
 | OpenCV integration tests | Expected pixels / geometry for each migrated node, disposal and cache behavior, preview limit validation. |
 | Persistence integration tests | Save/load round trip, malformed document rejection, migrations, missing-node placeholders, autosave policy validation. |
 | Architecture tests | Dependency direction, no WPF/OpenCV/host stack reference in Domain, and no host stack reference in any core assembly. |
-| Shell tests | The five documented regions and their named elements, token values and brush aliases, contrast of text and of the focus ring, no colour literal outside the token dictionary, every bound path resolvable through a public member, status transitions, and announcements by severity. |
-| UI smoke tests | Canvas add/connect/delete, property edit, run/cancel, light/dark template rendering. |
+| Shell tests | The five documented regions and their named elements, token values and brush aliases, contrast of text and of the focus ring, no colour literal outside the token dictionary, every bound path resolvable through a public member, every declared key used and declared before it is reached for, the canvas wiring of items, wires, commands, and shortcuts, status transitions, and announcements by severity. |
+| UI smoke tests | The real window, drawn with the shipped theme: placing a node from the catalogue, connecting two ports, selecting, deleting, undo, redo, and the surface a refused connection leaves unchanged. |
 
 Tests use xUnit and Shouldly. Test names use the form
 `Member_condition_expected_result`, e.g.
@@ -658,7 +750,10 @@ Tests use xUnit and Shouldly. Test names use the form
 The shell's markup is linked into `VisionWeave.App.Tests` as data, so regions,
 styles, and bindings are checked against the files the application ships without
 creating a window; a WPF element that a test genuinely needs is built on a
-single-threaded-apartment thread, the way the shell builds it.
+single-threaded-apartment thread, the way the shell builds it. The smoke test goes
+one step further and builds the real window over the application's own resources,
+so the templates, the bindings, and Nodify's containers and connectors are covered
+as they are drawn rather than as they are declared.
 
 The composition root is covered by `VisionWeave.App.Tests`, which resolves every
 registered service headlessly and refuses to start on a rejected setting. The

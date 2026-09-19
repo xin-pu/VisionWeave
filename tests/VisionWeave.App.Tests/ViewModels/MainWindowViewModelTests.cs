@@ -6,6 +6,7 @@ using VisionWeave.App.Tests.Support;
 using VisionWeave.App.ViewModels;
 using VisionWeave.Application.Definitions;
 using VisionWeave.Application.Editing;
+using VisionWeave.Application.Validation;
 using VisionWeave.Contracts.Diagnostics;
 using VisionWeave.Contracts.Nodes;
 using VisionWeave.Domain.Workflows;
@@ -76,8 +77,8 @@ public sealed class MainWindowViewModelTests : IDisposable
         shell.ViewModel.NodeCatalogSummary.ShouldBe("2 node types available");
         shell.ViewModel.CatalogueGroups.Select(group => group.Category)
             .ShouldBe([OpenCvNodeIds.FilterCategory, OpenCvNodeIds.TransformCategory]);
-        shell.ViewModel.CatalogueGroups[0].NodeNames.ShouldBe(["Gaussian Blur"]);
-        shell.ViewModel.CatalogueGroups[1].NodeNames.ShouldBe(["Resize"]);
+        shell.ViewModel.CatalogueGroups[0].Entries.Select(entry => entry.DisplayName).ShouldBe(["Gaussian Blur"]);
+        shell.ViewModel.CatalogueGroups[1].Entries.Select(entry => entry.DisplayName).ShouldBe(["Resize"]);
     }
 
     [Fact]
@@ -153,7 +154,13 @@ public sealed class MainWindowViewModelTests : IDisposable
         StubFileChooser chooser = new();
 
         return new Shell(
-            new MainWindowViewModel(session, catalog, openDocument, chooser, status),
+            new MainWindowViewModel(
+                session,
+                catalog,
+                new WorkflowValidator(catalog),
+                openDocument,
+                chooser,
+                status),
             openDocument,
             chooser,
             status);

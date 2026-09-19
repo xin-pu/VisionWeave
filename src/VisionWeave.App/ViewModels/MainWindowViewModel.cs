@@ -1,9 +1,11 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VisionWeave.App.Canvas;
 using VisionWeave.App.Commands;
 using VisionWeave.App.Sessions;
 using VisionWeave.Application.Definitions;
 using VisionWeave.Application.Validation;
+using VisionWeave.Contracts.Nodes;
 
 namespace VisionWeave.App.ViewModels;
 
@@ -21,12 +23,14 @@ internal sealed partial class MainWindowViewModel : ObservableObject
     internal MainWindowViewModel(
         EditorSession session,
         NodeDefinitionCatalog catalog,
+        WorkflowValidator validator,
         OpenDocumentCommand openDocument,
         IWorkflowFileChooser fileChooser,
         ShellStatus status)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(catalog);
+        ArgumentNullException.ThrowIfNull(validator);
         ArgumentNullException.ThrowIfNull(openDocument);
         ArgumentNullException.ThrowIfNull(fileChooser);
         ArgumentNullException.ThrowIfNull(status);
@@ -36,12 +40,15 @@ internal sealed partial class MainWindowViewModel : ObservableObject
         _catalog = catalog;
         _fileChooser = fileChooser;
         OpenDocument = openDocument;
-        CatalogueGroups = [.. catalog.Definitions
+        Canvas = new CanvasViewModel(session, catalog, validator, status);
+        CatalogueGroups = [.. CataloguedTypes()
             .GroupBy(definition => definition.Category)
             .OrderBy(group => group.Key, StringComparer.Ordinal)
             .Select(group => new ShellCatalogueGroup(
                 group.Key,
-                [.. group.Select(definition => definition.DisplayName).OrderBy(name => name, StringComparer.Ordinal)]))];
+                [.. group
+                    .Select(definition => new ShellCatalogueEntry(definition.TypeId.Value, definition.DisplayName))
+                    .OrderBy(entry => entry.DisplayName, StringComparer.Ordinal)]))];
 
         // The session owns the state and raises its own notifications; the strings
         // below read several of its values at once, so any session change refreshes
@@ -67,6 +74,13 @@ internal sealed partial class MainWindowViewModel : ObservableObject
     /// </remarks>
     public ShellStatus Status { get; }
 
+    /// <summary>Gets the canvas: the document projected onto nodes, ports, and wires.</summary>
+    /// <remarks>
+    /// Public for the same reason as <see cref="Status"/>: every binding beneath it
+    /// starts here.
+    /// </remarks>
+    public CanvasViewModel Canvas { get; }
+
     /// <summary>Gets the node catalogue, grouped by the category each definition declares.</summary>
     /// <remarks>
     /// Public because the catalogue region binds to it: WPF binds only to public
@@ -76,7 +90,7 @@ internal sealed partial class MainWindowViewModel : ObservableObject
     public IReadOnlyList<ShellCatalogueGroup> CatalogueGroups { get; }
 
     public string NodeCatalogSummary
-        => $"{_catalog.Definitions.Count} node types available";
+        => $"{_catalog.KnownTypeIds.Count} node types available";
 
     public string WindowTitle
         => $"{DocumentTitle} — VisionWeave";
@@ -134,6 +148,23 @@ internal sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(DocumentCounts));
         OnPropertyChanged(nameof(SelectionSummary));
         OnPropertyChanged(nameof(SelectionConditionSummary));
+    }
+
+    /// <summary>
+    /// Names the types the catalogue offers: one entry per known type, at the
+    /// version the catalog currently publishes, because adding a node places the
+    /// latest version and offering the same type twice would imply a choice the
+    /// command does not offer.
+    /// </summary>
+    private IEnumerable<NodeDefinition> CataloguedTypes()
+    {
+        foreach (NodeTypeId typeId in _catalog.KnownTypeIds.OrderBy(id => id.Value, StringComparer.Ordinal))
+        {
+            if (_catalog.TryResolveLatest(typeId, out NodeDefinition? definition) && definition is not null)
+            {
+                yield return definition;
+            }
+        }
     }
 
     /// <summary>

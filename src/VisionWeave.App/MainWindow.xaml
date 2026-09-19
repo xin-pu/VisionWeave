@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:design="clr-namespace:VisionWeave.App.Design"
+        xmlns:nodify="https://miroiu.github.io/nodify"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         mc:Ignorable="d"
         d:DataContext="{x:Static design:ShellDesignData.ViewModel}"
@@ -19,6 +20,12 @@
     <Window.InputBindings>
         <KeyBinding Key="O"
                     Command="{Binding OpenCommand}"
+                    Modifiers="Control" />
+        <KeyBinding Key="Z"
+                    Command="{Binding Canvas.UndoCommand}"
+                    Modifiers="Control" />
+        <KeyBinding Key="Y"
+                    Command="{Binding Canvas.RedoCommand}"
                     Modifiers="Control" />
     </Window.InputBindings>
 
@@ -67,6 +74,17 @@
                                VerticalAlignment="Center"
                                Foreground="{DynamicResource Brush.Text.Secondary}"
                                Text="Ctrl+O" />
+
+                    <Button Margin="16,0,0,0"
+                            Command="{Binding Canvas.UndoCommand}"
+                            Content="_Undo"
+                            Style="{StaticResource Shell.ActionButton}"
+                            ToolTip="Undo the last edit (Ctrl+Z)" />
+                    <Button Margin="6,0,0,0"
+                            Command="{Binding Canvas.RedoCommand}"
+                            Content="_Redo"
+                            Style="{StaticResource Shell.ActionButton}"
+                            ToolTip="Redo the last undone edit (Ctrl+Y)" />
                 </StackPanel>
 
                 <StackPanel Grid.Column="3" Orientation="Horizontal">
@@ -101,7 +119,7 @@
                                Text="{Binding NodeCatalogSummary}" />
                     <TextBlock DockPanel.Dock="Bottom"
                                Style="{StaticResource Shell.RegionNote}"
-                               Text="Search and add-by-drag arrive with the canvas package." />
+                               Text="Search arrives with the inspector package. Choosing a type adds it to the middle of the canvas." />
                     <ScrollViewer Margin="0,12,0,0" VerticalScrollBarVisibility="Auto">
                         <ItemsControl ItemsSource="{Binding CatalogueGroups}">
                             <ItemsControl.ItemTemplate>
@@ -110,12 +128,21 @@
                                         <TextBlock FontWeight="SemiBold"
                                                    Foreground="{DynamicResource Brush.Accent.Primary}"
                                                    Text="{Binding Category}" />
-                                        <ItemsControl Margin="0,4,0,0" ItemsSource="{Binding NodeNames}">
+                                        <ItemsControl Margin="0,4,0,0" ItemsSource="{Binding Entries}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
-                                                    <TextBlock Margin="8,1,0,1"
-                                                               Foreground="{DynamicResource Brush.Text.Primary}"
-                                                               Text="{Binding}" />
+                                                    <!--
+                                                        Choosing a type is the catalogue's one
+                                                        gesture: it reaches the canvas command
+                                                        rather than editing anything here.
+                                                    -->
+                                                    <Button Margin="0,1"
+                                                            HorizontalContentAlignment="Left"
+                                                            Command="{Binding DataContext.Canvas.AddNodeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            CommandParameter="{Binding TypeId}"
+                                                            Content="{Binding DisplayName}"
+                                                            Style="{StaticResource Shell.CatalogueEntry}"
+                                                            ToolTip="Add this node type to the middle of the canvas" />
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
@@ -139,28 +166,68 @@
                             BorderBrush="{DynamicResource Brush.Border.Subtle}"
                             BorderThickness="0,0,0,1"
                             CornerRadius="8,8,0,0">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Style="{StaticResource Shell.RegionHeader}" Text="{Binding DocumentTitle}" />
-                            <TextBlock Margin="12,0,0,0"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource Brush.Text.Secondary}"
-                                       Text="{Binding DocumentCounts}" />
-                        </StackPanel>
+                        <Grid>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource Shell.RegionHeader}" Text="{Binding DocumentTitle}" />
+                                <TextBlock Margin="12,0,0,0"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource Brush.Text.Secondary}"
+                                           Text="{Binding DocumentCounts}" />
+                            </StackPanel>
+
+                            <Button HorizontalAlignment="Right"
+                                    Command="{Binding Canvas.DeleteSelectionCommand}"
+                                    Content="_Delete"
+                                    Style="{StaticResource Shell.ActionButton}"
+                                    ToolTip="Delete the selected nodes and the wires attached to them (Delete)" />
+                        </Grid>
                     </Border>
 
-                    <StackPanel MaxWidth="420"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center">
-                        <TextBlock HorizontalAlignment="Center"
-                                   FontSize="15"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource Brush.Text.Primary}"
-                                   Text="Workflow canvas" />
-                        <TextBlock HorizontalAlignment="Center"
-                                   Style="{StaticResource Shell.RegionNote}"
-                                   TextAlignment="Center"
-                                   Text="Nodes, wires, and validation marks arrive with the canvas package. This surface already presents the document they will show." />
-                    </StackPanel>
+                    <Grid>
+                        <!--
+                            The work surface. Pan, zoom, and selection are the
+                            editor's; everything the document decides arrives as a
+                            projection, and every gesture leaves as a command.
+                        -->
+                        <nodify:NodifyEditor x:Name="WorkflowCanvas"
+                                             Background="{DynamicResource Brush.Background.Canvas}"
+                                             ConnectionCompletedCommand="{Binding Canvas.ConnectCommand}"
+                                             Connections="{Binding Canvas.Connectors}"
+                                             ConnectionTemplate="{StaticResource Shell.CanvasConnectionTemplate}"
+                                             ItemContainerStyle="{StaticResource Shell.CanvasNodeContainer}"
+                                             ItemTemplate="{StaticResource Shell.CanvasNode}"
+                                             ItemsDragCompletedCommand="{Binding Canvas.MoveCommand}"
+                                             ItemsSource="{Binding Canvas.Nodes}"
+                                             MaxViewportZoom="3"
+                                             MinViewportZoom="0.2"
+                                             PendingConnectionTemplate="{StaticResource Shell.CanvasPendingConnection}"
+                                             RemoveConnectionCommand="{Binding Canvas.DisconnectCommand}"
+                                             ViewportLocation="{Binding Canvas.ViewportLocation, Mode=OneWayToSource}"
+                                             ViewportSize="{Binding Canvas.ViewportSize, Mode=OneWayToSource}">
+                            <nodify:NodifyEditor.InputBindings>
+                                <KeyBinding Key="Delete" Command="{Binding Canvas.DeleteSelectionCommand}" />
+                            </nodify:NodifyEditor.InputBindings>
+                        </nodify:NodifyEditor>
+
+                        <!-- What to do while the document holds nothing to draw. -->
+                        <TextBlock MaxWidth="340"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   IsHitTestVisible="False"
+                                   Text="Choose a node type in the catalogue to place a node, then drag from one port to another to connect them."
+                                   TextAlignment="Center">
+                            <TextBlock.Style>
+                                <Style BasedOn="{StaticResource Shell.RegionNote}" TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Canvas.IsEmpty}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
                 </DockPanel>
             </Border>
 

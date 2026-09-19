@@ -7,6 +7,7 @@ using VisionWeave.App.Notifications;
 using VisionWeave.App.Sessions;
 using VisionWeave.App.ViewModels;
 using VisionWeave.Application.Definitions;
+using VisionWeave.Application.Validation;
 using VisionWeave.Contracts.Diagnostics;
 
 namespace VisionWeave.App;
@@ -57,7 +58,8 @@ public partial class App : System.Windows.Application
 
         // The shell is composed here rather than resolved, because the view model is
         // built from objects the container already owns: the session, the catalog,
-        // the status area, and the command that opens a document into that session.
+        // the validator the canvas judges a wire with, the status area, and the
+        // command that opens a document into that session.
         var openDocument = new OpenDocumentCommand(
             _services.GetRequiredService<AsyncCommandBoundary>(),
             session,
@@ -67,6 +69,7 @@ public partial class App : System.Windows.Application
             new MainWindowViewModel(
                 session,
                 catalog,
+                _services.GetRequiredService<WorkflowValidator>(),
                 openDocument,
                 _services.GetRequiredService<IWorkflowFileChooser>(),
                 status),

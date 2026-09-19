@@ -140,7 +140,7 @@ internal sealed partial class ShellStatus : ObservableObject
 
         NodeDiagnostic diagnostic = result.Diagnostics[0];
         ConditionSeverity = diagnostic.Severity;
-        Condition = $"{SeverityText.Of(diagnostic.Severity)}: {diagnostic.Code} {diagnostic.Message}";
+        Condition = DiagnosticText.Of(diagnostic);
     }
 
     private void ClearCondition()
