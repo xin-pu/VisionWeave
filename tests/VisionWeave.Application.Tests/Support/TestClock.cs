@@ -11,7 +11,7 @@ internal sealed class TestClock(DateTimeOffset start) : TimeProvider
 {
     private readonly object _gate = new();
     private readonly List<TestTimer> _timers = [];
-    private TaskCompletionSource _armed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly List<TaskCompletionSource> _waitingForArm = [];
     private long _ticks;
 
     public DateTimeOffset UtcNow { get; private set; } = start;
@@ -51,18 +51,21 @@ internal sealed class TestClock(DateTimeOffset start) : TimeProvider
     }
 
     /// <summary>
-    /// Gets a task that completes the next time the runtime arms a timer, so a
-    /// test can move the clock knowing the wait exists rather than guessing that
-    /// it does.
+    /// Waits for the runtime to arm its next timer, so a test can move the clock
+    /// knowing the wait exists rather than guessing that it does. The wait is
+    /// registered by the call, so a test registers it before the step that arms the
+    /// timer it wants to see: a timer armed earlier is one the caller has missed,
+    /// not one it will be told about afterwards.
     /// </summary>
-    internal Task NextTimer
+    /// <returns>A task that completes when a timer is armed.</returns>
+    internal Task WaitForNextTimer()
     {
-        get
+        lock (_gate)
         {
-            lock (_gate)
-            {
-                return _armed.Task;
-            }
+            var waiting = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _waitingForArm.Add(waiting);
+
+            return waiting.Task;
         }
     }
 
@@ -129,8 +132,13 @@ internal sealed class TestClock(DateTimeOffset start) : TimeProvider
         {
             _timers.Add(timer);
             timer.Change(dueTime, period);
-            _armed.TrySetResult();
-            _armed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            foreach (TaskCompletionSource waiting in _waitingForArm)
+            {
+                waiting.TrySetResult();
+            }
+
+            _waitingForArm.Clear();
         }
 
         return timer;

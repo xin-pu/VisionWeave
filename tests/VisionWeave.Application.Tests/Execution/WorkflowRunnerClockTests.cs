@@ -11,7 +11,9 @@ namespace VisionWeave.Application.Tests.Execution;
 /// The clock a run is given: how long it waits for a node that ignores
 /// cancellation, what a level that finishes takes off the clock again, and the
 /// durations the run and its nodes report. Every one of these is reached by
-/// moving the clock, so none of them depends on how loaded the machine is.
+/// moving the clock, so none of them depends on how loaded the machine is, and
+/// every wait for the run is bounded, so a signal that never arrives fails the
+/// test instead of hanging the suite.
 /// </summary>
 public sealed class WorkflowRunnerClockTests : RunnerTestBase
 {
@@ -54,15 +56,17 @@ public sealed class WorkflowRunnerClockTests : RunnerTestBase
                 timeProvider: clock)
             .RunAsync(Plan(document), cancellation.Token);
 
-        await blurStarted.Task;
+        await blurStarted.Task.Within("the run to reach the node that stops listening");
+        Task armed = clock.WaitForNextTimer();
         await cancellation.CancelAsync();
-        await clock.NextTimer;
+        await armed.Within("the run to take on its wait for the cancelled node");
 
         clock.Advance(TimeSpan.FromSeconds(4));
         run.IsCompleted.ShouldBeFalse("the grace period has not passed yet.");
 
         clock.Advance(TimeSpan.FromSeconds(1));
 
+        await run.Within("the run to quarantine the node that ignored the stop");
         WorkflowRunSummary summary = await run;
 
         summary.WasCancelled.ShouldBeTrue();
@@ -80,7 +84,7 @@ public sealed class WorkflowRunnerClockTests : RunnerTestBase
 
         blurMayFinish.TrySetResult(true);
 
-        await observed.Flat;
+        await observed.Flat.Within("the run to release the frames its runaway node still held");
 
         sourceFrames.Lease.IsDisposed.ShouldBeTrue();
         sourceFrames.Lease.OutstandingReservationsAtRelease.ShouldBe(0);
@@ -121,9 +125,10 @@ public sealed class WorkflowRunnerClockTests : RunnerTestBase
                 timeProvider: clock)
             .RunAsync(Plan(document), cancellation.Token);
 
-        await blurStarted.Task;
+        await blurStarted.Task.Within("the run to reach the node that listens");
         await cancellation.CancelAsync();
 
+        await run.Within("the run to finish once its node stopped");
         WorkflowRunSummary summary = await run;
 
         summary.WasCancelled.ShouldBeTrue();
@@ -169,5 +174,26 @@ public sealed class WorkflowRunnerClockTests : RunnerTestBase
             .Duration.ShouldBe(TimeSpan.FromSeconds(2));
         ledger.Outstanding.ShouldBe(0);
         ledger.ReservationsOutstanding.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task A_wait_nothing_arms_fails_the_test_instead_of_hanging_it()
+    {
+        var clock = new TestClock(Start);
+        bool failed = false;
+
+        try
+        {
+            // The limit is the test's own here, which is how a suite that waits for
+            // a signal it never gets reports the signal rather than stopping at it.
+            await clock.WaitForNextTimer().Within("a timer nothing arms", TimeSpan.FromMilliseconds(50));
+        }
+        catch (ShouldAssertException failure)
+        {
+            failure.Message.ShouldContain("a timer nothing arms");
+            failed = true;
+        }
+
+        failed.ShouldBeTrue("a signal that never arrives must fail the test that waits for it");
     }
 }
