@@ -174,6 +174,21 @@ including `VW-GRAPH-001` (cycle detected), `VW-PORT-001` (incompatible port),
 failed). UI messages, logs, and tests reference these identifiers rather than
 duplicating strings.
 
+Parameter values are validated where a node's definition resolves, not by the
+executor that happens to read them: `VW-PARAM-001` reports a value whose shape
+does not match the declared kind, `VW-PARAM-002` a numeric value outside the
+declared bounds, `VW-PARAM-003` an option the definition does not declare,
+`VW-PARAM-004` a name the definition does not declare, and `VW-PARAM-005` a
+required parameter the document leaves unset while the definition declares no
+default. A document that reports any of them never becomes a snapshot, so an
+unreadable value cannot reach an executor as a runtime failure. A disabled node
+is never executed, so only its value shapes are checked, not whether a required
+value is present.
+
+Editing reports its own outcome in the same way rather than throwing into a
+binding layer: `VW-EDIT-001` is a refused edit, which leaves the document
+untouched, and `VW-EDIT-002` is an undo or redo with nothing to reverse.
+
 ## 5. Execution design
 
 ### 5.1 Execution contract
@@ -269,6 +284,18 @@ Nodify renders and interacts with a projection of `WorkflowNodeViewModel` and
 is legal, run an algorithm, or own image data. The UI follows a one-way commit
 protocol: **UI intent -> application mutation -> accepted graph delta -> UI
 projection refresh**. ViewModel property setters never mutate Domain directly.
+
+An intent reaches the document as an `IDocumentCommand` handed to
+`DocumentCommandHistory.Execute`, which owns the single undo stack. A command
+carries the data its own reversal needs — the identifiers it created, the values
+it replaced, the entries it removed — so undo never rebuilds a whole document and
+the UI never supplies the state to restore. The returned `DocumentCommandResult`
+says whether the document changed and, when it did not, why; a refused edit is
+reported with diagnostics and leaves the document and the history untouched.
+Connection legality is judged by `WorkflowValidator.ValidateConnection`, which
+reports only the diagnostics a candidate wire itself would introduce, so the
+canvas can judge a pending connection while the rest of the graph is still
+incomplete.
 
 ```text
 NodeDefinition + NodeInstance
@@ -416,6 +443,21 @@ Autosave writes to a separate recoverable working copy. Atomic save uses a
 temporary file in the destination directory followed by replacement; failures
 do not overwrite the previously saved document.
 
+`WorkflowSession` is the editing session a caller works through, and it belongs
+to `Persistence` because it is the only layer that sees both the document and the
+file. It binds the document to its file and records whether that file may be
+written, whether the document has unsaved changes, and which diagnostics the load
+produced. Unsaved-change tracking counts every change, including a move, because
+a moved node is saved state; the document revision alone would miss it.
+`WorkflowSession.New`, `Open`, and `Recover` produce a session, `Save` writes it
+atomically and then drops the working copy, `TryAutosave` writes the working copy
+only for a dirty, writable document that has a path, and `Recover` reopens the
+working copy still bound to the document path, so saving a recovered document
+overwrites the document rather than the copy. A session recovered from a working
+copy starts dirty, because its content is not yet its file's content. Session
+ownership of the undo stack stays with `DocumentCommandHistory` in Application;
+the composition root pairs them for the editor.
+
 ## 8. Node catalog and Aries migration
 
 Initial node categories are Input/Output, Transform, Filter, Threshold,
@@ -467,7 +509,7 @@ trusted code; sandboxing is a future feature, not an implied security boundary.
 | Tier | Proof |
 | --- | --- |
 | Domain unit tests | Port compatibility, multiplicity, cycle detection, stable diagnostics, graph changes. |
-| Application unit tests | Topological order, dirty-subgraph selection, cancellation, branch blocking, undo/redo. |
+| Application unit tests | Topological order, dirty-subgraph selection, cancellation, branch blocking, document command history, undo grouping, refused edits. |
 | OpenCV integration tests | Expected pixels / geometry for each migrated node, disposal and cache behavior. |
 | Persistence integration tests | Save/load round trip, malformed document rejection, migrations, missing-node placeholders. |
 | Architecture tests | Dependency direction and no WPF/OpenCV reference in Domain. |
