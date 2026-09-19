@@ -61,6 +61,40 @@ public sealed class WorkflowRunnerTests : RunnerTestBase
     }
 
     [Fact]
+    public async Task Run_ignores_an_unavailable_optional_input_from_a_disabled_producer()
+    {
+        WorkflowDocument document = WorkflowDocument.Create("workflow");
+        NodeInstance image = document.AddNode(TestNodes.SourceType, 1, new CanvasPosition(0, 0));
+        NodeInstance mask = document.AddNode(TestNodes.SourceType, 1, new CanvasPosition(0, 100));
+        NodeInstance masking = document.AddNode(TestNodes.MaskingType, 1, new CanvasPosition(300, 0));
+        document.AddConnection(image.InstanceId, "image", masking.InstanceId, "image");
+        document.AddConnection(mask.InstanceId, "image", masking.InstanceId, "mask");
+        document.SetNodeEnabled(mask.InstanceId, false);
+
+        LeaseLedger ledger = NewLedger();
+        var frames = new FrameSource(ledger);
+        NodeExecutionRequest? request = null;
+        var maskingExecutor = new StubExecutor((executionRequest, _) =>
+        {
+            request = executionRequest;
+            return Task.FromResult(Succeeded(Outputs()));
+        });
+        StubResolver executors = new StubResolver()
+            .Add(TestNodes.SourceExecutorTypeId, frames.Executor)
+            .Add(TestNodes.MaskingExecutorTypeId, maskingExecutor);
+
+        WorkflowRunSummary summary = await Runner(executors, ledger, Options())
+            .RunAsync(Plan(document), CancellationToken.None);
+
+        summary.Status.ShouldBe(WorkflowRunStatus.Succeeded);
+        summary.StateOf(masking.InstanceId).ShouldBe(NodeRunState.Succeeded);
+        maskingExecutor.Invocations.ShouldBe(1);
+        request!.Inputs.Keys.ShouldBe(["image"]);
+        frames.Lease.IsDisposed.ShouldBeTrue();
+        ledger.Outstanding.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task Run_fan_out_keeps_the_frame_alive_for_the_second_consumer()
     {
         WorkflowDocument document = WorkflowDocument.Create("workflow");
