@@ -13,7 +13,7 @@
 - **Scope:** Port values, executable snapshots, native resource ownership, and `.vwflow` persistence.
 - **Observation:** The initial skeleton could enforce assembly boundaries, but implementation would have been premature before the design-review P0 items had durable decisions.
 - **Decision or next step:** ADR-0003 to ADR-0006 record those decisions and are implemented on the foundation branch. Their status stays Proposed until the maintainer accepts them after review.
-- **Update (2026-09-19):** The foundation slice is implemented locally on `feat/foundation` and is green on the four gates: build, 123 tests across the four test projects, `dotnet format --verify-no-changes`, and `scripts/Test-ProjectDocuments.ps1`. Nothing is pushed to origin, and the branch awaits the review that precedes the merge to `master`.
+- **Update (2026-09-19):** The foundation slice is implemented on `feat/foundation`. Review remediation branches [#1](https://github.com/xin-pu/VisionWeave/issues/1) and [#2](https://github.com/xin-pu/VisionWeave/issues/2) are pushed and closed; the foundation ref itself still awaits review before it is merged to `master`. The corresponding full Release suites passed with 125 and 124 tests respectively, together with format verification.
 - **Evidence:** `docs/adr/0003-port-value-types.md`, `docs/adr/0004-workflow-document-and-format.md`, `docs/adr/0005-native-resource-ownership.md`, `docs/adr/0006-editor-and-ui-commit-protocol.md`.
 - **Owner:** VisionWeave maintainers.
 - **Review again:** When the maintainer accepts or amends the ADRs after review.
@@ -72,3 +72,51 @@
 - **Evidence:** `src/VisionWeave.Application/Execution/WorkflowSnapshotFactory.cs`, `src/VisionWeave.Contracts/Nodes/ParameterDefinition.cs`, `tests/VisionWeave.Application.Tests/Execution/WorkflowSnapshotFactoryTests.cs` (`Build_parameter_without_a_default_stays_absent`), `tests/VisionWeave.IntegrationTests/OpenCv/OpenCvNodeCatalogTests.cs`.
 - **Owner:** VisionWeave maintainers.
 - **Review again:** Before the editor writes parameter values into a document, and before a path parameter enters the catalog.
+
+### PL-2026-007 - Deliver the persisted workflow vertical slice
+
+- **Status:** Open
+- **Priority:** P1
+- **Recorded on:** 2026-09-19
+- **Scope:** A real `.vwflow` document flowing from persistence into validation, snapshot construction, execution, and recovery diagnostics.
+- **Observation:** The Domain and Application layers now distinguish editable documents from executable snapshots, but the Persistence project has no exercised serializer/loader path. Without it, version handling, malformed-document recovery, resource references, and missing-node placeholders remain design-only behavior.
+- **Decision or next step:** Implement a versioned serializer and loader with round-trip, malformed-input, forward-version, and missing-definition tests. Keep WPF and Nodify types out of the format so the file remains an application-owned contract.
+- **Evidence:** `src/VisionWeave.Domain/Workflows/WorkflowDocument.cs`, `src/VisionWeave.Persistence/`, `docs/adr/0004-workflow-document-and-format.md`.
+- **Owner:** VisionWeave maintainers.
+- **Review again:** Before a user-created workflow can be saved or opened.
+
+### PL-2026-008 - Build the first Nodify editor vertical slice
+
+- **Status:** Open
+- **Priority:** P1
+- **Recorded on:** 2026-09-19
+- **Scope:** WPF UI bindings for document-backed nodes, ports, connections, selection, property editing, undo/redo, and run-state presentation.
+- **Observation:** The foundation provides a WPF shell, the Domain document model, and editor commit rules, but it has not yet proven that Nodify interactions become reversible document commands without leaking UI objects into Domain or Application.
+- **Decision or next step:** Implement one end-to-end canvas workflow: add nodes, connect compatible ports, edit a parameter, undo/redo each document change, and render validation/run diagnostics. Add a UI smoke test for this flow before expanding node families.
+- **Evidence:** `src/VisionWeave.App/`, `docs/adr/0006-editor-and-ui-commit-protocol.md`, `docs/design/visionweave-detailed-design.md` (sections 7 and 10).
+- **Owner:** VisionWeave maintainers.
+- **Review again:** Before introducing custom node controls, automatic layout, or subgraphs.
+
+### PL-2026-009 - Validate executor results against node output contracts
+
+- **Status:** Open
+- **Priority:** P1
+- **Recorded on:** 2026-09-19
+- **Scope:** The boundary between `INodeExecutor` results and scheduler publication.
+- **Observation:** The runner publishes every successful `NodeExecutionResult.Outputs` dictionary as supplied. It does not yet reject an unknown output port, a value whose `PortTypeId` conflicts with the declared output, or one lease reused across semantically distinct output ports. Such errors currently surface later as blocked consumers or scheduler failures rather than as a deterministic producer diagnostic.
+- **Decision or next step:** Validate result keys, declared output directions, value types, and duplicate image-lease ownership before publication. Define whether a node may intentionally alias one frame to multiple outputs; if allowed, represent that explicitly and reserve it safely.
+- **Evidence:** `src/VisionWeave.Application/Execution/WorkflowRunner.cs`, `src/VisionWeave.Application/Execution/RunState.cs`, `src/VisionWeave.Contracts/Execution/NodeExecutionResult.cs`, `docs/adr/0005-native-resource-ownership.md`.
+- **Owner:** VisionWeave maintainers.
+- **Review again:** Before external plugins or multi-output image nodes are enabled.
+
+### PL-2026-010 - Make runtime time and cancellation tests deterministic
+
+- **Status:** Monitoring
+- **Priority:** P2
+- **Recorded on:** 2026-09-19
+- **Scope:** Cancellation grace periods, preview fences, and quarantine paths in the application runtime.
+- **Observation:** Current behavior is covered by short real-time delays. The corrected per-level grace wait is now cancelled on normal completion, but its absence cannot be asserted directly, and timing-sensitive tests can become flaky under host load.
+- **Decision or next step:** Introduce a narrow, application-owned time/wait abstraction or `TimeProvider` seam for runner waits. Use it to assert normal-completion cleanup, grace expiry, and late executor completion without wall-clock sleeps; keep executor contracts free of test-only clock dependencies.
+- **Evidence:** `src/VisionWeave.Application/Execution/WorkflowRunner.cs`, `tests/VisionWeave.Application.Tests/Execution/WorkflowRunnerCancellationTests.cs`, [#1](https://github.com/xin-pu/VisionWeave/issues/1).
+- **Owner:** VisionWeave maintainers.
+- **Review again:** Before extending quarantine behavior to plugins or adding more timing-dependent execution features.
