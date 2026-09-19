@@ -4,3 +4,6 @@ Project design records live in this directory. Cross-project rules are linked th
 
 - [Development plan](development-plan.md): the ordered delivery plan from
   pre-WPF contracts through the first runnable WPF workflow.
+- [Pre-UI hardening and visual direction](pre-ui-hardening-and-visual-direction.md):
+  agent-ready work packages, the dark-amber visual system, and the boundary for
+  learning from OpenCMIS without copying it.
