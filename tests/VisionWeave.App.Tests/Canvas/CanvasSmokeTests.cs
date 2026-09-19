@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using System.Globalization;
+﻿using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -783,23 +782,53 @@ public sealed class CanvasSmokeTests
 
     /// <summary>
     /// Lets a flow that returns to the window's thread finish. Work that runs off the
-    /// dispatcher is posted back to it, so waiting means running what was posted rather
-    /// than sleeping on it, and a step that never finishes fails with what was expected
-    /// instead of hanging.
+    /// dispatcher is posted back to it, so waiting means running what was posted and
+    /// looking again once the thread has finished a piece of it, rather than sleeping
+    /// and hoping: the condition ends the wait, and the guard only ends one that would
+    /// never finish, so a flow that never gets there fails with what was expected
+    /// instead of hanging the test host.
     /// </summary>
     /// <param name="shell">The shell being driven.</param>
     /// <param name="until">What the flow is expected to have done.</param>
     private static void Settle(Shell shell, Func<bool> until)
     {
-        var waited = Stopwatch.StartNew();
-
-        while (!until() && waited.Elapsed < TimeSpan.FromSeconds(10))
+        Dispatcher dispatcher = Dispatcher.CurrentDispatcher;
+        var frame = new DispatcherFrame();
+        var guard = new DispatcherTimer(DispatcherPriority.Send, dispatcher)
         {
-            Lay(shell.Window);
-            Thread.Sleep(5);
+            Interval = TimeSpan.FromSeconds(10),
+        };
+
+        void Finished(object? sender, EventArgs args)
+        {
+            if (until())
+            {
+                frame.Continue = false;
+            }
+        }
+
+        guard.Tick += (_, _) => frame.Continue = false;
+        dispatcher.Hooks.OperationCompleted += Finished;
+        guard.Start();
+
+        try
+        {
+            if (!until())
+            {
+                Dispatcher.PushFrame(frame);
+            }
+        }
+        finally
+        {
+            guard.Stop();
+            dispatcher.Hooks.OperationCompleted -= Finished;
         }
 
         until().ShouldBeTrue("the flow the shell started did not finish in time.");
+
+        // The surface the step is about to read is laid out, so it reads what a user
+        // would see rather than what the last pass left pending.
+        shell.Window.UpdateLayout();
     }
 
     /// <summary>

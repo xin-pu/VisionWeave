@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using Shouldly;
+﻿using Shouldly;
 using VisionWeave.Application.Execution;
 using VisionWeave.Contracts.Execution;
 using VisionWeave.Contracts.Values;
@@ -92,28 +91,4 @@ public abstract class RunnerTestBase
     /// <returns>The result.</returns>
     protected static NodeExecutionResult Succeeded(IReadOnlyDictionary<string, PortValue> outputs)
         => NodeExecutionResult.Success(outputs, TimeSpan.FromMilliseconds(1));
-
-    /// <summary>
-    /// Waits until a condition holds, so that a test can observe a state that the
-    /// run reaches asynchronously without depending on a fixed delay.
-    /// </summary>
-    /// <param name="condition">The condition to wait for.</param>
-    /// <param name="because">The description used when the condition never holds.</param>
-    /// <returns>The awaited task.</returns>
-    protected static async Task WaitForAsync(Func<bool> condition, string because)
-    {
-        Stopwatch stopwatch = Stopwatch.StartNew();
-
-        while (stopwatch.Elapsed < TimeSpan.FromSeconds(5))
-        {
-            if (condition())
-            {
-                return;
-            }
-
-            await Task.Delay(10).ConfigureAwait(false);
-        }
-
-        condition().ShouldBeTrue(because);
-    }
 }
