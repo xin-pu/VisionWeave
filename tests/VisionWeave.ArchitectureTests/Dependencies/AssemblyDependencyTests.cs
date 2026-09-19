@@ -75,7 +75,7 @@ public sealed class AssemblyDependencyTests
 
         foreach (Assembly project in projects)
         {
-            AssertNoForbiddenReference(project, forbiddenPrefixes: ["VisionWeave.ArchitectureTests", "VisionWeave.Application.Tests", "VisionWeave.Domain.Tests", "VisionWeave.IntegrationTests"]);
+            AssertNoForbiddenReference(project, forbiddenPrefixes: ["VisionWeave.ArchitectureTests", "VisionWeave.Application.Tests", "VisionWeave.Domain.Tests", "VisionWeave.IntegrationTests", "VisionWeave.Persistence.Tests"]);
         }
     }
 

@@ -193,6 +193,14 @@ objects. Expected invalid workflow conditions return validation diagnostics;
 unexpected failures are captured at the runner boundary, logged once with the
 original exception, and returned as a node failure diagnostic.
 
+A node reports success together with its output values. Before the runtime hands
+those values to the scheduler it checks them against the node definition's output
+ports: the port must be declared as an output, the value must carry the port's
+declared type, and an image frame lease must be one the node created rather than
+one it received as an input, used for exactly one output port. A result that
+breaks that contract fails the node with `VW-EXEC-010` to `VW-EXEC-013` and
+releases the frames it reported.
+
 ### 5.2 Scheduler
 
 1. Capture an immutable `WorkflowSnapshot` with its monotonically increasing
@@ -383,6 +391,21 @@ missing plugin node becomes a non-executable placeholder rendered from its
 snapshot; its raw JSON and connections remain intact so it can be restored when
 the plugin returns. A document newer than the supported schema opens read-only
 without destructive rewrite.
+
+The implemented version 1 writer stores `schemaVersion`, `documentId`, `name`,
+`createdUtc`, `modifiedUtc`, `revision`, the optional `appVersion`,
+`requiredPlugins`, `nodes`, `connections`, and every field the build does not
+model. A node entry records `id`, `typeId`, `typeVersion`, `parameters`,
+`layout`, and `extensionData`, plus `label` and `enabled` when they differ from
+their defaults; a connection records its own `id`. A file is read when it
+declares `documentId`, `name`, `createdUtc`, and `revision`; otherwise it
+reports `VW-FILE-001` and yields no document. A schema version this build
+cannot migrate reports `VW-FILE-002` and opens read-only, and an entry or field
+that cannot be represented is skipped with `VW-FILE-003` rather than failing
+the load. Reading never changes the stored revision or modification instant,
+because a load is not an edit. The `resources` list and each node's
+`portSchemaSnapshot` are preserved verbatim but are not modeled yet, which
+PL-2026-011 tracks.
 
 Migrations are explicit `IWorkflowMigration` implementations keyed by source
 schema version. They are forward-only, idempotent, preserve unknown extension

@@ -15,6 +15,7 @@ public sealed class WorkflowDocument
     private readonly List<WorkflowConnection> _connections = [];
     private readonly Dictionary<string, string> _extensionData = new(StringComparer.Ordinal);
     private readonly HashSet<string> _requiredPlugins = new(StringComparer.Ordinal);
+    private bool _isHydrating;
 
     private WorkflowDocument(Guid id, string name, long revision, DateTimeOffset createdUtc, TimeProvider timeProvider)
     {
@@ -92,24 +93,53 @@ public sealed class WorkflowDocument
     }
 
     /// <summary>
-    /// Rehydrates a document that was loaded from storage, including its
-    /// revision, so that cached results keyed on the revision stay coherent.
+    /// Rehydrates a document that was loaded from storage. Loading is not an
+    /// edit: the mutations <paramref name="fill"/> performs rebuild the document
+    /// instead of revising it, and the stored revision and modification instant
+    /// are restored unchanged so that cached results keyed on the revision stay
+    /// reachable and a load never rewrites history.
     /// </summary>
     /// <param name="id">The stored document identifier.</param>
     /// <param name="name">The stored workflow name.</param>
-    /// <param name="revision">The stored revision.</param>
     /// <param name="createdUtc">The stored creation instant.</param>
+    /// <param name="modifiedUtc">The stored modification instant.</param>
+    /// <param name="revision">The stored revision.</param>
+    /// <param name="fill">Rebuilds the nodes, connections, and preserved fields.</param>
     /// <param name="timeProvider">The clock used for timestamps.</param>
     /// <returns>The restored document.</returns>
-    public static WorkflowDocument Restore(
+    public static WorkflowDocument Hydrate(
         Guid id,
         string name,
-        long revision,
         DateTimeOffset createdUtc,
+        DateTimeOffset modifiedUtc,
+        long revision,
+        Action<WorkflowDocument> fill,
         TimeProvider? timeProvider = null)
     {
+        ArgumentNullException.ThrowIfNull(fill);
         ArgumentOutOfRangeException.ThrowIfNegative(revision);
-        return new WorkflowDocument(id, RequireName(name), revision, createdUtc, timeProvider ?? TimeProvider.System);
+
+        var document = new WorkflowDocument(
+            id,
+            RequireName(name),
+            revision,
+            createdUtc,
+            timeProvider ?? TimeProvider.System)
+        {
+            ModifiedUtc = modifiedUtc,
+        };
+
+        document._isHydrating = true;
+        try
+        {
+            fill(document);
+        }
+        finally
+        {
+            document._isHydrating = false;
+        }
+
+        return document;
     }
 
     /// <summary>
@@ -299,6 +329,21 @@ public sealed class WorkflowDocument
     }
 
     /// <summary>
+    /// Preserves an unknown field read from a saved node entry, so that a later
+    /// save never drops node content this build does not understand.
+    /// </summary>
+    /// <param name="instanceId">The instance the field was stored on.</param>
+    /// <param name="name">The field name.</param>
+    /// <param name="json">The raw JSON fragment.</param>
+    public void PreserveNodeExtension(Guid instanceId, string name, string json)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(json);
+        GetNode(instanceId).SetExtensionData(name, json);
+        Commit(semantic: false);
+    }
+
+    /// <summary>
     /// Records the application version that wrote the document. This is file
     /// metadata and does not change the workflow revision.
     /// </summary>
@@ -376,6 +421,11 @@ public sealed class WorkflowDocument
 
     private void Commit(bool semantic)
     {
+        if (_isHydrating)
+        {
+            return;
+        }
+
         if (semantic)
         {
             Revision++;
