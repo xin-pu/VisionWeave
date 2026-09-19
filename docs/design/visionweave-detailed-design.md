@@ -475,7 +475,12 @@ unknown field merely because the current catalog lacks its definition.
 
 Autosave writes to a separate recoverable working copy. Atomic save uses a
 temporary file in the destination directory followed by replacement; failures
-do not overwrite the previously saved document.
+do not overwrite the previously saved document. The editor session reports an
+autosave attempt as an outcome rather than a Boolean — nothing to write, a copy
+written, a document that must not be written, or a write the file system refused
+— and a refused or failed write arrives as `VW-FILE-002` or `VW-FILE-001` with
+its exception kept for structured logging, so a scheduler or a timer never has to
+interpret an exception to decide what to do next.
 
 `WorkflowSession` is the editing session a caller works through, and it belongs
 to `Persistence` because it is the only layer that sees both the document and the

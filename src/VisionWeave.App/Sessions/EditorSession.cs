@@ -233,21 +233,45 @@ internal sealed partial class EditorSession : ObservableObject
     }
 
     /// <summary>
-    /// Writes the recoverable working copy of the document.
+    /// Writes the recoverable working copy of the document. The write runs through
+    /// the same path classification a deliberate save uses, so an unusable
+    /// destination is a diagnostic here too rather than an exception that reaches a
+    /// caller outside the command boundary.
     /// </summary>
     /// <returns>
-    /// <see langword="true"/> when a working copy was written; <see langword="false"/>
-    /// when there is nothing to autosave, because the document is unsaved or unchanged.
+    /// <see cref="AutosaveOutcome.Written"/> when a working copy was written,
+    /// <see cref="AutosaveOutcome.NotApplicable"/> when there is nothing to autosave
+    /// because the document is unsaved or unchanged,
+    /// <see cref="AutosaveOutcome.Refused"/> when the document must not be written,
+    /// or <see cref="AutosaveOutcome.Failed"/> with the diagnostic that explains a
+    /// write the file system refused.
     /// </returns>
-    internal bool TryAutosave()
+    internal AutosaveResult Autosave()
     {
-        if (!Session.TryAutosave())
+        if (Session.IsReadOnly)
         {
-            return false;
+            return AutosaveResult.Refused(
+                DiagnosticCodes.UnsupportedDocumentSchema,
+                "This document was opened read-only, so no working copy is written.");
+        }
+
+        try
+        {
+            if (!Session.TryAutosave())
+            {
+                return AutosaveResult.NotApplicable;
+            }
+        }
+        catch (Exception exception) when (DocumentLoader.IsUnusablePath(exception))
+        {
+            return AutosaveResult.Failed(
+                DiagnosticCodes.UnreadableDocument,
+                "The working copy could not be written. Check that the folder exists and that you are allowed to write to it.",
+                exception);
         }
 
         NotifyDocumentChanged();
-        return true;
+        return AutosaveResult.Written;
     }
 
     /// <summary>

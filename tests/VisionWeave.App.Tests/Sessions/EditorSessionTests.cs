@@ -1,4 +1,6 @@
-﻿using Shouldly;
+﻿using Microsoft.Extensions.Logging;
+using Shouldly;
+using VisionWeave.App.Commands;
 using VisionWeave.App.Sessions;
 using VisionWeave.App.Tests.Support;
 using VisionWeave.Application.Editing;
@@ -264,13 +266,114 @@ public sealed class EditorSessionTests : IDisposable
         string path = _directory.PathOf("autosaved.vwflow");
         session.SaveAs(path).ShouldBeEmpty();
 
-        session.TryAutosave().ShouldBeFalse();
+        session.Autosave().Outcome.ShouldBe(AutosaveOutcome.NotApplicable);
         session.HasWorkingCopy(path).ShouldBeFalse();
 
         session.Execute(new AddNodeCommand(new NodeTypeId("visionweave.test.unknown"), 1, new CanvasPosition(0, 0)));
 
-        session.TryAutosave().ShouldBeTrue();
+        AutosaveResult written = session.Autosave();
+
+        written.Outcome.ShouldBe(AutosaveOutcome.Written);
+        written.Succeeded.ShouldBeTrue();
+        written.Diagnostics.ShouldBeEmpty();
         session.HasWorkingCopy(path).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Autosave_of_a_document_without_a_path_reports_not_applicable()
+    {
+        EditorSession session = TestSessions.Create();
+        session.Execute(new AddNodeCommand(new NodeTypeId("visionweave.test.unknown"), 1, new CanvasPosition(0, 0)));
+
+        AutosaveResult result = session.Autosave();
+
+        result.Outcome.ShouldBe(AutosaveOutcome.NotApplicable);
+        result.Succeeded.ShouldBeFalse();
+        result.Diagnostics.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Autosave_of_a_read_only_document_reports_vw_file_002_without_writing()
+    {
+        EditorSession session = TestSessions.Create();
+        string path = _directory.SaveUnsupportedSchemaDocument("read-only.vwflow");
+        session.Open(path).Session.ShouldNotBeNull();
+        session.IsReadOnly.ShouldBeTrue();
+
+        AutosaveResult result = session.Autosave();
+
+        result.Outcome.ShouldBe(AutosaveOutcome.Refused);
+        result.Diagnostics.ShouldHaveSingleItem().Code.ShouldBe(DiagnosticCodes.UnsupportedDocumentSchema);
+        session.HasWorkingCopy(path).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Autosave_to_an_unusable_path_reports_vw_file_001_and_keeps_the_document_unsaved()
+    {
+        EditorSession session = TestSessions.Create();
+        string path = _directory.PathOf("refused.vwflow");
+        session.SaveAs(path).ShouldBeEmpty();
+        session.Execute(new AddNodeCommand(new NodeTypeId("visionweave.test.unknown"), 1, new CanvasPosition(0, 0)));
+
+        // The working copy is written beside the document, so an unusable
+        // destination is a directory sitting where the working copy would go.
+        System.IO.Directory.CreateDirectory(WorkflowDocumentWriter.GetWorkingCopyPath(path));
+
+        AutosaveResult result = session.Autosave();
+
+        result.Outcome.ShouldBe(AutosaveOutcome.Failed);
+        result.Succeeded.ShouldBeFalse();
+        NodeDiagnostic failure = result.Diagnostics.ShouldHaveSingleItem();
+        failure.Code.ShouldBe(DiagnosticCodes.UnreadableDocument);
+        failure.Exception.ShouldNotBeNull();
+        session.IsDirty.ShouldBeTrue();
+        session.HasWorkingCopy(path).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Autosave_of_a_document_with_an_unstorable_value_reports_vw_file_001()
+    {
+        EditorSession session = TestSessions.Create();
+        string path = _directory.PathOf("unstorable.vwflow");
+        session.SaveAs(path).ShouldBeEmpty();
+        NodeInstance node = session.Document.AddNode(
+            new NodeTypeId("visionweave.test.unknown"),
+            1,
+            new CanvasPosition(0, 0));
+        session.Document.SetNodeParameter(node.InstanceId, "unsupported", new Version(1, 0));
+
+        AutosaveResult result = session.Autosave();
+
+        result.Outcome.ShouldBe(AutosaveOutcome.Failed);
+        NodeDiagnostic failure = result.Diagnostics.ShouldHaveSingleItem();
+        failure.Code.ShouldBe(DiagnosticCodes.UnreadableDocument);
+        failure.Exception.ShouldBeOfType<NotSupportedException>();
+        session.HasWorkingCopy(path).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Autosave_failure_stays_inside_the_command_boundary()
+    {
+        EditorSession session = TestSessions.Create();
+        string path = _directory.PathOf("boundary.vwflow");
+        session.SaveAs(path).ShouldBeEmpty();
+        session.Execute(new AddNodeCommand(new NodeTypeId("visionweave.test.unknown"), 1, new CanvasPosition(0, 0)));
+        System.IO.Directory.CreateDirectory(WorkflowDocumentWriter.GetWorkingCopyPath(path));
+
+        var presenter = new RecordingNotificationPresenter();
+        var logger = new RecordingLogger<AsyncCommandBoundary>();
+        var boundary = new AsyncCommandBoundary(presenter, logger);
+
+        CommandExecutionResult result = await boundary.RunAsync(
+            "Autosave",
+            _ => Task.FromResult(session.Autosave().Diagnostics),
+            CancellationToken.None);
+
+        // An expected write failure is the operation's own report, so the boundary
+        // completes and never classifies it as an unanticipated command failure.
+        result.Completion.ShouldBe(CommandCompletion.Completed);
+        result.Diagnostics.ShouldHaveSingleItem().Code.ShouldBe(DiagnosticCodes.UnreadableDocument);
+        logger.Count(LogLevel.Error).ShouldBe(0);
     }
 
     [Fact]
@@ -280,7 +383,7 @@ public sealed class EditorSessionTests : IDisposable
         string path = _directory.PathOf("recovered.vwflow");
         session.SaveAs(path).ShouldBeEmpty();
         session.Execute(new AddNodeCommand(new NodeTypeId("visionweave.test.unknown"), 1, new CanvasPosition(0, 0)));
-        session.TryAutosave().ShouldBeTrue();
+        session.Autosave().Succeeded.ShouldBeTrue();
 
         EditorSession resumed = TestSessions.Create();
         WorkflowSessionResult result = resumed.Recover(path);
