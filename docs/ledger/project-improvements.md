@@ -38,3 +38,14 @@
 - **Evidence:** `docs/adr/0003-port-value-types.md`, `docs/adr/0006-editor-and-ui-commit-protocol.md`, `docs/design/visionweave-detailed-design.md`.
 - **Owner:** VisionWeave maintainers.
 - **Review again:** Before the first-release node catalog is frozen.
+
+### PL-2026-004 - Execution result cache
+
+- **Status:** Deferred
+- **Recorded on:** 2026-09-19
+- **Scope:** Reuse of node results between runs, including the cache budget and eviction of ADR-0005.
+- **Observation:** The run executes every scheduled node and releases every frame it published when the run ends, so nothing is reused. A node whose producer is not part of the plan is therefore reported blocked (`VW-EXEC-003`) instead of running on a stale value. `ExecutionOptions.CacheBudgetBytes` and the diagnostic `VW-EXEC-006` are declared but unreferenced until the cache exists.
+- **Decision or next step:** Defer the cache to the slice that implements incremental re-execution of a changed subgraph, and keep `IExecutionInputSource` as the only seam it plugs into so that no executor, node definition, or plan contract changes when it arrives.
+- **Evidence:** `src/VisionWeave.Application/Execution/IExecutionInputSource.cs`, `src/VisionWeave.Application/Execution/ExecutionOptions.cs`, `src/VisionWeave.Contracts/Diagnostics/DiagnosticCodes.cs`.
+- **Owner:** VisionWeave maintainers.
+- **Review again:** When the editor wires incremental runs to a plan built from changed nodes.
