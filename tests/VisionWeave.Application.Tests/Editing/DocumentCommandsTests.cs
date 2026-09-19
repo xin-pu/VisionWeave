@@ -89,6 +89,59 @@ public sealed class DocumentCommandsTests
     }
 
     [Fact]
+    public void RemoveNodes_apply_removes_every_named_instance_and_their_connections()
+    {
+        NodeInstance source = _document.AddNode(TestNodes.SourceType, 1, new CanvasPosition(0, 0));
+        NodeInstance blur = _document.AddNode(TestNodes.BlurType, 1, new CanvasPosition(200, 0));
+        NodeInstance masking = _document.AddNode(TestNodes.MaskingType, 1, new CanvasPosition(400, 0));
+        _document.AddConnection(source.InstanceId, "image", blur.InstanceId, "image");
+        _document.AddConnection(blur.InstanceId, "blurred", masking.InstanceId, "image");
+
+        var command = new RemoveNodesCommand([source.InstanceId, blur.InstanceId, masking.InstanceId]);
+        command.Apply(_document).IsAccepted.ShouldBeTrue();
+
+        _document.Nodes.ShouldBeEmpty();
+        _document.Connections.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void RemoveNodes_revert_restores_every_node_and_the_wire_that_joined_them()
+    {
+        NodeInstance source = _document.AddNode(TestNodes.SourceType, 1, new CanvasPosition(0, 0));
+        NodeInstance blur = _document.AddNode(TestNodes.BlurType, 1, new CanvasPosition(200, 40));
+        WorkflowConnection connection = _document.AddConnection(source.InstanceId, "image", blur.InstanceId, "image");
+
+        var command = new RemoveNodesCommand([source.InstanceId, blur.InstanceId]);
+        command.Apply(_document);
+        command.Revert(_document);
+
+        _document.Nodes.Count.ShouldBe(2);
+        _document.GetNode(source.InstanceId).Position.ShouldBe(new CanvasPosition(0, 0));
+        _document.GetNode(blur.InstanceId).Position.ShouldBe(new CanvasPosition(200, 40));
+        _document.Connections.ShouldHaveSingleItem().ConnectionId.ShouldBe(connection.ConnectionId);
+    }
+
+    [Fact]
+    public void RemoveNodes_with_an_instance_the_document_lost_removes_nothing()
+    {
+        NodeInstance blur = _document.AddNode(TestNodes.BlurType, 1, new CanvasPosition(200, 0));
+
+        var command = new RemoveNodesCommand([blur.InstanceId, Guid.NewGuid()]);
+
+        Should.Throw<KeyNotFoundException>(() => command.Apply(_document));
+
+        // A selection that has gone stale refuses the whole edit rather than
+        // deleting the part of itself the document still holds.
+        _document.Nodes.ShouldHaveSingleItem().InstanceId.ShouldBe(blur.InstanceId);
+    }
+
+    [Fact]
+    public void RemoveNodes_with_no_instance_is_refused_at_construction()
+    {
+        Should.Throw<ArgumentException>(() => new RemoveNodesCommand([]));
+    }
+
+    [Fact]
     public void MoveNodes_apply_moves_every_named_instance()
     {
         NodeInstance first = _document.AddNode(TestNodes.SourceType, 1, new CanvasPosition(0, 0));

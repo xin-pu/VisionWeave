@@ -231,6 +231,26 @@ public sealed class DocumentCommandHistoryTests
     }
 
     [Fact]
+    public void Undo_of_a_multi_node_delete_brings_the_whole_selection_back_at_once()
+    {
+        NodeInstance source = _document.AddNode(TestNodes.SourceType, 1, new CanvasPosition(0, 0));
+        NodeInstance blur = AddBlur();
+        WorkflowConnection connection = _document.AddConnection(source.InstanceId, "image", blur.InstanceId, "image");
+
+        _history.Execute(new RemoveNodesCommand([source.InstanceId, blur.InstanceId]));
+        _document.Nodes.ShouldBeEmpty();
+
+        _history.Undo().IsAccepted.ShouldBeTrue();
+
+        // Deleting a selection is one gesture, so it is one history step: both nodes
+        // and the wire between them return together, and nothing is left for a
+        // second undo to reverse.
+        _document.Nodes.Count.ShouldBe(2);
+        _document.Connections.ShouldHaveSingleItem().ConnectionId.ShouldBe(connection.ConnectionId);
+        _history.CanUndo.ShouldBeFalse();
+    }
+
+    [Fact]
     public void Clear_discards_both_directions_of_the_history()
     {
         _history.Execute(new AddNodeCommand(TestNodes.SourceType, 1, new CanvasPosition(0, 0)));

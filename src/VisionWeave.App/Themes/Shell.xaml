@@ -1,5 +1,6 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:nodify="https://miroiu.github.io/nodify">
 
     <!--
         The shell's styles. Every value comes from Themes/Tokens.xaml, so this file
@@ -89,7 +90,7 @@
                             CornerRadius="6"
                             SnapsToDevicePixels="True">
                         <ContentPresenter Margin="{TemplateBinding Padding}"
-                                          HorizontalAlignment="Center"
+                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                           VerticalAlignment="Center"
                                           RecognizesAccessKey="True" />
                     </Border>
@@ -108,6 +109,235 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <!--
+        The canvas surface. A node is a card that says what it is, which ports it
+        has, and what condition it owns; a wire is a line whose colour only repeats
+        what the wire's own label and the status area already say. Every value comes
+        from the token dictionary, so the canvas is themed by the same file as the
+        rest of the shell.
+    -->
+
+    <!--
+        A placed node. The container owns where the node sits and whether it is
+        selected, so both travel back to the projection: the position is what a
+        completed drag commits, and the selection is what the shell reports.
+    -->
+    <Style x:Key="Shell.CanvasNodeContainer" TargetType="nodify:ItemContainer">
+        <Setter Property="Location" Value="{Binding Location, Mode=TwoWay}" />
+        <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+        <Setter Property="SelectedBrush" Value="{DynamicResource Brush.Accent.Primary}" />
+        <Setter Property="SelectedBorderThickness" Value="2" />
+        <Setter Property="HighlightBrush" Value="{DynamicResource Brush.Accent.Hover}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource Shell.FocusVisual}" />
+    </Style>
+
+    <!--
+        A port. Nodify stops publishing a connector's anchor once IsConnected is
+        false, and its default is false, so a connector left at the default would
+        keep the point it started at while its node moved and every wire would hang
+        in the wrong place.
+    -->
+    <Style x:Key="Shell.CanvasConnector" TargetType="nodify:Connector">
+        <Setter Property="IsConnected" Value="True" />
+        <Setter Property="Width" Value="12" />
+        <Setter Property="Height" Value="12" />
+        <Setter Property="Background" Value="{DynamicResource Brush.Text.Secondary}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Background.SurfaceRaised}" />
+        <Setter Property="BorderThickness" Value="2" />
+        <Setter Property="Cursor" Value="Cross" />
+        <Setter Property="ToolTip" Value="{Binding Summary}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource Shell.FocusVisual}" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding Severity}" Value="Warning">
+                <Setter Property="Background" Value="{DynamicResource Brush.State.Warning}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Severity}" Value="Error">
+                <Setter Property="Background" Value="{DynamicResource Brush.State.Danger}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Severity}" Value="Information">
+                <Setter Property="Background" Value="{DynamicResource Brush.State.Info}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- A port that receives a value. -->
+    <DataTemplate x:Key="Shell.CanvasPortInput">
+        <StackPanel Margin="0,2" Orientation="Horizontal">
+            <nodify:Connector Anchor="{Binding Anchor, Mode=OneWayToSource}" Style="{StaticResource Shell.CanvasConnector}" />
+            <TextBlock Margin="6,0,0,0"
+                       VerticalAlignment="Center"
+                       FontSize="11"
+                       Foreground="{DynamicResource Brush.Text.Secondary}"
+                       Text="{Binding DisplayName}" />
+        </StackPanel>
+    </DataTemplate>
+
+    <!-- A port that publishes a value. -->
+    <DataTemplate x:Key="Shell.CanvasPortOutput">
+        <StackPanel Margin="0,2"
+                    HorizontalAlignment="Right"
+                    Orientation="Horizontal">
+            <TextBlock Margin="0,0,6,0"
+                       VerticalAlignment="Center"
+                       FontSize="11"
+                       Foreground="{DynamicResource Brush.Text.Secondary}"
+                       Text="{Binding DisplayName}" />
+            <nodify:Connector Anchor="{Binding Anchor, Mode=OneWayToSource}" Style="{StaticResource Shell.CanvasConnector}" />
+        </StackPanel>
+    </DataTemplate>
+
+    <!--
+        A wire. The label in the middle of the line is the word for the condition,
+        so a marked wire reads as marked without depending on its colour, and the
+        pointer resting on it explains the condition in full.
+    -->
+    <Style x:Key="Shell.CanvasConnection" TargetType="nodify:LineConnection">
+        <Setter Property="ArrowEnds" Value="End" />
+        <Setter Property="ArrowSize" Value="8,6" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="OutlineBrush" Value="{DynamicResource Brush.Text.Secondary}" />
+        <Setter Property="OutlineThickness" Value="2" />
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+        <Setter Property="Text" Value="{Binding SeverityWord}" />
+        <Setter Property="TextBackground" Value="{DynamicResource Brush.Background.SurfaceRaised}" />
+        <Setter Property="TextCornerRadius" Value="4" />
+        <Setter Property="TextPadding" Value="5,1" />
+        <Setter Property="ToolTip" Value="{Binding Summary}" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding Severity}" Value="Warning">
+                <Setter Property="OutlineBrush" Value="{DynamicResource Brush.State.Warning}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Severity}" Value="Error">
+                <Setter Property="OutlineBrush" Value="{DynamicResource Brush.State.Danger}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- A node: its title, the port it reads from, the port it publishes to, and its type. -->
+    <DataTemplate x:Key="Shell.CanvasNode">
+        <Border MinWidth="180"
+                Background="{DynamicResource Brush.Background.SurfaceRaised}"
+                BorderBrush="{DynamicResource Brush.Border.Subtle}"
+                BorderThickness="1"
+                CornerRadius="6"
+                ToolTip="{Binding Summary}">
+            <StackPanel>
+                <Border Padding="10,6"
+                        Background="{DynamicResource Brush.Background.Surface}"
+                        BorderBrush="{DynamicResource Brush.Border.Subtle}"
+                        BorderThickness="0,0,0,1"
+                        CornerRadius="6,6,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource Brush.Text.Primary}"
+                                   Text="{Binding DisplayName}"
+                                   TextTrimming="CharacterEllipsis" />
+
+                        <TextBlock Grid.Column="1"
+                                   Margin="8,0,0,0"
+                                   VerticalAlignment="Center"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Text="{Binding SeverityWord}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Severity}" Value="Information">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                            <Setter Property="Foreground" Value="{DynamicResource Brush.State.Info}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Severity}" Value="Warning">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                            <Setter Property="Foreground" Value="{DynamicResource Brush.State.Warning}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Severity}" Value="Error">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                            <Setter Property="Foreground" Value="{DynamicResource Brush.State.Danger}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+                </Border>
+
+                <Grid Margin="0,7">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <ItemsControl Grid.Column="0"
+                                  ItemTemplate="{StaticResource Shell.CanvasPortInput}"
+                                  ItemsSource="{Binding Inputs}" />
+                    <ItemsControl Grid.Column="1"
+                                  ItemTemplate="{StaticResource Shell.CanvasPortOutput}"
+                                  ItemsSource="{Binding Outputs}" />
+                </Grid>
+
+                <TextBlock Margin="10,0,10,8"
+                           FontSize="11"
+                           Foreground="{DynamicResource Brush.Text.Secondary}"
+                           Text="{Binding Caption}"
+                           TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+        </Border>
+    </DataTemplate>
+
+    <!-- A wire between two placed ports. -->
+    <DataTemplate x:Key="Shell.CanvasConnectionTemplate">
+        <nodify:LineConnection Source="{Binding Source.Anchor}"
+                               Style="{StaticResource Shell.CanvasConnection}"
+                               Target="{Binding Target.Anchor}" />
+    </DataTemplate>
+
+    <!--
+        The wire a drag is drawing. It is visual only: the document hears about the
+        gesture when the drag completes, and a drag that is refused leaves the canvas
+        exactly as it was. A drag that started at an input is drawn backwards, so the
+        curve follows the pointer whichever end it began at.
+    -->
+    <DataTemplate x:Key="Shell.CanvasPendingConnection">
+        <nodify:PendingConnection Source="{Binding}"
+                                  SourceAnchor="{Binding Anchor}"
+                                  Stroke="{DynamicResource Brush.Accent.Primary}"
+                                  StrokeDashArray="4 2"
+                                  StrokeThickness="2">
+            <nodify:PendingConnection.Style>
+                <Style TargetType="nodify:PendingConnection">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding Direction}" Value="Input">
+                            <Setter Property="Direction" Value="Backward" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </nodify:PendingConnection.Style>
+        </nodify:PendingConnection>
+    </DataTemplate>
+    <!--
+        One addable node type. It reads as a list entry rather than as an action,
+        because the catalogue is a list the user picks from, and it keeps the focus
+        ring and the pressed treatment of the shell's action control.
+    -->
+    <Style x:Key="Shell.CatalogueEntry"
+           BasedOn="{StaticResource Shell.ActionButton}"
+           TargetType="Button">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Left" />
+        <Setter Property="Padding" Value="8,3" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
     </Style>
 
 </ResourceDictionary>

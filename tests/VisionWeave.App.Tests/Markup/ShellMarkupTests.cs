@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Shouldly;
 using VisionWeave.App;
+using VisionWeave.App.Canvas;
 using VisionWeave.App.ViewModels;
 
 namespace VisionWeave.App.Tests.Markup;
@@ -27,6 +28,22 @@ public sealed class ShellMarkupTests
         "StatusRegion",
     ];
 
+    /// <summary>
+    /// The objects the shell's markup binds against: the window's view model, the
+    /// status area it presents, the records the catalogue is drawn from, and the
+    /// three types the canvas templates take as their data context.
+    /// </summary>
+    private static readonly Type[] BindingRoots =
+    [
+        typeof(MainWindowViewModel),
+        typeof(ShellStatus),
+        typeof(ShellCatalogueGroup),
+        typeof(ShellCatalogueEntry),
+        typeof(WorkflowNodeViewModel),
+        typeof(PortViewModel),
+        typeof(WorkflowConnectionViewModel),
+    ];
+
     [Fact]
     public void The_shell_declares_the_five_documented_regions()
     {
@@ -40,7 +57,7 @@ public sealed class ShellMarkupTests
     public void The_markup_names_only_keys_the_theme_declares()
     {
         HashSet<string> brushes = Keys("Themes/Tokens.xaml", "SolidColorBrush");
-        HashSet<string> styles = Keys("Themes/Shell.xaml", "Style");
+        HashSet<string> declared = DeclaredKeys();
 
         foreach (string file in new[] { "App.xaml", "MainWindow.xaml", "Themes/Shell.xaml" })
         {
@@ -55,7 +72,7 @@ public sealed class ShellMarkupTests
 
             foreach (string style in ReferencedKeys(markup, "Shell."))
             {
-                styles.ShouldContain(
+                declared.ShouldContain(
                     style,
                     $"{file} refers to {style}, which the shell dictionary must declare.");
             }
@@ -63,16 +80,41 @@ public sealed class ShellMarkupTests
     }
 
     [Fact]
-    public void Every_style_the_shell_declares_is_used_by_the_shell()
+    public void Every_key_the_shell_declares_is_used_by_the_shell()
     {
-        // A style nothing refers to is a look the shell no longer has, and leaving it
+        // A key nothing refers to is a look the shell no longer has, and leaving it
         // behind would make the dictionary claim a state the window does not present.
         string referenced = Read("MainWindow.xaml") + Read("Themes/Shell.xaml");
 
-        foreach (string style in Keys("Themes/Shell.xaml", "Style"))
+        foreach (string key in DeclaredKeys())
         {
-            ReferencedKeys(referenced, style).ShouldNotBeEmpty(
-                $"{style} is declared but never used.");
+            ReferencedKeys(referenced, key).ShouldNotBeEmpty(
+                $"{key} is declared but never used.");
+        }
+    }
+
+    [Fact]
+    public void The_shell_declares_every_key_it_reaches_for_before_it_reaches_for_it()
+    {
+        // A StaticResource is resolved against what the dictionary has already
+        // declared, so a template that reaches for a key declared below it fails the
+        // moment the template is applied — while the shell draws its first node,
+        // rather than here.
+        HashSet<string> declared = [];
+
+        foreach (XElement entry in XDocument.Load(PathOf("Themes/Shell.xaml")).Root!.Elements())
+        {
+            foreach (string key in ReferencedKeys(entry.ToString(), "Shell."))
+            {
+                declared.ShouldContain(
+                    key,
+                    $"{entry.Name.LocalName} {((string?)entry.Attribute(Xaml + "Key")) ?? "?"} reaches for {key} before the dictionary declares it.");
+            }
+
+            if (entry.Attribute(Xaml + "Key") is { } declaredKey)
+            {
+                declared.Add((string)declaredKey);
+            }
         }
     }
 
@@ -103,17 +145,49 @@ public sealed class ShellMarkupTests
     }
 
     [Fact]
-    public void The_shell_binds_the_open_command_to_control_o()
+    public void The_shell_binds_the_editing_gestures_to_the_documented_shortcuts()
     {
-        XDocument shell = XDocument.Load(PathOf("MainWindow.xaml"));
-
-        XElement binding = shell
+        Dictionary<string, (string? Modifiers, string? Command)> shortcuts = XDocument
+            .Load(PathOf("MainWindow.xaml"))
             .Descendants()
-            .Single(element => element.Name.LocalName == "KeyBinding");
+            .Where(element => element.Name.LocalName == "KeyBinding")
+            .ToDictionary(
+                element => (string)element.Attribute("Key")!,
+                element => ((string?)element.Attribute("Modifiers"), (string?)element.Attribute("Command")));
 
-        ((string?)binding.Attribute("Key")).ShouldBe("O");
-        ((string?)binding.Attribute("Modifiers")).ShouldBe("Control");
-        ((string?)binding.Attribute("Command")).ShouldBe("{Binding OpenCommand}");
+        // The window's own shortcuts: opening a file, and the two history steps
+        // every editor offers.
+        shortcuts["O"].ShouldBe(("Control", "{Binding OpenCommand}"));
+        shortcuts["Z"].ShouldBe(("Control", "{Binding Canvas.UndoCommand}"));
+        shortcuts["Y"].ShouldBe(("Control", "{Binding Canvas.RedoCommand}"));
+
+        // Deleting belongs to the work surface, so it is bound where the focus is
+        // rather than on the window.
+        shortcuts["Delete"].ShouldBe((null, "{Binding Canvas.DeleteSelectionCommand}"));
+    }
+
+    [Fact]
+    public void The_canvas_presents_the_projection_and_reports_every_gesture_as_a_command()
+    {
+        XElement canvas = NodifyEditor();
+
+        // What the document decides is presented here; every gesture the work
+        // surface recognizes leaves as a command, so the markup holds no rule of
+        // its own about what may be placed, connected, or removed.
+        AttributeText(canvas, "ItemsSource").ShouldBe("{Binding Canvas.Nodes}");
+        AttributeText(canvas, "Connections").ShouldBe("{Binding Canvas.Connectors}");
+        AttributeText(canvas, "ConnectionCompletedCommand").ShouldBe("{Binding Canvas.ConnectCommand}");
+        AttributeText(canvas, "RemoveConnectionCommand").ShouldBe("{Binding Canvas.DisconnectCommand}");
+        AttributeText(canvas, "ItemsDragCompletedCommand").ShouldBe("{Binding Canvas.MoveCommand}");
+        AttributeText(canvas, "ItemContainerStyle").ShouldBe("{StaticResource Shell.CanvasNodeContainer}");
+        AttributeText(canvas, "ItemTemplate").ShouldBe("{StaticResource Shell.CanvasNode}");
+        AttributeText(canvas, "ConnectionTemplate").ShouldBe("{StaticResource Shell.CanvasConnectionTemplate}");
+        AttributeText(canvas, "PendingConnectionTemplate").ShouldBe("{StaticResource Shell.CanvasPendingConnection}");
+
+        // A node is placed where the user is looking, so the surface reports where
+        // its viewport is instead of the canvas asking the window for it.
+        AttributeText(canvas, "ViewportLocation").ShouldBe("{Binding Canvas.ViewportLocation, Mode=OneWayToSource}");
+        AttributeText(canvas, "ViewportSize").ShouldBe("{Binding Canvas.ViewportSize, Mode=OneWayToSource}");
     }
 
     [Fact]
@@ -178,37 +252,87 @@ public sealed class ShellMarkupTests
         // silently: the field is empty and nothing reports an error. Every path the
         // markup binds is therefore walked here from the object the markup binds it
         // against, so a member that loses its accessibility fails in this test
-        // rather than as a blank region in a running shell.
-        const BindingFlags Exposed = BindingFlags.Public | BindingFlags.Instance;
-        Type[] roots = [typeof(MainWindowViewModel), typeof(ShellCatalogueGroup)];
-
-        foreach (string path in BindingPaths("MainWindow.xaml"))
+        // rather than as a blank region in a running shell. A path such as
+        // DisplayName is presented by more than one object, so it needs one root
+        // that carries the whole path.
+        foreach (string file in new[] { "MainWindow.xaml", "Themes/Shell.xaml" })
         {
-            string first = path.Split('.')[0];
-            Type? root = roots.SingleOrDefault(candidate => candidate.GetProperty(first, Exposed) is not null);
-
-            root.ShouldNotBeNull($"{path} starts at no type the shell presents.");
-
-            Type current = root!;
-            foreach (string step in path.Split('.'))
+            foreach (string path in BindingPaths(file))
             {
-                PropertyInfo? property = current.GetProperty(step, Exposed);
+                string[] steps = path.Split('.');
 
-                property.ShouldNotBeNull($"{path} must resolve: {current.Name} has no public {step}.");
-                current = property!.PropertyType;
+                BindingRoots
+                    .Where(root => Resolves(root, steps))
+                    .ShouldNotBeEmpty(
+                        $"{file} binds {path}, which resolves from no type the shell presents.");
             }
         }
     }
 
     /// <summary>
+    /// Walks a binding path from a candidate root, so the whole chain is checked
+    /// rather than only its first step.
+    /// </summary>
+    /// <param name="root">The object the markup could be binding against.</param>
+    /// <param name="steps">The path, split on its separators.</param>
+    /// <returns><see langword="true"/> when the path resolves.</returns>
+    private static bool Resolves(Type root, IReadOnlyList<string> steps)
+    {
+        const BindingFlags Exposed = BindingFlags.Public | BindingFlags.Instance;
+        Type? current = root;
+
+        foreach (string step in steps)
+        {
+            current = current.GetProperty(step, Exposed)?.PropertyType;
+
+            if (current is null)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
     /// Reads the paths a markup file binds, so they can be resolved without a
-    /// window. A binding with no path binds the object itself and is skipped.
+    /// window. A binding that names its own source is left out: the framework
+    /// resolves it against an object this test cannot walk to.
     /// </summary>
     private static IEnumerable<string> BindingPaths(string file)
         => Regex
-            .Matches(Read(file), @"\{Binding\s+(?!RelativeSource|ElementName|Path=)([A-Za-z_][A-Za-z0-9_.]*)\}")
+            .Matches(Read(file), @"\{Binding\s+([^{}]*)\}")
             .Select(match => match.Groups[1].Value)
+            .Where(body => !body.Contains("RelativeSource", StringComparison.Ordinal)
+                && !body.Contains("ElementName", StringComparison.Ordinal))
+            .Select(body => body.Split(',')[0].Trim().Replace("Path=", string.Empty, StringComparison.Ordinal))
+            .Where(path => path.Length > 0)
             .Distinct(StringComparer.Ordinal);
+
+    /// <summary>The work surface the canvas region draws.</summary>
+    private static XElement NodifyEditor()
+        => XDocument
+            .Load(PathOf("MainWindow.xaml"))
+            .Descendants()
+            .Single(element => element.Name.LocalName == "NodifyEditor");
+
+    /// <summary>Reads an attribute the markup is expected to carry.</summary>
+    /// <param name="element">The element to read.</param>
+    /// <param name="name">The attribute name.</param>
+    /// <returns>The value, which fails the test when the attribute is absent.</returns>
+    private static string AttributeText(XElement element, string name)
+    {
+        string? value = (string?)element.Attribute(name);
+
+        return value.ShouldNotBeNull($"{element.Name.LocalName} declares no {name}.");
+    }
+
+    /// <summary>
+    /// Every key the shell dictionary declares. The markup reaches for styles and
+    /// templates by name, so both are keys the theme promises.
+    /// </summary>
+    private static HashSet<string> DeclaredKeys()
+        => [.. Keys("Themes/Shell.xaml", "Style"), .. Keys("Themes/Shell.xaml", "DataTemplate")];
 
     private static IEnumerable<string> NamedElements(string file)
         => XDocument

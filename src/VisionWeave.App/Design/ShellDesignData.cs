@@ -52,6 +52,7 @@ public static class ShellDesignData
         return new MainWindowViewModel(
             session,
             catalog,
+            validator,
             new OpenDocumentCommand(
                 new AsyncCommandBoundary(new SilentPresenter(), NullLogger<AsyncCommandBoundary>.Instance),
                 session,
