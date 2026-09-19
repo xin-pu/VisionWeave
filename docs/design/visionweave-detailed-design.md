@@ -193,6 +193,14 @@ objects. Expected invalid workflow conditions return validation diagnostics;
 unexpected failures are captured at the runner boundary, logged once with the
 original exception, and returned as a node failure diagnostic.
 
+A node reports success together with its output values. Before the runtime hands
+those values to the scheduler it checks them against the node definition's output
+ports: the port must be declared as an output, the value must carry the port's
+declared type, and an image frame lease must be one the node created rather than
+one it received as an input, used for exactly one output port. A result that
+breaks that contract fails the node with `VW-EXEC-010` to `VW-EXEC-013` and
+releases the frames it reported.
+
 ### 5.2 Scheduler
 
 1. Capture an immutable `WorkflowSnapshot` with its monotonically increasing

@@ -100,15 +100,16 @@
 
 ### PL-2026-009 - Validate executor results against node output contracts
 
-- **Status:** Open
+- **Status:** Implemented
 - **Priority:** P1
 - **Recorded on:** 2026-09-19
 - **Scope:** The boundary between `INodeExecutor` results and scheduler publication.
 - **Observation:** The runner publishes every successful `NodeExecutionResult.Outputs` dictionary as supplied. It does not yet reject an unknown output port, a value whose `PortTypeId` conflicts with the declared output, or one lease reused across semantically distinct output ports. Such errors currently surface later as blocked consumers or scheduler failures rather than as a deterministic producer diagnostic.
 - **Decision or next step:** Validate result keys, declared output directions, value types, and duplicate image-lease ownership before publication. Define whether a node may intentionally alias one frame to multiple outputs; if allowed, represent that explicitly and reserve it safely.
-- **Evidence:** `src/VisionWeave.Application/Execution/WorkflowRunner.cs`, `src/VisionWeave.Application/Execution/RunState.cs`, `src/VisionWeave.Contracts/Execution/NodeExecutionResult.cs`, `docs/adr/0005-native-resource-ownership.md`.
+- **Update (2026-09-19):** `NodeOutputContract` now checks a successful result before the runtime publishes anything, and reports `VW-EXEC-010` for a port the definition does not declare as an output, `VW-EXEC-011` for a missing value or a value whose port type is not the declared one, `VW-EXEC-012` for one lease reported on two output ports, and `VW-EXEC-013` for a lease the node received as an input. Aliasing stays unsupported: an executor publishes leases it created, and a node that needs two outputs produces two frames. Rejected outputs are released unless the node only borrowed them, which also covers the failure and cancellation paths. A successful node that publishes no value for a declared output is deliberately left as a blocked consumer, because a missing value is a schedulable condition rather than a contract violation.
+- **Evidence:** `src/VisionWeave.Application/Execution/NodeOutputContract.cs`, `src/VisionWeave.Contracts/Diagnostics/DiagnosticCodes.cs`, `tests/VisionWeave.Application.Tests/Execution/WorkflowRunnerOutputContractTests.cs`, `src/VisionWeave.Application/Execution/WorkflowRunner.cs`, `src/VisionWeave.Application/Execution/RunState.cs`, `src/VisionWeave.Contracts/Execution/NodeExecutionResult.cs`, `docs/adr/0005-native-resource-ownership.md`.
 - **Owner:** VisionWeave maintainers.
-- **Review again:** Before external plugins or multi-output image nodes are enabled.
+- **Review again:** Reopen if a node ever needs to publish one frame on several ports or to publish to an optional output port; both need an explicit ownership representation in ADR-0005 rather than a relaxed check.
 
 ### PL-2026-010 - Make runtime time and cancellation tests deterministic
 
