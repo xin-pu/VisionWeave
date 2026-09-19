@@ -55,6 +55,35 @@ public sealed class WorkflowDocumentRoundTripTests
     }
 
     [Fact]
+    public void Save_and_load_round_trip_a_document_that_carries_repairable_conditions()
+    {
+        using var directory = new TemporaryDirectory();
+        string path = directory.File("repairable.vwflow");
+
+        // The validator, not the reader, is what judges these: a document may
+        // save a parameter its definition does not declare and connect a port its
+        // definition no longer has, and both must survive a round trip intact so
+        // the attribution can be recomputed from the reloaded document.
+        WorkflowDocument document = WorkflowDocument.Create("repairable");
+        NodeInstance blur = document.AddNode(BlurType, 1, new CanvasPosition(0, 0));
+        NodeInstance other = document.AddNode(BlurType, 1, new CanvasPosition(200, 0));
+        document.SetNodeParameter(blur.InstanceId, "sharpness", 2);
+        document.AddConnection(other.InstanceId, "gone", blur.InstanceId, "missing");
+
+        WorkflowDocumentWriter.Save(document, path);
+        WorkflowLoadResult result = WorkflowDocumentReader.Load(path);
+
+        result.Succeeded.ShouldBeTrue();
+        result.Diagnostics.ShouldBeEmpty();
+
+        WorkflowDocument loaded = result.Document!;
+        loaded.GetNode(blur.InstanceId).Parameters["sharpness"].ShouldBe(2L);
+        WorkflowConnection connection = loaded.Connections.ShouldHaveSingleItem();
+        connection.SourcePortId.ShouldBe("gone");
+        connection.TargetPortId.ShouldBe("missing");
+    }
+
+    [Fact]
     public void Save_writes_the_same_content_for_the_same_document()
     {
         using var directory = new TemporaryDirectory();

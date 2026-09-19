@@ -4,17 +4,28 @@ namespace VisionWeave.Application.Validation;
 
 /// <summary>
 /// An immutable, revision-tagged view of one validation run, indexed by stable
-/// node instance identifier. Selection is what changes when the user clicks, so
-/// a projection answers a selection query without re-validating the document and
-/// without holding a view model: a selection that outlives the edit which
-/// produced the projection reports nothing for a node the document no longer
-/// contains instead of throwing or keeping a stale badge alive, and the caller
-/// can tell a current projection from a superseded one through
-/// <see cref="Matches"/>.
+/// node instance identifier and by the narrower element a diagnostic names.
+/// Selection is what changes when the user clicks, so a projection answers a
+/// selection query without re-validating the document and without holding a view
+/// model: a selection that outlives the edit which produced the projection
+/// reports nothing for a node the document no longer contains instead of throwing
+/// or keeping a stale badge alive, and the caller can tell a current projection
+/// from a superseded one through <see cref="Matches"/>.
 /// </summary>
+/// <remarks>
+/// A port, a parameter, and a connection are indexed under the identifiers the
+/// diagnostic names, so a port shows the conditions of that port rather than the
+/// severity of the node that owns it. A diagnostic is never lost to indexing: one
+/// whose target this projection does not index stays under the node it names, or
+/// under the document when it names none.
+/// </remarks>
 public sealed class ValidationProjection
 {
     private readonly Dictionary<Guid, List<NodeDiagnostic>> _byNode;
+    private readonly Dictionary<Guid, List<NodeDiagnostic>> _nodeLevel;
+    private readonly Dictionary<(Guid NodeId, string PortId), List<NodeDiagnostic>> _byPort;
+    private readonly Dictionary<(Guid NodeId, string ParameterName), List<NodeDiagnostic>> _byParameter;
+    private readonly Dictionary<Guid, List<NodeDiagnostic>> _byConnection;
     private readonly List<NodeDiagnostic> _documentDiagnostics;
     private readonly int _errorCount;
 
@@ -35,6 +46,10 @@ public sealed class ValidationProjection
         DocumentRevision = documentRevision;
         Diagnostics = result.Diagnostics;
         _byNode = [];
+        _nodeLevel = [];
+        _byPort = [];
+        _byParameter = [];
+        _byConnection = [];
         _documentDiagnostics = [];
 
         // The validator emits a deterministic sequence, and grouping preserves
@@ -50,16 +65,22 @@ public sealed class ValidationProjection
             if (diagnostic.NodeInstanceId is not { } nodeInstanceId)
             {
                 _documentDiagnostics.Add(diagnostic);
-                continue;
+                Index(diagnostic);
             }
-
-            if (!_byNode.TryGetValue(nodeInstanceId, out List<NodeDiagnostic>? nodeDiagnostics))
+            else
             {
-                nodeDiagnostics = [];
-                _byNode.Add(nodeInstanceId, nodeDiagnostics);
-            }
+                Group(_byNode, nodeInstanceId).Add(diagnostic);
 
-            nodeDiagnostics.Add(diagnostic);
+                if (!Index(diagnostic))
+                {
+                    // A condition this projection could not attribute to a
+                    // narrower element is reported at the node scope it names, so
+                    // the node's ports and parameters present it instead of
+                    // hiding a condition that must not be lost. A condition that
+                    // names no node at all stays a document diagnostic.
+                    Group(_nodeLevel, nodeInstanceId).Add(diagnostic);
+                }
+            }
         }
     }
 
@@ -117,6 +138,77 @@ public sealed class ValidationProjection
             : null;
 
     /// <summary>
+    /// Gets the diagnostics that apply to one port: the conditions the port
+    /// itself earned, preceded by the conditions the node reports about itself.
+    /// A port does not inherit the node's document-level or other-member
+    /// diagnostics, so a parameter outside its range no longer marks every
+    /// connector of the same node as invalid.
+    /// </summary>
+    /// <param name="nodeInstanceId">The node instance that owns the port.</param>
+    /// <param name="portId">The port identifier.</param>
+    /// <returns>
+    /// The applicable diagnostics in validation order. A port the projection
+    /// never saw answers with its node's own conditions, and a node it never saw
+    /// answers with nothing, so a view bound to a removed port degrades to the
+    /// node instead of claiming the port is clean.
+    /// </returns>
+    public IReadOnlyList<NodeDiagnostic> DiagnosticsForPort(Guid nodeInstanceId, string portId)
+        => ForOwnedElement(_byPort, (nodeInstanceId, portId), nodeInstanceId);
+
+    /// <summary>
+    /// Gets the severity a port should present.
+    /// </summary>
+    /// <param name="nodeInstanceId">The node instance that owns the port.</param>
+    /// <param name="portId">The port identifier.</param>
+    /// <returns>The highest applicable severity, or <see langword="null"/>.</returns>
+    public DiagnosticSeverity? SeverityOfPort(Guid nodeInstanceId, string portId)
+        => HighestSeverity(DiagnosticsForPort(nodeInstanceId, portId));
+
+    /// <summary>
+    /// Gets the diagnostics that apply to one parameter: the conditions the
+    /// parameter itself earned, preceded by the conditions the node reports about
+    /// itself. A node-level failure is what makes a parameter's own state
+    /// unknowable, which is why it is reported together with the parameter's
+    /// conditions and not instead away from them.
+    /// </summary>
+    /// <param name="nodeInstanceId">The node instance that owns the parameter.</param>
+    /// <param name="parameterName">The parameter name.</param>
+    /// <returns>The applicable diagnostics in validation order.</returns>
+    public IReadOnlyList<NodeDiagnostic> DiagnosticsForParameter(Guid nodeInstanceId, string parameterName)
+        => ForOwnedElement(_byParameter, (nodeInstanceId, parameterName), nodeInstanceId);
+
+    /// <summary>
+    /// Gets the severity a parameter should present.
+    /// </summary>
+    /// <param name="nodeInstanceId">The node instance that owns the parameter.</param>
+    /// <param name="parameterName">The parameter name.</param>
+    /// <returns>The highest applicable severity, or <see langword="null"/>.</returns>
+    public DiagnosticSeverity? SeverityOfParameter(Guid nodeInstanceId, string parameterName)
+        => HighestSeverity(DiagnosticsForParameter(nodeInstanceId, parameterName));
+
+    /// <summary>
+    /// Gets the diagnostics that belong to one connection. A connection belongs
+    /// to two nodes, so it inherits neither node's conditions, and a condition
+    /// the wire caused is reported here whether or not both of its ends still
+    /// name a node the document contains.
+    /// </summary>
+    /// <param name="connectionId">The connection identifier.</param>
+    /// <returns>
+    /// The connection's diagnostics in validation order, or an empty list when
+    /// the connection is clean or the projection never saw it.
+    /// </returns>
+    public IReadOnlyList<NodeDiagnostic> DiagnosticsForConnection(Guid connectionId)
+        => _byConnection.TryGetValue(connectionId, out List<NodeDiagnostic>? diagnostics) ? diagnostics : [];
+
+    /// <summary>
+    /// Gets the severity a connection should present.
+    /// </summary>
+    /// <param name="connectionId">The connection identifier.</param>
+    /// <returns>The connection's highest severity, or <see langword="null"/>.</returns>
+    public DiagnosticSeverity? SeverityOfConnection(Guid connectionId)
+        => HighestSeverity(DiagnosticsForConnection(connectionId));
+
+    /// <summary>
     /// Reports the diagnostics that belong to a selection, which is the union of
     /// the selected nodes' diagnostics and the document-level ones. A selection
     /// panel that showed only the selected nodes would claim a selection is
@@ -148,6 +240,70 @@ public sealed class ValidationProjection
         }
 
         return new SelectionValidation(diagnostics);
+    }
+
+    private IReadOnlyList<NodeDiagnostic> ForOwnedElement<TKey>(
+        IReadOnlyDictionary<TKey, List<NodeDiagnostic>> index,
+        TKey key,
+        Guid ownerNodeId)
+        where TKey : notnull
+    {
+        bool owned = _nodeLevel.TryGetValue(ownerNodeId, out List<NodeDiagnostic>? nodeDiagnostics);
+
+        if (!index.TryGetValue(key, out List<NodeDiagnostic>? own))
+        {
+            // The element this caller asked about is not in this projection: the
+            // document has moved on, or it was never reported. The node's own
+            // conditions are the nearest broader answer, and there are none when
+            // the node is unknown too, so a stale view shows nothing rather than
+            // a badge that describes an element it can no longer name.
+            return owned ? nodeDiagnostics! : [];
+        }
+
+        if (!owned)
+        {
+            return own;
+        }
+
+        // The broader scope comes first, so a reader learns why the element
+        // cannot be trusted before what is wrong with it in particular.
+        return [.. nodeDiagnostics!, .. own];
+    }
+
+    private bool Index(NodeDiagnostic diagnostic)
+    {
+        switch (diagnostic.Target)
+        {
+            case PortTarget port when !string.IsNullOrEmpty(port.PortId):
+                Group(_byPort, (port.NodeInstanceId, port.PortId)).Add(diagnostic);
+                return true;
+            case ParameterTarget parameter when !string.IsNullOrEmpty(parameter.ParameterName):
+                Group(_byParameter, (parameter.NodeInstanceId, parameter.ParameterName)).Add(diagnostic);
+                return true;
+            case ConnectionTarget connection:
+                Group(_byConnection, connection.ConnectionId).Add(diagnostic);
+                return true;
+            default:
+                // A diagnostic that names no target, one whose identifier cannot
+                // be used, and one whose target kind a later contract version
+                // adds are all left to the scope they already have, where they
+                // remain visible instead of vanishing from every view.
+                return false;
+        }
+    }
+
+    private static List<NodeDiagnostic> Group<TKey>(
+        Dictionary<TKey, List<NodeDiagnostic>> index,
+        TKey key)
+        where TKey : notnull
+    {
+        if (!index.TryGetValue(key, out List<NodeDiagnostic>? diagnostics))
+        {
+            diagnostics = [];
+            index.Add(key, diagnostics);
+        }
+
+        return diagnostics;
     }
 
     private static DiagnosticSeverity? HighestSeverity(IReadOnlyList<NodeDiagnostic> diagnostics)
