@@ -83,13 +83,21 @@ public sealed class DocumentCommandHistory
         _redo.Clear();
 
         DateTimeOffset now = _timeProvider.GetUtcNow();
+        ICoalescingCommand? unit = _undo.Count > 0 ? _undo[^1] as ICoalescingCommand : null;
         bool coalesced = _lastAppliedUtc is DateTimeOffset applied
             && now - applied <= _options.ParameterCoalescingWindow
-            && _undo.Count > 0
-            && _undo[^1] is ICoalescingCommand previous
-            && previous.ContinuesInto(command);
+            && unit is not null
+            && unit.ContinuesInto(command);
 
-        if (!coalesced)
+        if (coalesced)
+        {
+            // The unit keeps the command that was applied first, because that is the
+            // one holding the value the parameter had before it, so the newer value
+            // moves into it: the document already holds that value, and the kept
+            // command now describes both ends of the unit.
+            unit!.ContinueWith(command);
+        }
+        else
         {
             _undo.Add(command);
         }

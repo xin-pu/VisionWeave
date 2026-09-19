@@ -46,7 +46,12 @@ public static class ShellDesignData
             OpenCvNodeIds.BlurredPortId,
             resize,
             OpenCvNodeIds.ImagePortId));
+
+        // The sample carries one condition, so the designer shows the inspector's
+        // list the way a document with something to say draws it: the value is
+        // outside the range its definition declares.
         session.Execute(new SetNodeParameterCommand(blur, OpenCvNodeIds.KernelSizeParameter, 5));
+        session.Execute(new SetNodeParameterCommand(blur, OpenCvNodeIds.KernelSizeParameter, 4096));
         session.Select([blur]);
 
         return new MainWindowViewModel(
@@ -57,7 +62,13 @@ public static class ShellDesignData
                 new AsyncCommandBoundary(new SilentPresenter(), NullLogger<AsyncCommandBoundary>.Instance),
                 session,
                 status),
+            new SaveDocumentCommand(
+                new AsyncCommandBoundary(new SilentPresenter(), NullLogger<AsyncCommandBoundary>.Instance),
+                session,
+                status,
+                new SilentFileChooser()),
             new SilentFileChooser(),
+            new ShellPromptViewModel(),
             status);
     }
 
@@ -97,5 +108,8 @@ public static class ShellDesignData
     {
         /// <inheritdoc />
         public string? ChooseDocumentToOpen(string? currentPath) => null;
+
+        /// <inheritdoc />
+        public string? ChooseDocumentToSave(string? currentPath, string suggestedName) => null;
     }
 }

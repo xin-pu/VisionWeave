@@ -340,4 +340,109 @@
         <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
     </Style>
 
+    <!--
+        The inspector: what the selection is, the fields its definition declares, and
+        the conditions the selection carries. A field and a condition both name what
+        they mean in words, so a marked field reads as marked without its colour.
+    -->
+
+    <!-- The name of the selected node, which is the one heading the region repeats. -->
+    <Style x:Key="Shell.InspectorTitle" TargetType="TextBlock">
+        <Setter Property="Margin" Value="0,8,0,0" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <!--
+        A text the user types: the catalogue search and a parameter's value. Both are
+        the same control with the same treatment, so a field looks like a field.
+    -->
+    <Style x:Key="Shell.InputField" TargetType="TextBox">
+        <Setter Property="Background" Value="{DynamicResource Brush.Background.SurfaceRaised}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border.Subtle}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CaretBrush" Value="{DynamicResource Brush.Accent.Primary}" />
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+        <Setter Property="Padding" Value="6,3" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource Shell.FocusVisual}" />
+    </Style>
+
+    <!-- The label of one parameter. -->
+    <Style x:Key="Shell.FieldLabel" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <!--
+        The condition one field carries. It stays out of the way until there is
+        something to say, and it says what it is in words beside the colour.
+    -->
+    <Style x:Key="Shell.FieldCondition" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding Severity}" Value="Information">
+                <Setter Property="Foreground" Value="{DynamicResource Brush.State.Info}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Severity}" Value="Warning">
+                <Setter Property="Foreground" Value="{DynamicResource Brush.State.Warning}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Severity}" Value="Error">
+                <Setter Property="Foreground" Value="{DynamicResource Brush.State.Danger}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- One condition in the inspector's list, coloured by how serious it is. -->
+    <Style x:Key="Shell.DiagnosticRow" TargetType="Border">
+        <Setter Property="Margin" Value="0,4,0,0" />
+        <Setter Property="Padding" Value="8" />
+        <Setter Property="Background" Value="{DynamicResource Brush.Background.SurfaceRaised}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border.Subtle}" />
+        <Setter Property="BorderThickness" Value="2,0,0,0" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding Severity}" Value="Information">
+                <Setter Property="BorderBrush" Value="{DynamicResource Brush.State.Info}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Severity}" Value="Warning">
+                <Setter Property="BorderBrush" Value="{DynamicResource Brush.State.Warning}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Severity}" Value="Error">
+                <Setter Property="BorderBrush" Value="{DynamicResource Brush.State.Danger}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!--
+        A notice that holds back a whole region: the document was opened read-only,
+        so the shell says so where the work would have happened.
+    -->
+    <Style x:Key="Shell.Notice" TargetType="Border">
+        <Setter Property="Margin" Value="0,8,0,0" />
+        <Setter Property="Padding" Value="10,8" />
+        <Setter Property="Background" Value="{DynamicResource Brush.Background.SurfaceRaised}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.State.Warning}" />
+        <Setter Property="BorderThickness" Value="2,0,0,0" />
+    </Style>
+
+    <!--
+        The card a question about the document is drawn on. It sits over the work
+        surface rather than in a window of its own, so the shell asks without
+        leaving itself.
+    -->
+    <Style x:Key="Shell.PromptCard" TargetType="Border">
+        <Setter Property="MaxWidth" Value="460" />
+        <Setter Property="Padding" Value="20" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Background" Value="{DynamicResource Brush.Background.SurfaceRaised}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Accent.Primary}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+    </Style>
+
 </ResourceDictionary>

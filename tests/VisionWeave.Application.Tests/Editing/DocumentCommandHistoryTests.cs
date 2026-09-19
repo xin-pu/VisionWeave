@@ -153,6 +153,46 @@ public sealed class DocumentCommandHistoryTests
     }
 
     [Fact]
+    public void Redo_of_a_coalesced_parameter_edit_restores_the_value_the_unit_ended_on()
+    {
+        NodeInstance blur = AddBlur();
+
+        _history.Execute(new SetNodeParameterCommand(blur.InstanceId, "kernelSize", 5));
+        _clock.Advance(TimeSpan.FromMilliseconds(100));
+        _history.Execute(new SetNodeParameterCommand(blur.InstanceId, "kernelSize", 9));
+        _clock.Advance(TimeSpan.FromMilliseconds(100));
+        _history.Execute(new SetNodeParameterCommand(blur.InstanceId, "kernelSize", 11));
+
+        _history.Undo().IsAccepted.ShouldBeTrue();
+        blur.Parameters.ShouldNotContainKey("kernelSize");
+
+        // The merged unit is one edit, so redoing it has to bring back where the user
+        // ended rather than the value its first edit happened to set.
+        _history.Redo().IsAccepted.ShouldBeTrue();
+        blur.Parameters["kernelSize"].ShouldBe(11);
+
+        _history.Undo().IsAccepted.ShouldBeTrue();
+        blur.Parameters.ShouldNotContainKey("kernelSize");
+    }
+
+    [Fact]
+    public void Redo_of_a_coalesced_parameter_edit_restores_the_value_the_unit_replaced()
+    {
+        NodeInstance blur = AddBlur();
+
+        _history.Execute(new SetNodeParameterCommand(blur.InstanceId, "kernelSize", 3));
+        _clock.Advance(TimeSpan.FromSeconds(5));
+        _history.Execute(new SetNodeParameterCommand(blur.InstanceId, "kernelSize", 7));
+        _history.Execute(new SetNodeParameterCommand(blur.InstanceId, "kernelSize", 11));
+
+        _history.Undo().IsAccepted.ShouldBeTrue();
+        blur.Parameters["kernelSize"].ShouldBe(3);
+
+        _history.Redo().IsAccepted.ShouldBeTrue();
+        blur.Parameters["kernelSize"].ShouldBe(11);
+    }
+
+    [Fact]
     public void Execute_edits_of_two_parameters_are_separate_undo_units()
     {
         NodeInstance blur = AddBlur();

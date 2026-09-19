@@ -137,7 +137,9 @@ internal sealed partial class EditorSession : ObservableObject
 
     /// <summary>
     /// Opens the document stored at a path, replacing the current document when the
-    /// read succeeds.
+    /// read succeeds. The read and the replacement are separate steps so a shell can
+    /// run the blocking one elsewhere; this pairs them, which is all a headless
+    /// caller needs.
     /// </summary>
     /// <param name="path">The document path.</param>
     /// <param name="cancellationToken">
@@ -147,11 +149,7 @@ internal sealed partial class EditorSession : ObservableObject
     /// </param>
     /// <returns>The session, or the diagnostics that explain why it could not be opened.</returns>
     internal WorkflowSessionResult Open(string path, CancellationToken cancellationToken = default)
-    {
-        WorkflowSessionResult result = _loader.Open(path);
-        cancellationToken.ThrowIfCancellationRequested();
-        return Adopt(result);
-    }
+        => Adopt(Read(path), cancellationToken);
 
     /// <summary>
     /// Resumes the working copy of the document at a path, which stays bound to that
@@ -163,10 +161,49 @@ internal sealed partial class EditorSession : ObservableObject
     /// <param name="cancellationToken">The token that stops the open.</param>
     /// <returns>The session, or the diagnostics that explain why it could not be recovered.</returns>
     internal WorkflowSessionResult Recover(string path, CancellationToken cancellationToken = default)
+        => Adopt(ReadWorkingCopy(path), cancellationToken);
+
+    /// <summary>
+    /// Reads the document stored at a path without making it the document being
+    /// edited. Reading a file is blocking work, so a shell runs this off the thread
+    /// that owns its bindings and adopts what it returns there.
+    /// </summary>
+    /// <param name="path">The document path, which the reader classifies.</param>
+    /// <returns>The read session, or the diagnostics that explain why it could not be read.</returns>
+    internal WorkflowSessionResult Read(string path) => _loader.Open(path);
+
+    /// <summary>
+    /// Reads the working copy beside a path without making it the document being
+    /// edited, for the same reason <see cref="Read"/> exists.
+    /// </summary>
+    /// <param name="path">The path of the document the working copy belongs to.</param>
+    /// <returns>The recovered session, or the diagnostics that explain why it could not be recovered.</returns>
+    internal WorkflowSessionResult ReadWorkingCopy(string path) => _loader.Recover(path);
+
+    /// <summary>
+    /// Makes what a read produced the document being edited. Every listener the
+    /// shell has learns about the replacement here, so this runs on the thread that
+    /// owns those listeners: a notification raised anywhere else reaches the window
+    /// as a change it refuses to apply.
+    /// </summary>
+    /// <param name="result">What a read produced.</param>
+    /// <param name="cancellationToken">
+    /// The token that stops the open. A stopped open leaves the current document in
+    /// place, because the read has already happened.
+    /// </param>
+    /// <returns>The result, so a caller can report the diagnostics it carries.</returns>
+    internal WorkflowSessionResult Adopt(WorkflowSessionResult result, CancellationToken cancellationToken = default)
     {
-        WorkflowSessionResult result = _loader.Recover(path);
+        ArgumentNullException.ThrowIfNull(result);
+
         cancellationToken.ThrowIfCancellationRequested();
-        return Adopt(result);
+
+        if (result.Session is { } opened)
+        {
+            Session = opened;
+        }
+
+        return result;
     }
 
     /// <summary>
@@ -283,6 +320,20 @@ internal sealed partial class EditorSession : ObservableObject
     /// <returns>The outcome of the attempt.</returns>
     internal DocumentCommandResult Execute(IDocumentCommand command)
     {
+        ArgumentNullException.ThrowIfNull(command);
+
+        // A read-only document is one this build cannot write back without discarding
+        // what it does not understand, so no edit is applied to it at all. Refusing
+        // here rather than at each gesture keeps a command that was added later from
+        // quietly bypassing the rule, and it refuses without an undo step, which is
+        // what makes the refusal something the user can only notice rather than undo.
+        if (Session.IsReadOnly)
+        {
+            return DocumentCommandResult.Refused(
+                DiagnosticCodes.UnsupportedDocumentSchema,
+                "This document was opened read-only, because this build does not understand everything it stores. No edit was applied.");
+        }
+
         DocumentCommandResult result = _history.Execute(command);
         NotifyCommitted(result);
         return result;
@@ -321,16 +372,6 @@ internal sealed partial class EditorSession : ObservableObject
         ArgumentNullException.ThrowIfNull(nodeInstanceIds);
 
         Selection = [.. nodeInstanceIds];
-    }
-
-    private WorkflowSessionResult Adopt(WorkflowSessionResult result)
-    {
-        if (result.Session is { } opened)
-        {
-            Session = opened;
-        }
-
-        return result;
     }
 
     /// <summary>

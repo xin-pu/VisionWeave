@@ -200,6 +200,55 @@ public sealed class OpenDocumentCommandTests : IDisposable
         status.ConditionSeverity.ShouldBeNull();
     }
 
+    [Fact]
+    public async Task OpenCommand_reads_the_file_away_from_the_thread_that_started_it()
+    {
+        int caller = Environment.CurrentManagedThreadId;
+        int? readOn = null;
+        StubDocumentLoader loader = new(_ =>
+        {
+            readOn = Environment.CurrentManagedThreadId;
+            return new WorkflowSessionResult(WorkflowSession.New("Loaded"), []);
+        });
+        (OpenDocumentCommand command, _, _) = Create(loader, "any.vwflow");
+
+        await command.Command.ExecuteAsync(null);
+
+        // Reading a file blocks, so it cannot run on the thread that owns the window:
+        // the shell would stop answering while a large document is read.
+        readOn.ShouldNotBeNull();
+        readOn.ShouldNotBe(caller, "the read has to run off the thread the shell is drawn on.");
+        loader.OpenCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task OpenCommand_replaces_the_document_only_once_the_read_has_arrived()
+    {
+        TaskCompletionSource started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        WorkflowSession loaded = WorkflowSession.New("Loaded");
+        StubDocumentLoader loader = new(_ =>
+        {
+            started.TrySetResult();
+            release.Task.Wait();
+            return new WorkflowSessionResult(loaded, []);
+        });
+        (OpenDocumentCommand command, EditorSession session, _) = Create(loader, "any.vwflow");
+        WorkflowSession original = session.Session;
+
+        Task execution = command.Command.ExecuteAsync(null);
+        await started.Task;
+
+        // The read has happened and the shell is still editing what it was: what a
+        // read produced becomes the document in the step that runs after it.
+        session.Session.ShouldBeSameAs(original);
+
+        release.SetResult();
+        await execution;
+
+        session.Session.ShouldBeSameAs(loaded);
+    }
+
     /// <inheritdoc />
     public void Dispose() => _directory.Dispose();
 

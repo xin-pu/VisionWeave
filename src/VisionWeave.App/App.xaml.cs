@@ -59,11 +59,11 @@ public partial class App : System.Windows.Application
         // The shell is composed here rather than resolved, because the view model is
         // built from objects the container already owns: the session, the catalog,
         // the validator the canvas judges a wire with, the status area, and the
-        // command that opens a document into that session.
-        var openDocument = new OpenDocumentCommand(
-            _services.GetRequiredService<AsyncCommandBoundary>(),
-            session,
-            status);
+        // commands that open and write a document in that session.
+        AsyncCommandBoundary boundary = _services.GetRequiredService<AsyncCommandBoundary>();
+        var openDocument = new OpenDocumentCommand(boundary, session, status);
+        var fileChooser = _services.GetRequiredService<IWorkflowFileChooser>();
+        var saveDocument = new SaveDocumentCommand(boundary, session, status, fileChooser);
 
         MainWindow shell = new(
             new MainWindowViewModel(
@@ -71,7 +71,9 @@ public partial class App : System.Windows.Application
                 catalog,
                 _services.GetRequiredService<WorkflowValidator>(),
                 openDocument,
-                _services.GetRequiredService<IWorkflowFileChooser>(),
+                saveDocument,
+                fileChooser,
+                new ShellPromptViewModel(),
                 status),
             _services.GetRequiredService<SnackbarNotificationPresenter>());
 
