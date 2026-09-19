@@ -482,14 +482,15 @@ dependency versions are centralized in `Directory.Packages.props`.
 
 Implementation starts only after these records exist and link back here:
 
-| Record | Decision to capture |
-| --- | --- |
-| `docs/adr/0001-dependency-direction.md` | Contracts, Domain, Application, OpenCv, Persistence, PluginSdk, and App reference rules. |
-| `docs/adr/0002-nodify-editor.md` | Nodify scope, UI intent/rollback protocol, and WPF UI ownership. |
-| `docs/adr/0003-workflow-format.md` | `.vwflow` schema, migration, unknown-node, and forward-version policy. |
-| `docs/adr/0004-mat-ownership.md` | Lease state machine, cache ownership, preview fence, and native disposal tests. |
-| `docs/adr/0005-dependency-selection.md` | WPF UI, Nodify, OpenCvSharp, test/analyzer packages; version, license, maintenance, target-framework, audit, and transitive review evidence. |
-| `docs/ledger/standards-deviations.md` | Each approved exception to the adopted standards, or an explicit "none" baseline. |
+| Record | Decision captured | Status |
+| --- | --- | --- |
+| [ADR-0001](../adr/0001-directed-project-dependencies.md) | Contracts, Domain, Application, OpenCv, Persistence, PluginSdk, and App reference rules. | Accepted |
+| [ADR-0002](../adr/0002-initial-framework-dependencies.md) | WPF UI, Nodify, OpenCvSharp, and test package selection; license, target framework, and audit posture. | Accepted |
+| [ADR-0003](../adr/0003-port-value-types.md) | Port type identity, contract value representations, compatibility table, multiplicity, and the deferred batch/collection flow. | Proposed |
+| [ADR-0004](../adr/0004-workflow-document-and-format.md) | `WorkflowDocument` versus executable snapshot, `.vwflow` schema, definition versions and migrations, unknown-node placeholders, resource references, and forward-version policy. | Proposed |
+| [ADR-0005](../adr/0005-native-resource-ownership.md) | Lease state machine, reservations, executor resource scope, cache ownership, preview fence, cancellation quarantine, and lease-ledger tests. | Proposed |
+| [ADR-0006](../adr/0006-editor-and-ui-commit-protocol.md) | Nodify and WPF UI scope, UI intent/rollback protocol, undo granularity, and the deferred automatic-layout and subgraph capabilities. | Proposed |
+| [docs/ledger/standards-deviations.md](../ledger/standards-deviations.md) | Each approved exception to the adopted standards, or an explicit "none" baseline. | No deviations |
 
 ## 13. Alternatives considered
 

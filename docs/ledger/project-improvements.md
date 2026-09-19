@@ -8,14 +8,14 @@
 
 ### PL-2026-001 - Close execution and persistence contract decisions
 
-- **Status:** Open
+- **Status:** Monitoring
 - **Recorded on:** 2026-09-18
 - **Scope:** Port values, executable snapshots, native resource ownership, and `.vwflow` persistence.
-- **Observation:** The initial skeleton can enforce assembly boundaries, but implementation would be premature before the design-review P0 items have durable decisions.
-- **Decision or next step:** Create and approve the listed ADRs before implementing the execution engine or workflow serializer.
-- **Evidence:** `docs/design/visionweave-detailed-design.md` and the local design review report.
+- **Observation:** The initial skeleton could enforce assembly boundaries, but implementation would have been premature before the design-review P0 items had durable decisions.
+- **Decision or next step:** ADR-0003 to ADR-0006 record those decisions and are implemented on the foundation branch. Their status stays Proposed until the maintainer accepts them after review.
+- **Evidence:** `docs/adr/0003-port-value-types.md`, `docs/adr/0004-workflow-document-and-format.md`, `docs/adr/0005-native-resource-ownership.md`, `docs/adr/0006-editor-and-ui-commit-protocol.md`.
 - **Owner:** VisionWeave maintainers.
-- **Review again:** Before execution-engine implementation.
+- **Review again:** When the maintainer accepts or amends the ADRs after review.
 
 ### PL-2026-002 - Add reproducible hosted CI
 
@@ -27,3 +27,14 @@
 - **Evidence:** `.github/workflows/ci.yml`.
 - **Owner:** VisionWeave maintainers.
 - **Review again:** After the first pull request.
+
+### PL-2026-003 - Deferred Aries capabilities
+
+- **Status:** Monitoring
+- **Recorded on:** 2026-09-19
+- **Scope:** First-release capability coverage against the Aries reference implementation.
+- **Observation:** Aries offered batch image flow over `Mats`, automatic graph layout and edge routing, nested subgraph nodes, template matching, circle-grid calibration, OCR, and work-directory output export. The first release defers batch/collection flow (ADR-0003), automatic layout and subgraphs (ADR-0006), and the remaining node families (detailed design section 8).
+- **Decision or next step:** Keep the deferrals as decisions rather than omissions, and re-evaluate after the first-release node catalog and the persistence path are working end to end.
+- **Evidence:** `docs/adr/0003-port-value-types.md`, `docs/adr/0006-editor-and-ui-commit-protocol.md`, `docs/design/visionweave-detailed-design.md`.
+- **Owner:** VisionWeave maintainers.
+- **Review again:** Before the first-release node catalog is frozen.
