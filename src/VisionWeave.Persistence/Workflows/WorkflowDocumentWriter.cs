@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using VisionWeave.Contracts.Workflows;
 using VisionWeave.Domain.Workflows;
 
 namespace VisionWeave.Persistence.Workflows;
@@ -44,6 +45,8 @@ public static class WorkflowDocumentWriter
         }
 
         writer.WriteEndArray();
+
+        WriteResources(writer, document);
 
         writer.WriteStartArray(WorkflowJson.Nodes);
         foreach (NodeInstance node in document.Nodes.OrderBy(item => item.InstanceId))
@@ -142,6 +145,8 @@ public static class WorkflowDocumentWriter
 
         writer.WriteEndObject();
 
+        WritePortSchemaSnapshot(writer, node);
+
         writer.WriteStartObject(WorkflowJson.NodeLayout);
         writer.WriteNumber(WorkflowJson.LayoutX, node.Position.X);
         writer.WriteNumber(WorkflowJson.LayoutY, node.Position.Y);
@@ -152,6 +157,103 @@ public static class WorkflowDocumentWriter
         writer.WriteEndObject();
 
         writer.WriteEndObject();
+    }
+
+    /// <summary>
+    /// Writes the remembered ports of a node at the node entry, so a document whose
+    /// node definition is unavailable can be rendered from what it recorded. An
+    /// empty snapshot is omitted, like every other member that carries its default.
+    /// </summary>
+    private static void WritePortSchemaSnapshot(Utf8JsonWriter writer, NodeInstance node)
+    {
+        if (node.PortSchemaSnapshot.Count == 0)
+        {
+            return;
+        }
+
+        writer.WriteStartArray(WorkflowJson.NodePortSchemaSnapshot);
+
+        foreach (PortSchemaEntry port in node.PortSchemaSnapshot)
+        {
+            writer.WriteStartObject();
+            writer.WriteString(WorkflowJson.SnapshotPortId, port.PortId);
+            writer.WriteString(WorkflowJson.SnapshotDirection, port.Direction.ToString());
+
+            if (port.TypeId is { } typeId)
+            {
+                writer.WriteString(WorkflowJson.SnapshotTypeId, typeId.Value);
+            }
+
+            if (port.Multiplicity is { } multiplicity)
+            {
+                writer.WriteString(WorkflowJson.SnapshotMultiplicity, multiplicity.ToString());
+            }
+
+            if (port.IsOptional is { } isOptional)
+            {
+                writer.WriteBoolean(WorkflowJson.SnapshotIsOptional, isOptional);
+            }
+
+            if (port.DisplayName is { } displayName)
+            {
+                writer.WriteString(WorkflowJson.SnapshotDisplayName, displayName);
+            }
+
+            writer.WriteEndObject();
+        }
+
+        writer.WriteEndArray();
+    }
+
+    /// <summary>
+    /// Writes the resources the document declares, in the order it records them. An
+    /// empty list is omitted, so a document that declares none is written exactly as
+    /// it was before the field existed.
+    /// </summary>
+    private static void WriteResources(Utf8JsonWriter writer, WorkflowDocument document)
+    {
+        if (document.Resources.Count == 0)
+        {
+            return;
+        }
+
+        writer.WriteStartArray(WorkflowJson.Resources);
+
+        foreach (ResourceReference resource in document.Resources)
+        {
+            WriteResource(writer, resource);
+        }
+
+        writer.WriteEndArray();
+    }
+
+    private static void WriteResource(Utf8JsonWriter writer, ResourceReference resource)
+    {
+        switch (resource)
+        {
+            case FileResourceReference file:
+                writer.WriteStartObject();
+                writer.WriteString(WorkflowJson.ResourceKind, WorkflowJson.FileResourceKind);
+                writer.WriteString(WorkflowJson.ResourcePath, file.Path);
+
+                if (file.ExpectedSha256 is not null)
+                {
+                    writer.WriteString(WorkflowJson.ResourceExpectedSha256, file.ExpectedSha256);
+                }
+
+                writer.WriteEndObject();
+                break;
+
+            case UnknownResourceReference unknown:
+                // A kind this build does not model is written back exactly as it was
+                // read, so a save never rewrites a reference it cannot interpret.
+                writer.WriteRawValue(unknown.Json);
+                break;
+
+            default:
+                throw new NotSupportedException(
+                    $"A '{resource.GetType().Name}' resource is not part of the workflow format.");
+        }
     }
 
     private static void WriteConnection(Utf8JsonWriter writer, WorkflowConnection connection)

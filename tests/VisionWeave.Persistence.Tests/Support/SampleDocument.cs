@@ -1,11 +1,14 @@
 ﻿using VisionWeave.Contracts.Nodes;
+using VisionWeave.Contracts.Ports;
+using VisionWeave.Contracts.Workflows;
 using VisionWeave.Domain.Workflows;
 
 namespace VisionWeave.Persistence.Tests.Support;
 
 /// <summary>
 /// The document the persistence tests save and load: two nodes, every parameter
-/// value shape the format stores, a connection, and preserved unknown fields.
+/// value shape the format stores, a connection, a file resource, a remembered port
+/// schema, and preserved unknown fields.
 /// </summary>
 internal static class SampleDocument
 {
@@ -30,6 +33,19 @@ internal static class SampleDocument
         document.SetNodeEnabled(blur.InstanceId, false);
         document.PreserveExtension("futureField", """{"a":1}""");
         document.PreserveNodeExtension(blur.InstanceId, "futureNodeField", """{"b":[1,2]}""");
+        document.AddResource(new FileResourceReference("assets/plate.png", "9f2c1a"));
+        document.SetNodePortSchemaSnapshot(
+            blur.InstanceId,
+            [
+                new PortSchemaEntry(
+                    "image",
+                    PortDirection.Input,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    false,
+                    "Image"),
+                new PortSchemaEntry("mask", PortDirection.Output),
+            ]);
         document.AddConnection(source.InstanceId, "image", blur.InstanceId, "image");
 
         return document;

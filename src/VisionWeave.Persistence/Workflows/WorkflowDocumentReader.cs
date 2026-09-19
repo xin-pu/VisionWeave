@@ -2,6 +2,8 @@
 using System.Text.Json;
 using VisionWeave.Contracts.Diagnostics;
 using VisionWeave.Contracts.Nodes;
+using VisionWeave.Contracts.Ports;
+using VisionWeave.Contracts.Workflows;
 using VisionWeave.Domain.Workflows;
 
 namespace VisionWeave.Persistence.Workflows;
@@ -37,6 +39,11 @@ namespace VisionWeave.Persistence.Workflows;
 /// fields inside the node's extension data, and a node entry without a
 /// <c>typeVersion</c> is treated as version 0.
 /// </description></item>
+/// <item><description>
+/// The document's <c>resources</c> and each node's <c>portSchemaSnapshot</c> are
+/// read as typed values. A resource of a kind this build does not model is
+/// preserved verbatim, because an unmodelled kind is not an incoherent document.
+/// </description></item>
 /// </list>
 /// </remarks>
 public static class WorkflowDocumentReader
@@ -54,6 +61,7 @@ public static class WorkflowDocumentReader
         WorkflowJson.Extensions,
         WorkflowJson.Nodes,
         WorkflowJson.Connections,
+        WorkflowJson.Resources,
     };
 
     private static readonly HashSet<string> NodeFields = new(StringComparer.Ordinal)
@@ -66,6 +74,7 @@ public static class WorkflowDocumentReader
         WorkflowJson.NodeLayout,
         WorkflowJson.NodeLabel,
         WorkflowJson.NodeEnabled,
+        WorkflowJson.NodePortSchemaSnapshot,
     };
 
     /// <summary>
@@ -157,6 +166,7 @@ public static class WorkflowDocumentReader
     {
         ReadNodes(target, root, diagnostics);
         ReadConnections(target, root, diagnostics);
+        ReadResources(target, root, diagnostics);
 
         foreach (string plugin in ReadTextArray(root, WorkflowJson.RequiredPlugins, diagnostics))
         {
@@ -218,8 +228,132 @@ public static class WorkflowDocumentReader
         }
 
         ReadParameters(target, entry, node.InstanceId, diagnostics);
+        ReadPortSchemaSnapshot(target, entry, node.InstanceId, diagnostics);
         PreserveNodeFields(target, entry, node.InstanceId, diagnostics);
     }
+
+    private static void ReadResources(WorkflowDocument target, JsonElement root, List<NodeDiagnostic> diagnostics)
+    {
+        if (!TryGetArray(root, WorkflowJson.Resources, out JsonElement resources, diagnostics))
+        {
+            return;
+        }
+
+        foreach (JsonElement entry in resources.EnumerateArray())
+        {
+            if (ReadResource(entry, diagnostics) is { } resource)
+            {
+                target.AddResource(resource);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reads one resource entry. A file reference this build understands becomes
+    /// typed state; a file reference that names no path is incoherent and is
+    /// skipped; any other entry is preserved verbatim, because a kind this build
+    /// does not model is not a defect in the document.
+    /// </summary>
+    private static ResourceReference? ReadResource(JsonElement entry, List<NodeDiagnostic> diagnostics)
+    {
+        if (entry.ValueKind != JsonValueKind.Object
+            || !TryReadText(entry, WorkflowJson.ResourceKind, out string? kind))
+        {
+            return new UnknownResourceReference(null, entry.GetRawText());
+        }
+
+        if (kind != WorkflowJson.FileResourceKind)
+        {
+            return new UnknownResourceReference(kind, entry.GetRawText());
+        }
+
+        if (!TryReadText(entry, WorkflowJson.ResourcePath, out string? path))
+        {
+            Skip(diagnostics, null, "A 'file' resource names no path and was skipped.");
+            return null;
+        }
+
+        return new FileResourceReference(
+            path!,
+            TryReadText(entry, WorkflowJson.ResourceExpectedSha256, out string? digest) ? digest : null);
+    }
+
+    private static void ReadPortSchemaSnapshot(
+        WorkflowDocument target,
+        JsonElement entry,
+        Guid instanceId,
+        List<NodeDiagnostic> diagnostics)
+    {
+        if (!entry.TryGetProperty(WorkflowJson.NodePortSchemaSnapshot, out JsonElement snapshot))
+        {
+            return;
+        }
+
+        if (snapshot.ValueKind != JsonValueKind.Array)
+        {
+            Skip(
+                diagnostics,
+                instanceId,
+                $"The port schema snapshot of node '{instanceId}' is not a JSON array and was skipped.");
+            return;
+        }
+
+        List<PortSchemaEntry> ports = [];
+
+        foreach (JsonElement item in snapshot.EnumerateArray())
+        {
+            if (ReadPortSchemaEntry(item) is { } port)
+            {
+                ports.Add(port);
+                continue;
+            }
+
+            Skip(
+                diagnostics,
+                instanceId,
+                $"A port schema entry of node '{instanceId}' names no port or direction and was skipped.");
+        }
+
+        if (ports.Count > 0)
+        {
+            target.SetNodePortSchemaSnapshot(instanceId, ports);
+        }
+    }
+
+    /// <summary>
+    /// Reads one remembered port. The identifier and the direction identify the
+    /// port, so both are required; the descriptive members are best effort, and a
+    /// member this build cannot read is treated as one the document never recorded.
+    /// </summary>
+    private static PortSchemaEntry? ReadPortSchemaEntry(JsonElement item)
+    {
+        if (item.ValueKind != JsonValueKind.Object
+            || !TryReadText(item, WorkflowJson.SnapshotPortId, out string? portId)
+            || !TryReadEnum(item, WorkflowJson.SnapshotDirection, out PortDirection direction))
+        {
+            return null;
+        }
+
+        return new PortSchemaEntry(
+            portId!,
+            direction,
+            TryReadText(item, WorkflowJson.SnapshotTypeId, out string? typeId) ? new PortTypeId(typeId!) : null,
+            TryReadEnum(item, WorkflowJson.SnapshotMultiplicity, out PortMultiplicity multiplicity)
+                ? multiplicity
+                : null,
+            TryReadOptional(item),
+            TryReadText(item, WorkflowJson.SnapshotDisplayName, out string? displayName) ? displayName : null);
+    }
+
+    private static bool? TryReadOptional(JsonElement item)
+        => item.TryGetProperty(WorkflowJson.SnapshotIsOptional, out JsonElement element)
+            ? element.ValueKind switch
+            {
+                JsonValueKind.True => true,
+                JsonValueKind.False => false,
+                _ => null,
+            }
+            : null;
 
     private static void ReadParameters(
         WorkflowDocument target,
@@ -516,6 +650,32 @@ public static class WorkflowDocumentReader
 
         value = element.GetString();
         return !string.IsNullOrWhiteSpace(value);
+    }
+
+    /// <summary>
+    /// Reads an enumeration member by its name. The format writes the member name,
+    /// so a number is not one of the values it stores.
+    /// </summary>
+    private static bool TryReadEnum<TEnum>(JsonElement parent, string name, out TEnum value)
+        where TEnum : struct, Enum
+    {
+        value = default;
+
+        if (!TryReadText(parent, name, out string? stored))
+        {
+            return false;
+        }
+
+        foreach (TEnum candidate in Enum.GetValues<TEnum>())
+        {
+            if (string.Equals(candidate.ToString(), stored, StringComparison.Ordinal))
+            {
+                value = candidate;
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool TryReadInstant(JsonElement parent, string name, out DateTimeOffset value)

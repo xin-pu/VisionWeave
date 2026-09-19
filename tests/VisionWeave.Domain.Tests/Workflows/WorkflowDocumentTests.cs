@@ -1,5 +1,7 @@
 ﻿using Shouldly;
 using VisionWeave.Contracts.Nodes;
+using VisionWeave.Contracts.Ports;
+using VisionWeave.Contracts.Workflows;
 using VisionWeave.Domain.Workflows;
 
 namespace VisionWeave.Domain.Tests.Workflows;
@@ -183,6 +185,55 @@ public sealed class WorkflowDocumentTests
         document.GetNode(node.InstanceId).Parameters["kernelSize"].ShouldBe(5);
         document.Nodes.Count.ShouldBe(1);
         document.ExtensionData["futureField"].ShouldBe("""{"a":1}""");
+    }
+
+    [Fact]
+    public void AddResource_increments_revision_and_change_count()
+    {
+        WorkflowDocument document = WorkflowDocument.Create("workflow");
+        long revision = document.Revision;
+        long changes = document.ChangeCount;
+
+        document.AddResource(new FileResourceReference("assets/plate.png"));
+
+        document.Revision.ShouldBe(revision + 1);
+        document.ChangeCount.ShouldBe(changes + 1);
+        document.Resources.ShouldHaveSingleItem().ShouldBe(new FileResourceReference("assets/plate.png"));
+    }
+
+    [Fact]
+    public void Setting_a_node_port_schema_snapshot_does_not_change_the_revision()
+    {
+        WorkflowDocument document = WorkflowDocument.Create("workflow");
+        NodeInstance node = document.AddNode(BlurType, 1, new CanvasPosition(0, 0));
+        long revision = document.Revision;
+
+        document.SetNodePortSchemaSnapshot(
+            node.InstanceId,
+            [new PortSchemaEntry("image", PortDirection.Input, BuiltInPortTypeIds.ImageFrame)]);
+
+        document.Revision.ShouldBe(revision);
+        PortSchemaEntry entry = document.GetNode(node.InstanceId).PortSchemaSnapshot.ShouldHaveSingleItem();
+        entry.PortId.ShouldBe("image");
+        entry.TypeId.ShouldBe(BuiltInPortTypeIds.ImageFrame);
+    }
+
+    [Fact]
+    public void Clone_deep_copies_the_resources_and_the_node_snapshots()
+    {
+        WorkflowDocument document = WorkflowDocument.Create("workflow");
+        NodeInstance node = document.AddNode(BlurType, 1, new CanvasPosition(0, 0));
+        document.AddResource(new FileResourceReference("assets/plate.png"));
+        document.SetNodePortSchemaSnapshot(node.InstanceId, [new PortSchemaEntry("image", PortDirection.Input)]);
+
+        WorkflowDocument clone = document.Clone();
+        clone.AddResource(new FileResourceReference("assets/mask.png"));
+        clone.SetNodePortSchemaSnapshot(node.InstanceId, [new PortSchemaEntry("mask", PortDirection.Output)]);
+
+        document.Resources.ShouldHaveSingleItem()
+            .ShouldBe(new FileResourceReference("assets/plate.png"));
+        document.GetNode(node.InstanceId).PortSchemaSnapshot.ShouldHaveSingleItem()
+            .PortId.ShouldBe("image");
     }
 
     [Fact]

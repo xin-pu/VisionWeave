@@ -15,7 +15,9 @@ it would add noise without changing a current decision.
   [ADR-0008](adr/0008-async-ui-command-boundary.md) for the shell's command and
   error boundary,
   [ADR-0010](adr/0010-diagnostic-targets.md) for what a diagnostic is attributed
-  to, and
+  to,
+  [ADR-0011](adr/0011-resource-references-and-port-schema-snapshots.md) for how a
+  document names the files it reads and remembers a node's ports, and
   [ADR-0007](adr/0007-host-composition-and-configuration.md) for the current
   application-host direction.
 - [Project ledgers](ledger/README.md) — improvements, risks, and standards

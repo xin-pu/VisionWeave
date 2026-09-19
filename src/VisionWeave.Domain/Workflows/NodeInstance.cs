@@ -1,4 +1,5 @@
 ﻿using VisionWeave.Contracts.Nodes;
+using VisionWeave.Contracts.Workflows;
 
 namespace VisionWeave.Domain.Workflows;
 
@@ -12,6 +13,7 @@ public sealed class NodeInstance
 {
     private readonly Dictionary<string, object?> _parameters = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _extensionData = new(StringComparer.Ordinal);
+    private PortSchemaEntry[] _portSchemaSnapshot = [];
 
     internal NodeInstance(Guid instanceId, NodeTypeId nodeTypeId, int typeVersion, CanvasPosition position)
     {
@@ -62,6 +64,14 @@ public sealed class NodeInstance
     /// </summary>
     public IReadOnlyDictionary<string, string> ExtensionData => _extensionData;
 
+    /// <summary>
+    /// Gets the ports the node was saved with, which a session renders the node
+    /// from when its definition is unavailable. The snapshot is a rendering
+    /// fallback and never a second source of truth: for a known node type the
+    /// resolved definition wins.
+    /// </summary>
+    public IReadOnlyList<PortSchemaEntry> PortSchemaSnapshot => _portSchemaSnapshot;
+
     internal void SetParameter(string name, object? value) => _parameters[name] = value;
 
     internal void ClearParameter(string name) => _parameters.Remove(name);
@@ -75,6 +85,9 @@ public sealed class NodeInstance
     internal void SetLabel(string? label) => Label = label;
 
     internal void SetExtensionData(string name, string json) => _extensionData[name] = json;
+
+    internal void SetPortSchemaSnapshot(IReadOnlyList<PortSchemaEntry> snapshot)
+        => _portSchemaSnapshot = [.. snapshot];
 
     internal NodeInstance Copy()
     {
@@ -93,6 +106,8 @@ public sealed class NodeInstance
         {
             copy._extensionData[extension.Key] = extension.Value;
         }
+
+        copy._portSchemaSnapshot = [.. _portSchemaSnapshot];
 
         return copy;
     }

@@ -117,4 +117,5 @@ stable.
 - [ADR-0008: async command and error boundary](../adr/0008-async-ui-command-boundary.md)
 - [ADR-0009: editor session orchestration](../adr/0009-editor-session-orchestration.md)
 - [ADR-0010: diagnostic targets narrower than a node](../adr/0010-diagnostic-targets.md)
+- [ADR-0011: resource references and remembered port schemas](../adr/0011-resource-references-and-port-schema-snapshots.md)
 - [Project improvements ledger](../ledger/project-improvements.md)
