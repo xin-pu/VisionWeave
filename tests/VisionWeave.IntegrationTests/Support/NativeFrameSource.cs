@@ -66,7 +66,7 @@ internal sealed class NativeFrameSource
     /// Gets the executor of the source node.
     /// </summary>
     internal Func<NodeExecutionRequest, CancellationToken, Task<NodeExecutionResult>> Executor
-        => (_, _) => Task.FromResult(NodeExecutionResult.Success(Produce(), TimeSpan.FromMilliseconds(1)));
+        => (_, _) => Task.FromResult(NodeExecutionResult.Success(Produce()));
 
     /// <summary>
     /// Creates a native frame and publishes it as the value of the source's output

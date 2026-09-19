@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using OpenCvSharp;
+﻿using OpenCvSharp;
 using VisionWeave.Contracts.Diagnostics;
 using VisionWeave.Contracts.Execution;
 using VisionWeave.Contracts.Files;
@@ -42,8 +41,6 @@ public sealed class ImageSourceExecutor : INodeExecutor
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        Stopwatch stopwatch = Stopwatch.StartNew();
-
         string declared = ParameterText(request, OpenCvNodeIds.PathParameter);
 
         if (!WorkDirectoryPath.TryResolve(
@@ -52,7 +49,7 @@ public sealed class ImageSourceExecutor : INodeExecutor
             out string path,
             out string? refusal))
         {
-            return Task.FromResult(NodeExecutionResult.Failure(FrameInput.Rejected(request, refusal), stopwatch.Elapsed));
+            return Task.FromResult(NodeExecutionResult.Failure(FrameInput.Rejected(request, refusal)));
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -70,22 +67,19 @@ public sealed class ImageSourceExecutor : INodeExecutor
                 return Task.FromResult(NodeExecutionResult.Failure(
                     FrameInput.Rejected(
                         request,
-                        $"The file '{declared}' could not be read as an image. Check that it exists beside the workflow and that its format is one OpenCV reads."),
-                    stopwatch.Elapsed));
+                        $"The file '{declared}' could not be read as an image. Check that it exists beside the workflow and that its format is one OpenCV reads.")));
             }
 
             // The lease owns the mat from here on, exactly as it owns one this
             // executor allocated: the runtime releases it once its consumers are done.
             MatFrameLease produced = MatFrameLease.Create(read, _ledger);
             transferred = true;
-            stopwatch.Stop();
 
             return Task.FromResult(NodeExecutionResult.Success(
                 new Dictionary<string, PortValue>(StringComparer.Ordinal)
                 {
                     [OpenCvNodeIds.ImagePortId] = new ImageFrameValue(produced),
-                },
-                stopwatch.Elapsed));
+                }));
         }
         finally
         {

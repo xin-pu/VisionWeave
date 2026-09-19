@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using OpenCvSharp;
+﻿using OpenCvSharp;
 using VisionWeave.Contracts.Diagnostics;
 using VisionWeave.Contracts.Execution;
 using VisionWeave.Contracts.Files;
@@ -32,11 +31,9 @@ public sealed class SaveImageExecutor : INodeExecutor
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        Stopwatch stopwatch = Stopwatch.StartNew();
-
         if (!FrameInput.TryRead(request, out MatFrameLease input, out NodeDiagnostic? failure))
         {
-            return Task.FromResult(NodeExecutionResult.Failure(failure!, stopwatch.Elapsed));
+            return Task.FromResult(NodeExecutionResult.Failure(failure!));
         }
 
         string declared = request.Parameters.Contains(OpenCvNodeIds.PathParameter)
@@ -49,7 +46,7 @@ public sealed class SaveImageExecutor : INodeExecutor
             out string destination,
             out string? refusal))
         {
-            return Task.FromResult(NodeExecutionResult.Failure(FrameInput.Rejected(request, refusal), stopwatch.Elapsed));
+            return Task.FromResult(NodeExecutionResult.Failure(FrameInput.Rejected(request, refusal)));
         }
 
         bool overwrite = request.Parameters.Contains(OpenCvNodeIds.OverwriteParameter)
@@ -60,8 +57,7 @@ public sealed class SaveImageExecutor : INodeExecutor
             return Task.FromResult(NodeExecutionResult.Failure(
                 FrameInput.Rejected(
                     request,
-                    $"The file '{declared}' already exists. Turn on the node's replace parameter to write over it, or name another file."),
-                stopwatch.Elapsed));
+                    $"The file '{declared}' already exists. Turn on the node's replace parameter to write over it, or name another file.")));
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -73,8 +69,7 @@ public sealed class SaveImageExecutor : INodeExecutor
             if (!Cv2.ImWrite(temporary, input.Mat))
             {
                 return Task.FromResult(NodeExecutionResult.Failure(
-                    FrameInput.Rejected(request, DescribeUnwritable(declared)),
-                    stopwatch.Elapsed));
+                    FrameInput.Rejected(request, DescribeUnwritable(declared))));
             }
 
             File.Move(temporary, destination, overwrite: true);
@@ -84,8 +79,7 @@ public sealed class SaveImageExecutor : INodeExecutor
             // A format OpenCV has no writer for arrives this way rather than as a
             // false return, and it is a condition of the document, not a defect.
             return Task.FromResult(NodeExecutionResult.Failure(
-                FrameInput.Rejected(request, DescribeUnwritable(declared), exception),
-                stopwatch.Elapsed));
+                FrameInput.Rejected(request, DescribeUnwritable(declared), exception)));
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or NotSupportedException)
         {
@@ -93,19 +87,15 @@ public sealed class SaveImageExecutor : INodeExecutor
                 FrameInput.Rejected(
                     request,
                     $"The file '{declared}' could not be written. Check that the folder exists and that you are allowed to write in it.",
-                    exception),
-                stopwatch.Elapsed));
+                    exception)));
         }
         finally
         {
             DeleteIfPresent(temporary);
         }
 
-        stopwatch.Stop();
-
         return Task.FromResult(NodeExecutionResult.Success(
-            new Dictionary<string, PortValue>(StringComparer.Ordinal),
-            stopwatch.Elapsed));
+            new Dictionary<string, PortValue>(StringComparer.Ordinal)));
     }
 
     private static string DescribeUnwritable(string declared)

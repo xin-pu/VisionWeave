@@ -119,4 +119,5 @@ stable.
 - [ADR-0010: diagnostic targets narrower than a node](../adr/0010-diagnostic-targets.md)
 - [ADR-0011: resource references and remembered port schemas](../adr/0011-resource-references-and-port-schema-snapshots.md)
 - [ADR-0012: file access and the working directory](../adr/0012-file-access-and-the-working-directory.md)
+- [ADR-0013: execution timing ownership](../adr/0013-execution-timing-ownership.md)
 - [Project improvements ledger](../ledger/project-improvements.md)

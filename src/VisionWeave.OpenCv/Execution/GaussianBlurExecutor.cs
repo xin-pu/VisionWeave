@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using OpenCvSharp;
+﻿using OpenCvSharp;
 using VisionWeave.Contracts.Diagnostics;
 using VisionWeave.Contracts.Execution;
 using VisionWeave.Contracts.Nodes;
@@ -41,11 +40,9 @@ public sealed class GaussianBlurExecutor : INodeExecutor
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        Stopwatch stopwatch = Stopwatch.StartNew();
-
         if (!FrameInput.TryRead(request, out MatFrameLease input, out NodeDiagnostic? failure))
         {
-            return Task.FromResult(NodeExecutionResult.Failure(failure!, stopwatch.Elapsed));
+            return Task.FromResult(NodeExecutionResult.Failure(failure!));
         }
 
         int kernelSize = request.Parameters.GetInt32(OpenCvNodeIds.KernelSizeParameter);
@@ -58,8 +55,7 @@ public sealed class GaussianBlurExecutor : INodeExecutor
                 FrameInput.Rejected(
                     request,
                     $"Parameter '{OpenCvNodeIds.KernelSizeParameter}' must be an odd number between " +
-                    $"{OpenCvParameterBounds.MinKernelSize} and {OpenCvParameterBounds.MaxKernelSize}, but it is {kernelSize}."),
-                stopwatch.Elapsed));
+                    $"{OpenCvParameterBounds.MinKernelSize} and {OpenCvParameterBounds.MaxKernelSize}, but it is {kernelSize}.")));
         }
 
         double sigma = request.Parameters.Contains(OpenCvNodeIds.SigmaParameter)
@@ -72,8 +68,7 @@ public sealed class GaussianBlurExecutor : INodeExecutor
                 FrameInput.Rejected(
                     request,
                     $"Parameter '{OpenCvNodeIds.SigmaParameter}' must be between " +
-                    $"{OpenCvParameterBounds.MinSigma} and {OpenCvParameterBounds.MaxSigma}, but it is {sigma}."),
-                stopwatch.Elapsed));
+                    $"{OpenCvParameterBounds.MinSigma} and {OpenCvParameterBounds.MaxSigma}, but it is {sigma}.")));
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -89,14 +84,12 @@ public sealed class GaussianBlurExecutor : INodeExecutor
 
             MatFrameLease produced = MatFrameLease.Create(output, _ledger);
             transferred = true;
-            stopwatch.Stop();
 
             return Task.FromResult(NodeExecutionResult.Success(
                 new Dictionary<string, PortValue>(StringComparer.Ordinal)
                 {
                     [OpenCvNodeIds.BlurredPortId] = new ImageFrameValue(produced),
-                },
-                stopwatch.Elapsed));
+                }));
         }
         finally
         {
