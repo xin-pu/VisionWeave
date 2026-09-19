@@ -18,7 +18,9 @@ namespace VisionWeave.OpenCv.Nodes;
 /// own neighbourhood as well as one that compares it with a number, the four nodes
 /// that find an edge — the two gradient measurements, the curvature, and the edge map
 /// that follows from a gradient — and the three that reshape what a threshold left
-/// behind, which are the first nodes in the Morphology category.
+/// behind, which are the first nodes in the Morphology category. The three Draw
+/// nodes are the only ones that change a frame without reading it as a measurement:
+/// they mark a rectangle, a line, or a circle on the frame they are given.
 /// </para>
 /// </summary>
 public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
@@ -45,6 +47,9 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
         CreateErode(),
         CreateDilate(),
         CreateMorphologyEx(),
+        CreateDrawRectangle(),
+        CreateDrawLine(),
+        CreateDrawCircle(),
     ];
 
     /// <inheritdoc />
@@ -895,6 +900,180 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
             ],
             OpenCvNodeIds.MorphologyExExecutorTypeId);
 
+    private static NodeDefinition CreateDrawRectangle()
+        => new(
+            new NodeTypeId(OpenCvNodeIds.DrawRectangleTypeId),
+            TypeVersion: 1,
+            DisplayName: "Draw Rectangle",
+            OpenCvNodeIds.DrawCategory,
+            [
+                new PortDefinition(
+                    OpenCvNodeIds.ImagePortId,
+                    PortDirection.Input,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Image"),
+                new PortDefinition(
+                    OpenCvNodeIds.DrawnPortId,
+                    PortDirection.Output,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Drawn"),
+            ],
+            [
+                new ParameterDefinition(
+                    OpenCvNodeIds.XParameter,
+                    ParameterKind.Integer,
+                    IsRequired: true,
+                    DisplayName: "Left",
+                    Minimum: OpenCvParameterBounds.MinOrigin,
+                    Maximum: OpenCvParameterBounds.MaxDimension,
+                    DefaultValue: 0),
+                new ParameterDefinition(
+                    OpenCvNodeIds.YParameter,
+                    ParameterKind.Integer,
+                    IsRequired: true,
+                    DisplayName: "Top",
+                    Minimum: OpenCvParameterBounds.MinOrigin,
+                    Maximum: OpenCvParameterBounds.MaxDimension,
+                    DefaultValue: 0),
+                new ParameterDefinition(
+                    OpenCvNodeIds.WidthParameter,
+                    ParameterKind.Integer,
+                    IsRequired: true,
+                    DisplayName: "Width",
+                    Minimum: OpenCvParameterBounds.MinDimension,
+                    Maximum: OpenCvParameterBounds.MaxDimension,
+                    DefaultValue: 640),
+                new ParameterDefinition(
+                    OpenCvNodeIds.HeightParameter,
+                    ParameterKind.Integer,
+                    IsRequired: true,
+                    DisplayName: "Height",
+                    Minimum: OpenCvParameterBounds.MinDimension,
+                    Maximum: OpenCvParameterBounds.MaxDimension,
+                    DefaultValue: 480),
+                .. CreateColourParameters(),
+                CreateThicknessParameter(),
+                CreateFilledParameter(),
+            ],
+            OpenCvNodeIds.DrawRectangleExecutorTypeId);
+
+    private static NodeDefinition CreateDrawLine()
+        => new(
+            new NodeTypeId(OpenCvNodeIds.DrawLineTypeId),
+            TypeVersion: 1,
+            DisplayName: "Draw Line",
+            OpenCvNodeIds.DrawCategory,
+            [
+                new PortDefinition(
+                    OpenCvNodeIds.ImagePortId,
+                    PortDirection.Input,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Image"),
+                new PortDefinition(
+                    OpenCvNodeIds.DrawnPortId,
+                    PortDirection.Output,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Drawn"),
+            ],
+            [
+                new ParameterDefinition(
+                    OpenCvNodeIds.StartXParameter,
+                    ParameterKind.Integer,
+                    IsRequired: true,
+                    DisplayName: "Start X",
+                    Minimum: OpenCvParameterBounds.MinOrigin,
+                    Maximum: OpenCvParameterBounds.MaxDimension,
+                    DefaultValue: 0),
+                new ParameterDefinition(
+                    OpenCvNodeIds.StartYParameter,
+                    ParameterKind.Integer,
+                    IsRequired: true,
+                    DisplayName: "Start Y",
+                    Minimum: OpenCvParameterBounds.MinOrigin,
+                    Maximum: OpenCvParameterBounds.MaxDimension,
+                    DefaultValue: 0),
+                new ParameterDefinition(
+                    OpenCvNodeIds.EndXParameter,
+                    ParameterKind.Integer,
+                    IsRequired: true,
+                    DisplayName: "End X",
+                    Minimum: OpenCvParameterBounds.MinOrigin,
+                    Maximum: OpenCvParameterBounds.MaxDimension,
+                    DefaultValue: 640),
+                new ParameterDefinition(
+                    OpenCvNodeIds.EndYParameter,
+                    ParameterKind.Integer,
+                    IsRequired: true,
+                    DisplayName: "End Y",
+                    Minimum: OpenCvParameterBounds.MinOrigin,
+                    Maximum: OpenCvParameterBounds.MaxDimension,
+                    DefaultValue: 480),
+                .. CreateColourParameters(),
+                CreateThicknessParameter(),
+            ],
+            OpenCvNodeIds.DrawLineExecutorTypeId);
+
+    private static NodeDefinition CreateDrawCircle()
+        => new(
+            new NodeTypeId(OpenCvNodeIds.DrawCircleTypeId),
+            TypeVersion: 1,
+            DisplayName: "Draw Circle",
+            OpenCvNodeIds.DrawCategory,
+            [
+                new PortDefinition(
+                    OpenCvNodeIds.ImagePortId,
+                    PortDirection.Input,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Image"),
+                new PortDefinition(
+                    OpenCvNodeIds.DrawnPortId,
+                    PortDirection.Output,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Drawn"),
+            ],
+            [
+                new ParameterDefinition(
+                    OpenCvNodeIds.XParameter,
+                    ParameterKind.Integer,
+                    IsRequired: true,
+                    DisplayName: "Centre X",
+                    Minimum: OpenCvParameterBounds.MinOrigin,
+                    Maximum: OpenCvParameterBounds.MaxDimension,
+                    DefaultValue: 320),
+                new ParameterDefinition(
+                    OpenCvNodeIds.YParameter,
+                    ParameterKind.Integer,
+                    IsRequired: true,
+                    DisplayName: "Centre Y",
+                    Minimum: OpenCvParameterBounds.MinOrigin,
+                    Maximum: OpenCvParameterBounds.MaxDimension,
+                    DefaultValue: 240),
+                new ParameterDefinition(
+                    OpenCvNodeIds.RadiusParameter,
+                    ParameterKind.Integer,
+                    IsRequired: true,
+                    DisplayName: "Radius",
+                    Minimum: OpenCvParameterBounds.MinRadius,
+                    Maximum: OpenCvParameterBounds.MaxDimension,
+                    DefaultValue: 100),
+                .. CreateColourParameters(),
+                CreateThicknessParameter(),
+                CreateFilledParameter(),
+            ],
+            OpenCvNodeIds.DrawCircleExecutorTypeId);
+
     private static ParameterDefinition CreateKernelShapeParameter()
         => new(
             OpenCvNodeIds.KernelShapeParameter,
@@ -913,4 +1092,40 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
             Minimum: OpenCvParameterBounds.MinIterations,
             Maximum: OpenCvParameterBounds.MaxIterations,
             DefaultValue: 1);
+
+    private static IReadOnlyList<ParameterDefinition> CreateColourParameters()
+        =>
+        [
+            CreateColourComponent(OpenCvNodeIds.BlueParameter, "Blue"),
+            CreateColourComponent(OpenCvNodeIds.GreenParameter, "Green"),
+            CreateColourComponent(OpenCvNodeIds.RedParameter, "Red"),
+        ];
+
+    private static ParameterDefinition CreateColourComponent(string name, string displayName)
+        => new(
+            name,
+            ParameterKind.Integer,
+            IsRequired: true,
+            DisplayName: displayName,
+            Minimum: OpenCvParameterBounds.MinLevel,
+            Maximum: OpenCvParameterBounds.MaxLevel,
+            DefaultValue: (int)OpenCvParameterBounds.MaxLevel);
+
+    private static ParameterDefinition CreateThicknessParameter()
+        => new(
+            OpenCvNodeIds.ThicknessParameter,
+            ParameterKind.Integer,
+            IsRequired: true,
+            DisplayName: "Thickness",
+            Minimum: OpenCvParameterBounds.MinThickness,
+            Maximum: OpenCvParameterBounds.MaxThickness,
+            DefaultValue: OpenCvParameterBounds.MinThickness);
+
+    private static ParameterDefinition CreateFilledParameter()
+        => new(
+            OpenCvNodeIds.FilledParameter,
+            ParameterKind.Boolean,
+            IsRequired: false,
+            DisplayName: "Filled",
+            DefaultValue: false);
 }

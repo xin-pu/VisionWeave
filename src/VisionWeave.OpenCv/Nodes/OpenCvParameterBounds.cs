@@ -22,10 +22,10 @@ public static class OpenCvParameterBounds
     /// <summary>The greatest bilateral sigma, which is the whole range of an 8-bit intensity.</summary>
     public const double MaxBilateralSigma = 255d;
 
-    /// <summary>The smallest frame dimension the resize node produces.</summary>
+    /// <summary>The smallest frame dimension a node produces or marks.</summary>
     public const int MinDimension = 1;
 
-    /// <summary>The greatest frame dimension the resize node produces.</summary>
+    /// <summary>The greatest frame dimension a node produces or marks.</summary>
     public const int MaxDimension = 16384;
 
     /// <summary>The smallest median kernel dimension. A median of one pixel would smooth nothing.</summary>
@@ -62,13 +62,13 @@ public static class OpenCvParameterBounds
     /// <summary>The smallest neighbourhood an adaptive threshold can compare a pixel against.</summary>
     public const int MinBlockSize = 3;
 
-    /// <summary>The smallest accepted rectangle coordinate.</summary>
+    /// <summary>The smallest accepted coordinate a node names on a frame.</summary>
     public const int MinOrigin = 0;
 
-    /// <summary>The smallest accepted threshold, which is also the darkest 8-bit pixel.</summary>
+    /// <summary>The smallest accepted threshold or colour component, which is also the darkest 8-bit pixel.</summary>
     public const double MinLevel = 0d;
 
-    /// <summary>The greatest accepted threshold, which is also the brightest 8-bit pixel.</summary>
+    /// <summary>The greatest accepted threshold or colour component, which is also the brightest 8-bit pixel.</summary>
     public const double MaxLevel = 255d;
 
     /// <summary>The smallest offset an adaptive threshold subtracts from the local average.</summary>
@@ -82,4 +82,13 @@ public static class OpenCvParameterBounds
 
     /// <summary>The most times a morphology node applies its structuring element.</summary>
     public const int MaxIterations = 16;
+
+    /// <summary>The thinnest outline a draw node marks with, which is one pixel wide.</summary>
+    public const int MinThickness = 1;
+
+    /// <summary>The widest outline a draw node marks with.</summary>
+    public const int MaxThickness = 255;
+
+    /// <summary>The smallest radius a draw node accepts. Zero is the single pixel the centre names.</summary>
+    public const int MinRadius = 0;
 }

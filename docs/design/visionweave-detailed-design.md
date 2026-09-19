@@ -878,12 +878,31 @@ are the same hand-written ones — a step, a single brighter pixel, and a single
 because what an element can remove or fill is measured in pixels. Its departures are
 recorded in PL-2026-003 as well: the kernel is a shape and the side of a square rather
 than a kernel the user assembles, the anchor is always the centre, and the operation is
-one of five options rather than a number.
+one of five options rather than a number. The fifth filled the Draw category, which the
+table has also listed since the first release: `Draw Rectangle`, `Draw Line`, and `Draw
+Circle`, which are the only nodes that change a frame without reading it as a
+measurement. It exists for one decision, and it is how a colour is a parameter: the
+inspector holds numbers, so a colour is three of them, named after the components a
+drawing call reads in order — `blue`, `green`, and `red` — and a frame of a single
+channel takes the first, which is what a scalar means to such an image rather than a
+rule this layer invents. The default is white, so a mark on a mask needs nothing set,
+and `filled` is its own switch rather than OpenCV's width of minus one, because a
+parameter whose value says another one does not apply is a parameter that hides a
+decision; the line node declares no such switch, since a line has no inside. Each node
+copies the frame it was given and marks the copy, because a frame in this build has one
+owner and marking the frame it was given would change a value another node may still
+read. A shape that reaches past an edge is drawn up to it, which is what marking a
+region at the border means, and because the call reads pixels and writes the same type
+back, every layout is accepted and reported, as the two pyramid nodes and the
+morphology nodes do. The tests state the whole result of a shape as a picture of the
+marked pixels, so the rasterisation and the clipping are what is asserted rather than
+described.
 What the batches leave out names its reason in the issue that
 migrated them: `Filter2D`, `Normalize`, the point scaling node, and the channel nodes
 wait on a kernel representation, on a decision about masks and depths, on a consumer
-of its own, and on multi-port nodes respectively; the draw family waits on the batch
-after this one, and the contour family waits on the `Contours` value ADR-0003 defers.
+of its own, and on multi-port nodes respectively, and `Draw Contours` — the other node
+the table's Draw row names — waits on the `Contours` value ADR-0003 defers, which is
+also what the contour family waits on.
 The two file-backed nodes — `Image Source` and `Save Image` — are the ones that
 name a file, so they are the nodes a working directory is resolved for (5.4): each
 declares a required `path` parameter, the save node additionally declares the

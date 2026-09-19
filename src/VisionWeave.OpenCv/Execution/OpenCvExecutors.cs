@@ -44,6 +44,9 @@ public static class OpenCvExecutors
             [OpenCvNodeIds.ErodeExecutorTypeId] = new ErodeExecutor(ledger),
             [OpenCvNodeIds.DilateExecutorTypeId] = new DilateExecutor(ledger),
             [OpenCvNodeIds.MorphologyExExecutorTypeId] = new MorphologyExExecutor(ledger),
+            [OpenCvNodeIds.DrawRectangleExecutorTypeId] = new DrawRectangleExecutor(ledger),
+            [OpenCvNodeIds.DrawLineExecutorTypeId] = new DrawLineExecutor(ledger),
+            [OpenCvNodeIds.DrawCircleExecutorTypeId] = new DrawCircleExecutor(ledger),
         }.ToFrozenDictionary(StringComparer.Ordinal);
     }
 }
