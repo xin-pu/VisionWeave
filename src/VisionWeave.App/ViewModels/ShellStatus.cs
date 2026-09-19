@@ -2,6 +2,7 @@
 using VisionWeave.App.Commands;
 using VisionWeave.App.Presentation;
 using VisionWeave.App.Sessions;
+using VisionWeave.Application.Execution;
 using VisionWeave.Contracts.Diagnostics;
 
 namespace VisionWeave.App.ViewModels;
@@ -27,6 +28,15 @@ internal sealed partial class ShellStatus : ObservableObject
 
     /// <summary>The run-outcome field before anything can run.</summary>
     internal const string NoRunText = "No run yet";
+
+    /// <summary>The run-outcome field while a run is executing.</summary>
+    internal const string RunningText = "Running…";
+
+    /// <summary>The run-outcome field for a run that finished and reported no failure.</summary>
+    internal const string RanText = "Completed";
+
+    /// <summary>The run-outcome field for a run a node failed in.</summary>
+    internal const string RunFailedText = "Failed";
 
     /// <summary>The condition field before the shell has observed anything.</summary>
     internal const string NoConditionText = "No conditions reported yet";
@@ -67,7 +77,10 @@ internal sealed partial class ShellStatus : ObservableObject
     [ObservableProperty]
     public partial string BackgroundOperation { get; private set; }
 
-    /// <summary>Gets the outcome of the last workflow run, which nothing produces yet.</summary>
+    /// <summary>
+    /// Gets the outcome of the last workflow run: that it is running, what it
+    /// produced, that the user stopped it, or why it was never started.
+    /// </summary>
     [ObservableProperty]
     public partial string RunOutcome { get; private set; }
 
@@ -147,6 +160,46 @@ internal sealed partial class ShellStatus : ObservableObject
     {
         ConditionSeverity = null;
         Condition = NoConditionText;
+    }
+
+    /// <summary>
+    /// Reports that a run started, so the readout names the work in progress rather
+    /// than the outcome of the run before it.
+    /// </summary>
+    internal void BeginRun() => RunOutcome = RunningText;
+
+    /// <summary>
+    /// Reports what a run produced.
+    /// </summary>
+    /// <param name="summary">The outcome the runner returned.</param>
+    /// <remarks>
+    /// Only the run readout is written. A stopped run returns what it produced
+    /// rather than throwing, so the shell did finish the Run operation and the
+    /// operation field reads the same as it would for any command that returned —
+    /// the stop is a statement about the run, and this is where the run is read.
+    /// The condition field is left alone, so a condition the run observed on its way
+    /// out stays readable.
+    /// </remarks>
+    internal void ReportRun(WorkflowRunSummary summary)
+    {
+        ArgumentNullException.ThrowIfNull(summary);
+
+        RunOutcome = summary.WasCancelled
+            ? StoppedText
+            : summary.Status == WorkflowRunStatus.Failed ? RunFailedText : RanText;
+    }
+
+    /// <summary>
+    /// Reports that a run never started, and why. A refusal is a state rather than a
+    /// history: leaving the outcome of the run before it standing would describe work
+    /// the user did not ask for.
+    /// </summary>
+    /// <param name="reason">What prevented the run, as the rest of the sentence reads it.</param>
+    internal void ReportRunRefused(string reason)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+
+        RunOutcome = $"Not run: {reason}";
     }
 
     private void OnSessionPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)

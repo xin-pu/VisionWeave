@@ -17,7 +17,9 @@ it would add noise without changing a current decision.
   [ADR-0010](adr/0010-diagnostic-targets.md) for what a diagnostic is attributed
   to,
   [ADR-0011](adr/0011-resource-references-and-port-schema-snapshots.md) for how a
-  document names the files it reads and remembers a node's ports, and
+  document names the files it reads and remembers a node's ports,
+  [ADR-0012](adr/0012-file-access-and-the-working-directory.md) for what a node's
+  file path names and which files one run may reach, and
   [ADR-0007](adr/0007-host-composition-and-configuration.md) for the current
   application-host direction.
 - [Project ledgers](ledger/README.md) — improvements, risks, and standards

@@ -29,12 +29,14 @@ internal static class ExecutorTestRequest
     /// <param name="parameters">The validated parameters.</param>
     /// <param name="inputs">The bound inputs.</param>
     /// <param name="scope">The resource scope of the execution.</param>
+    /// <param name="environment">The environment the run resolves file paths in, when the test is about files.</param>
     /// <returns>The request.</returns>
     internal static NodeExecutionRequest For(
         string nodeTypeId,
         NodeParameterSet parameters,
         IReadOnlyDictionary<string, PortValue> inputs,
-        IExecutionResourceScope scope)
+        IExecutionResourceScope scope,
+        NodeExecutionEnvironment? environment = null)
         => new()
         {
             NodeTypeId = new NodeTypeId(nodeTypeId),
@@ -44,6 +46,7 @@ internal static class ExecutorTestRequest
             Parameters = parameters,
             Inputs = inputs,
             Resources = scope,
+            Environment = environment ?? NodeExecutionEnvironment.Default,
         };
 
     /// <summary>

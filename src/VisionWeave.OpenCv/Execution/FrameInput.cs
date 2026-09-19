@@ -60,4 +60,21 @@ internal static class FrameInput
             DiagnosticSeverity.Error,
             message,
             request.NodeInstanceId);
+
+    /// <summary>
+    /// Creates the failure a node reports when it rejects an input or a parameter
+    /// for a reason the user cannot read off the document, such as a write the
+    /// platform refused.
+    /// </summary>
+    /// <param name="request">The request being executed.</param>
+    /// <param name="message">The user-facing explanation, which carries no path or platform detail.</param>
+    /// <param name="exception">The original failure, retained for structured logs only.</param>
+    /// <returns>The diagnostic.</returns>
+    internal static NodeDiagnostic Rejected(NodeExecutionRequest request, string message, Exception exception)
+        => new(
+            DiagnosticCodes.NodeExecutionFailed,
+            DiagnosticSeverity.Error,
+            message,
+            request.NodeInstanceId,
+            exception);
 }

@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using VisionWeave.App.Canvas;
 using VisionWeave.App.Commands;
 using VisionWeave.App.Inspector;
+using VisionWeave.App.Preview;
 using VisionWeave.App.Sessions;
 using VisionWeave.Application.Definitions;
 using VisionWeave.Application.Validation;
@@ -29,6 +30,8 @@ internal sealed partial class MainWindowViewModel : ObservableObject
         WorkflowValidator validator,
         OpenDocumentCommand openDocument,
         SaveDocumentCommand saveDocument,
+        RunWorkflowCommand runWorkflow,
+        PreviewViewModel preview,
         IWorkflowFileChooser fileChooser,
         ShellPromptViewModel prompt,
         ShellStatus status)
@@ -38,6 +41,8 @@ internal sealed partial class MainWindowViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(validator);
         ArgumentNullException.ThrowIfNull(openDocument);
         ArgumentNullException.ThrowIfNull(saveDocument);
+        ArgumentNullException.ThrowIfNull(runWorkflow);
+        ArgumentNullException.ThrowIfNull(preview);
         ArgumentNullException.ThrowIfNull(fileChooser);
         ArgumentNullException.ThrowIfNull(prompt);
         ArgumentNullException.ThrowIfNull(status);
@@ -47,8 +52,10 @@ internal sealed partial class MainWindowViewModel : ObservableObject
         _catalog = catalog;
         _fileChooser = fileChooser;
         Prompt = prompt;
+        Preview = preview;
         OpenDocument = openDocument;
         SaveDocument = saveDocument;
+        RunWorkflow = runWorkflow;
         Canvas = new CanvasViewModel(session, catalog, validator, status);
         Inspector = new InspectorViewModel(session, catalog, status);
         CatalogueSearch = string.Empty;
@@ -65,6 +72,18 @@ internal sealed partial class MainWindowViewModel : ObservableObject
 
     /// <summary>Gets the command that writes the document to its file.</summary>
     internal SaveDocumentCommand SaveDocument { get; }
+
+    /// <summary>Gets the command that runs the document and reports what it produced.</summary>
+    /// <remarks>
+    /// Public so the shell's Run and Cancel actions can bind through it, which is
+    /// what keeps two gestures over one running state in one object; the type stays
+    /// internal, and WPF reaches its public members from here.
+    /// </remarks>
+    public RunWorkflowCommand RunWorkflow { get; }
+
+    /// <summary>Gets the managed preview of the newest image a run published.</summary>
+    /// <remarks>Public so the preview region can bind through it.</remarks>
+    public PreviewViewModel Preview { get; }
 
     /// <summary>
     /// Gets the editing session this shell presents. The session replaces the

@@ -1,15 +1,20 @@
-﻿using Microsoft.Extensions.Logging.Abstractions;
+﻿using System.Windows.Threading;
+using Microsoft.Extensions.Logging.Abstractions;
 using VisionWeave.App.Commands;
+using VisionWeave.App.Composition;
 using VisionWeave.App.Notifications;
+using VisionWeave.App.Preview;
 using VisionWeave.App.Sessions;
 using VisionWeave.App.ViewModels;
 using VisionWeave.Application.Definitions;
 using VisionWeave.Application.Editing;
+using VisionWeave.Application.Execution;
 using VisionWeave.Application.Validation;
 using VisionWeave.Contracts.Diagnostics;
 using VisionWeave.Contracts.Nodes;
 using VisionWeave.Domain.Workflows;
 using VisionWeave.OpenCv.Nodes;
+using VisionWeave.OpenCv.Preview;
 
 namespace VisionWeave.App.Design;
 
@@ -36,6 +41,8 @@ public static class ShellDesignData
         var validator = new WorkflowValidator(catalog);
         EditorSession session = new(new DocumentLoader(), validator, TimeProvider.System);
         ShellStatus status = new(session);
+        PreviewViewModel preview = new(session);
+        var boundary = new AsyncCommandBoundary(new SilentPresenter(), NullLogger<AsyncCommandBoundary>.Instance);
 
         Guid blur = AddNode(session, catalog, OpenCvNodeIds.GaussianBlurTypeId, new CanvasPosition(0, 0));
         Guid resize = AddNode(session, catalog, OpenCvNodeIds.ResizeTypeId, new CanvasPosition(280, 0));
@@ -58,17 +65,50 @@ public static class ShellDesignData
             session,
             catalog,
             validator,
-            new OpenDocumentCommand(
-                new AsyncCommandBoundary(new SilentPresenter(), NullLogger<AsyncCommandBoundary>.Instance),
-                session,
-                status),
-            new SaveDocumentCommand(
-                new AsyncCommandBoundary(new SilentPresenter(), NullLogger<AsyncCommandBoundary>.Instance),
-                session,
-                status,
-                new SilentFileChooser()),
+            new OpenDocumentCommand(boundary, session, status),
+            new SaveDocumentCommand(boundary, session, status, new SilentFileChooser()),
+            RunWorkflow(session, catalog, status, boundary, preview),
+            preview,
             new SilentFileChooser(),
             new ShellPromptViewModel(),
+            status);
+    }
+
+    /// <summary>
+    /// Builds the sample's Run action out of the objects the application composes:
+    /// the same ledger, executors, capture, plan builder, runtime, and preview. The
+    /// sample document has never been saved, so running it is refused the way the
+    /// application refuses it — which is a state the designer should show rather
+    /// than one it should invent a result for.
+    /// </summary>
+    /// <param name="session">The session whose document is run.</param>
+    /// <param name="catalog">The definitions the sample document is captured against.</param>
+    /// <param name="status">The shell state that reports what the run did.</param>
+    /// <param name="boundary">The boundary that runs the operation and reports its outcome.</param>
+    /// <param name="preview">The preview the sample shell draws.</param>
+    /// <returns>The sample's run command.</returns>
+    private static RunWorkflowCommand RunWorkflow(
+        EditorSession session,
+        NodeDefinitionCatalog catalog,
+        ShellStatus status,
+        AsyncCommandBoundary boundary,
+        PreviewViewModel preview)
+    {
+        var ledger = new LeaseLedger();
+
+        return new RunWorkflowCommand(
+            boundary,
+            session,
+            new WorkflowSnapshotFactory(catalog),
+            new ExecutionPlanBuilder(),
+            new WorkflowRunner(
+                new ExecutorRegistry(ledger),
+                ledger,
+                ExecutionOptions.Default,
+                new RunPreviewObserver(
+                    FramePreviewConverter.Default,
+                    catalog,
+                    new ShellRunPreviewPresenter(preview, Dispatcher.CurrentDispatcher))),
             status);
     }
 

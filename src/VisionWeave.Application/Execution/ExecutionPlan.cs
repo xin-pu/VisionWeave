@@ -1,4 +1,6 @@
-﻿namespace VisionWeave.Application.Execution;
+﻿using VisionWeave.Contracts.Execution;
+
+namespace VisionWeave.Application.Execution;
 
 /// <summary>
 /// The work one run has to perform: the nodes to execute in topological order,
@@ -57,6 +59,13 @@ public sealed record ExecutionPlan
     /// runtime reports these as blocked instead of executing them.
     /// </summary>
     public IReadOnlyList<Guid> BlockedNodeIds { get; }
+
+    /// <summary>
+    /// Gets the environment this plan runs in, which the runtime hands to every
+    /// node it starts. It defaults to a run that resolves no file path, because a
+    /// plan built without one describes only nodes that touch no file.
+    /// </summary>
+    public NodeExecutionEnvironment Environment { get; init; } = NodeExecutionEnvironment.Default;
 
     /// <summary>
     /// Gets the identifiers of the nodes to execute, in topological order.

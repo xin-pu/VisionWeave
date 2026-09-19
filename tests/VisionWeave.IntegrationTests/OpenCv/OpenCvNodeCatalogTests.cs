@@ -12,9 +12,11 @@ namespace VisionWeave.IntegrationTests.OpenCv;
 /// <summary>
 /// The contract between the definitions the OpenCV provider publishes and the
 /// registrations that execute them. A definition with no executor would be
-/// placeable but unrunnable, and a required parameter with no usable default
-/// would make a freshly placed node fail on its first run, so both are checked
-/// here rather than discovered by a user.
+/// placeable but unrunnable, and a required parameter with no usable default would
+/// make a freshly placed node fail on its first run, so both are checked here
+/// rather than discovered by a user. The one parameter a node cannot default is
+/// the file it reads or writes, which is checked to be required of exactly the
+/// nodes that name one.
 /// </summary>
 public sealed class OpenCvNodeCatalogTests
 {
@@ -26,10 +28,11 @@ public sealed class OpenCvNodeCatalogTests
     {
         NodeDefinitionCatalog catalog = NodeDefinitionCatalog.FromProviders([new OpenCvNodeDefinitionProvider()]);
 
-        catalog.KnownTypeIds.Count.ShouldBe(2);
+        catalog.KnownTypeIds.Count.ShouldBe(Definitions.Count);
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.ImageSourceTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.SaveImageTypeId));
         catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.GaussianBlurTypeId));
         catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.ResizeTypeId));
-        catalog.Definitions.Count.ShouldBe(Definitions.Count);
 
         foreach (NodeDefinition definition in Definitions)
         {
@@ -39,44 +42,77 @@ public sealed class OpenCvNodeCatalogTests
     }
 
     [Fact]
-    public void Every_definition_declares_one_image_input_and_one_image_output()
+    public void Every_definition_declares_at_most_one_image_input_and_one_image_output()
     {
         Definitions.ShouldNotBeEmpty();
 
         foreach (NodeDefinition definition in Definitions)
         {
-            PortDefinition input = definition.Inputs.ShouldHaveSingleItem();
-            input.Id.ShouldBe(OpenCvNodeIds.ImagePortId);
-            input.TypeId.ShouldBe(BuiltInPortTypeIds.ImageFrame);
-            input.Multiplicity.ShouldBe(PortMultiplicity.Single);
-            input.IsOptional.ShouldBeFalse();
+            definition.Ports.ShouldNotBeEmpty($"{definition.TypeId} declares no port, so it can neither receive nor publish an image.");
+            definition.Inputs.Count().ShouldBeLessThanOrEqualTo(1, $"{definition.TypeId} declares more than one input.");
+            definition.Outputs.Count().ShouldBeLessThanOrEqualTo(1, $"{definition.TypeId} declares more than one output.");
 
-            PortDefinition output = definition.Outputs.ShouldHaveSingleItem();
-            output.Id.ShouldBeOneOf(OpenCvNodeIds.BlurredPortId, OpenCvNodeIds.ResizedPortId);
-            output.TypeId.ShouldBe(BuiltInPortTypeIds.ImageFrame);
-            output.Multiplicity.ShouldBe(PortMultiplicity.Single);
-            output.IsOptional.ShouldBeFalse();
+            foreach (PortDefinition port in definition.Ports)
+            {
+                port.TypeId.ShouldBe(BuiltInPortTypeIds.ImageFrame);
+                port.Multiplicity.ShouldBe(PortMultiplicity.Single);
+                port.IsOptional.ShouldBeFalse();
+            }
+
+            // A node that reads a file starts a workflow with an image, one that
+            // writes a file ends one, and a transform does both under a name that
+            // says what it produced.
+            foreach (PortDefinition input in definition.Inputs)
+            {
+                input.Id.ShouldBe(OpenCvNodeIds.ImagePortId);
+            }
+
+            foreach (PortDefinition output in definition.Outputs)
+            {
+                output.Id.ShouldBeOneOf(
+                    OpenCvNodeIds.ImagePortId,
+                    OpenCvNodeIds.BlurredPortId,
+                    OpenCvNodeIds.ResizedPortId);
+            }
         }
     }
 
     [Fact]
-    public void Every_required_parameter_declares_a_default_so_a_placed_node_can_run()
+    public void Every_required_parameter_declares_a_default_unless_it_names_a_file()
     {
         Definitions.ShouldNotBeEmpty();
 
         foreach (NodeDefinition definition in Definitions)
         {
-            foreach (ParameterDefinition parameter in definition.Parameters)
+            foreach (ParameterDefinition parameter in definition.Parameters.Where(item => item.IsRequired))
             {
-                if (!parameter.IsRequired)
+                if (parameter.Kind == ParameterKind.Path)
                 {
+                    // A file a run reads or writes has to be one the user chose, so
+                    // the definition requires it and cannot invent a default.
+                    parameter.DefaultValue.ShouldBeNull(
+                        $"{definition.TypeId} requires the path '{parameter.Name}' but declares a default for it.");
                     continue;
                 }
 
                 parameter.DefaultValue.ShouldNotBeNull(
-                    $"{definition.TypeId} requires '{parameter.Name}', and parameter validation is not implemented "
-                    + "yet (PL-2026-006), so a node placed without a saved value has nothing to run with.");
+                    $"{definition.TypeId} requires '{parameter.Name}', so a node placed without a saved value "
+                    + "has nothing to run with.");
             }
+        }
+    }
+
+    [Fact]
+    public void Only_the_file_backed_nodes_declare_a_path_parameter()
+    {
+        foreach (NodeDefinition definition in Definitions)
+        {
+            bool namesAFile = definition.Parameters.Any(parameter => parameter.Kind == ParameterKind.Path);
+
+            namesAFile.ShouldBe(
+                definition.TypeId == new NodeTypeId(OpenCvNodeIds.ImageSourceTypeId)
+                    || definition.TypeId == new NodeTypeId(OpenCvNodeIds.SaveImageTypeId),
+                $"{definition.TypeId} names a file only if it reads one or writes one.");
         }
     }
 

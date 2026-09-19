@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using Shouldly;
 using VisionWeave.App.Commands;
+using VisionWeave.App.Preview;
 using VisionWeave.App.Sessions;
 using VisionWeave.App.Tests.Support;
 using VisionWeave.App.ViewModels;
@@ -75,11 +76,13 @@ public sealed class MainWindowViewModelTests : IDisposable
     {
         Shell shell = Create(_directory.SaveReadableDocument(), OpenCvCatalog());
 
-        shell.ViewModel.NodeCatalogSummary.ShouldBe("2 node types available");
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("4 node types available");
         shell.ViewModel.CatalogueGroups.Select(group => group.Category)
-            .ShouldBe([OpenCvNodeIds.FilterCategory, OpenCvNodeIds.TransformCategory]);
+            .ShouldBe([OpenCvNodeIds.FilterCategory, OpenCvNodeIds.InputOutputCategory, OpenCvNodeIds.TransformCategory]);
         shell.ViewModel.CatalogueGroups[0].Entries.Select(entry => entry.DisplayName).ShouldBe(["Gaussian Blur"]);
-        shell.ViewModel.CatalogueGroups[1].Entries.Select(entry => entry.DisplayName).ShouldBe(["Resize"]);
+        shell.ViewModel.CatalogueGroups[1].Entries.Select(entry => entry.DisplayName)
+            .ShouldBe(["Image Source", "Save Image"]);
+        shell.ViewModel.CatalogueGroups[2].Entries.Select(entry => entry.DisplayName).ShouldBe(["Resize"]);
     }
 
     [Fact]
@@ -319,7 +322,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         shell.ViewModel.CatalogueGroups.Select(group => group.Category)
             .ShouldBe([OpenCvNodeIds.FilterCategory]);
         shell.ViewModel.CatalogueGroups[0].Entries.Select(entry => entry.DisplayName).ShouldBe(["Gaussian Blur"]);
-        shell.ViewModel.NodeCatalogSummary.ShouldBe("1 of 2 node types match “blur”");
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("1 of 4 node types match “blur”");
         shell.ViewModel.CatalogueNotice.ShouldBeEmpty();
     }
 
@@ -345,7 +348,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         // so the region explains itself instead.
         shell.ViewModel.CatalogueGroups.ShouldBeEmpty();
         shell.ViewModel.CatalogueNotice.ShouldBe("No node type matches this search.");
-        shell.ViewModel.NodeCatalogSummary.ShouldBe("0 of 2 node types match “nothing-like-this”");
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("0 of 4 node types match “nothing-like-this”");
     }
 
     [Fact]
@@ -356,8 +359,8 @@ public sealed class MainWindowViewModelTests : IDisposable
 
         shell.ViewModel.CatalogueSearch = string.Empty;
 
-        shell.ViewModel.CatalogueGroups.Count.ShouldBe(2);
-        shell.ViewModel.NodeCatalogSummary.ShouldBe("2 node types available");
+        shell.ViewModel.CatalogueGroups.Count.ShouldBe(3);
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("4 node types available");
         shell.ViewModel.CatalogueNotice.ShouldBeEmpty();
     }
 
@@ -389,6 +392,8 @@ public sealed class MainWindowViewModelTests : IDisposable
                 new WorkflowValidator(catalog),
                 openDocument,
                 saveDocument,
+                ShellRun.CommandFor(session, catalog, status, boundary),
+                new PreviewViewModel(session),
                 chooser,
                 prompt,
                 status),

@@ -24,6 +24,8 @@ public static class OpenCvExecutors
 
         return new Dictionary<string, INodeExecutor>(StringComparer.Ordinal)
         {
+            [OpenCvNodeIds.ImageSourceExecutorTypeId] = new ImageSourceExecutor(ledger),
+            [OpenCvNodeIds.SaveImageExecutorTypeId] = new SaveImageExecutor(),
             [OpenCvNodeIds.GaussianBlurExecutorTypeId] = new GaussianBlurExecutor(ledger),
             [OpenCvNodeIds.ResizeExecutorTypeId] = new ResizeExecutor(ledger),
         }.ToFrozenDictionary(StringComparer.Ordinal);

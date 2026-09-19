@@ -24,6 +24,9 @@
         <KeyBinding Key="S"
                     Command="{Binding SaveCommand}"
                     Modifiers="Control" />
+        <KeyBinding Key="R"
+                    Command="{Binding RunWorkflow.Command}"
+                    Modifiers="Control" />
         <KeyBinding Key="Z"
                     Command="{Binding Canvas.UndoCommand}"
                     Modifiers="Control" />
@@ -98,6 +101,22 @@
                             Content="_Redo"
                             Style="{StaticResource Shell.ActionButton}"
                             ToolTip="Redo the last undone edit (Ctrl+Y)" />
+
+                    <!--
+                        Running and stopping are the two gestures over one running
+                        state: the Run action is disabled while a run is executing,
+                        and Cancel is enabled exactly while there is one to stop.
+                    -->
+                    <Button Margin="24,0,0,0"
+                            Command="{Binding RunWorkflow.Command}"
+                            Content="_Run"
+                            Style="{StaticResource Shell.ActionButton}"
+                            ToolTip="Run the workflow and show the newest image it produces (Ctrl+R)" />
+                    <Button Margin="6,0,0,0"
+                            Command="{Binding RunWorkflow.CancelCommand}"
+                            Content="_Cancel"
+                            Style="{StaticResource Shell.ActionButton}"
+                            ToolTip="Stop the run. Everything the run already produced is kept." />
                 </StackPanel>
 
                 <StackPanel Grid.Column="3" Orientation="Horizontal">
@@ -237,12 +256,18 @@
                     </Border>
 
                     <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
                         <!--
                             The work surface. Pan, zoom, and selection are the
                             editor's; everything the document decides arrives as a
                             projection, and every gesture leaves as a command.
                         -->
                         <nodify:NodifyEditor x:Name="WorkflowCanvas"
+                                             Grid.Row="0"
                                              Background="{DynamicResource Brush.Background.Canvas}"
                                              ConnectionCompletedCommand="{Binding Canvas.ConnectCommand}"
                                              Connections="{Binding Canvas.Connectors}"
@@ -263,7 +288,8 @@
                         </nodify:NodifyEditor>
 
                         <!-- What to do while the document holds nothing to draw. -->
-                        <TextBlock MaxWidth="340"
+                        <TextBlock Grid.Row="0"
+                                   MaxWidth="340"
                                    HorizontalAlignment="Center"
                                    VerticalAlignment="Center"
                                    IsHitTestVisible="False"
@@ -280,6 +306,62 @@
                                 </Style>
                             </TextBlock.Style>
                         </TextBlock>
+
+                        <!--
+                            What the last run produced: the newest image a node
+                            published, the node that published it, and the size and
+                            pixel layout it arrived with. The image is a copy, so it
+                            stays readable after the run that produced it has ended
+                            and released every frame it held, and it is drawn from
+                            below the work surface so the document keeps the room it
+                            is edited in.
+                        -->
+                        <Border x:Name="PreviewRegion"
+                                Grid.Row="1"
+                                Padding="16,12"
+                                Background="{DynamicResource Brush.Background.SurfaceRaised}"
+                                BorderBrush="{DynamicResource Brush.Border.Subtle}"
+                                BorderThickness="0,1,0,0">
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Top"
+                                           Style="{StaticResource Shell.RegionHeader}"
+                                           Text="Preview" />
+                                <TextBlock DockPanel.Dock="Top"
+                                           Style="{StaticResource Shell.RegionNote}"
+                                           Text="{Binding Preview.PreviewTitle}" />
+                                <TextBlock DockPanel.Dock="Bottom"
+                                           Style="{StaticResource Shell.RegionNote}"
+                                           Text="{Binding Preview.PreviewDetail}" />
+
+                                <!--
+                                    Said while nothing has run, and taken away as soon
+                                    as something has: an empty frame with no
+                                    explanation would read as a preview that failed
+                                    to draw.
+                                -->
+                                <TextBlock DockPanel.Dock="Top"
+                                           Margin="0,4,0,0"
+                                           Text="{Binding Preview.PreviewNotice}"
+                                           TextWrapping="Wrap">
+                                    <TextBlock.Style>
+                                        <Style BasedOn="{StaticResource Shell.RegionNote}" TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Preview.HasPreview}" Value="False">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+
+                                <Image Margin="0,8,0,0"
+                                       HorizontalAlignment="Left"
+                                       MaxHeight="200"
+                                       Source="{Binding Preview.Image}"
+                                       Stretch="Uniform" />
+                            </DockPanel>
+                        </Border>
                     </Grid>
                 </DockPanel>
             </Border>
