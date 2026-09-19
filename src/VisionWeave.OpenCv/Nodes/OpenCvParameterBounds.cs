@@ -31,6 +31,34 @@ public static class OpenCvParameterBounds
     /// <summary>The smallest median kernel dimension. A median of one pixel would smooth nothing.</summary>
     public const int MinMedianKernelSize = 3;
 
+    /// <summary>The greatest derivative kernel dimension the node offers, which is the widest one OpenCV documents.</summary>
+    public const int MaxDerivativeKernelSize = 7;
+
+    /// <summary>The lowest derivative order a derivative node applies.</summary>
+    public const int MinDerivativeOrder = 0;
+
+    /// <summary>The highest derivative order a derivative node applies, which is what a three by three kernel reaches.</summary>
+    public const int MaxDerivativeOrder = 2;
+
+    /// <summary>The smallest factor a derivative node applies to a result.</summary>
+    public const double MinScale = 0d;
+
+    /// <summary>The greatest factor a derivative node applies to a result.</summary>
+    public const double MaxScale = 100d;
+
+    /// <summary>The smallest aperture the edge node measures a gradient with.</summary>
+    public const int MinCannyApertureSize = 3;
+
+    /// <summary>The greatest aperture the edge node measures a gradient with.</summary>
+    public const int MaxCannyApertureSize = 7;
+
+    /// <summary>
+    /// The greatest gradient an 8-bit frame can produce, which is what an edge
+    /// threshold is compared against: two differences of 255, which is the widest
+    /// step between two neighbouring pixels.
+    /// </summary>
+    public const double MaxEdgeThreshold = 2 * MaxLevel;
+
     /// <summary>The smallest neighbourhood an adaptive threshold can compare a pixel against.</summary>
     public const int MinBlockSize = 3;
 

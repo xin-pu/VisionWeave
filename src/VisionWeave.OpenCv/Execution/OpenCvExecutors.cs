@@ -37,6 +37,10 @@ public static class OpenCvExecutors
             [OpenCvNodeIds.AdaptiveThresholdExecutorTypeId] = new AdaptiveThresholdExecutor(ledger),
             [OpenCvNodeIds.PyrDownExecutorTypeId] = new PyrDownExecutor(ledger),
             [OpenCvNodeIds.PyrUpExecutorTypeId] = new PyrUpExecutor(ledger),
+            [OpenCvNodeIds.SobelExecutorTypeId] = new SobelExecutor(ledger),
+            [OpenCvNodeIds.ScharrExecutorTypeId] = new ScharrExecutor(ledger),
+            [OpenCvNodeIds.LaplacianExecutorTypeId] = new LaplacianExecutor(ledger),
+            [OpenCvNodeIds.CannyExecutorTypeId] = new CannyExecutor(ledger),
         }.ToFrozenDictionary(StringComparer.Ordinal);
     }
 }
