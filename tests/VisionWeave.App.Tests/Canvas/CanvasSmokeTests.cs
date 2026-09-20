@@ -16,6 +16,7 @@ using VisionWeave.App.Inspector;
 using VisionWeave.App.Notifications;
 using VisionWeave.App.Preview;
 using VisionWeave.App.Sessions;
+using VisionWeave.App.Tests.Markup;
 using VisionWeave.App.Tests.Support;
 using VisionWeave.App.ViewModels;
 using VisionWeave.Application.Definitions;
@@ -40,10 +41,10 @@ namespace VisionWeave.App.Tests.Canvas;
 /// they are bound to. One test walks every flow the shell promises — placing,
 /// connecting, selecting, deleting, and rewinding a workflow; editing a parameter,
 /// reading the condition it earned, saving, and opening the file again; running a
-/// stored workflow over a real image and seeing what it produced — because the
-/// window is built here under one <see cref="System.Windows.Application"/> for the
-/// process, which is what WPF allows. Each step asserts on the elements a user would
-/// be looking at.
+/// stored workflow over a real image and seeing what it produced; and reporting every
+/// binding the shell failed to resolve — because the window is built here under one
+/// <see cref="System.Windows.Application"/> for the process, which is what WPF allows.
+/// Each step asserts on the elements a user would be looking at.
 /// </summary>
 public sealed class CanvasSmokeTests
 {
@@ -62,6 +63,10 @@ public sealed class CanvasSmokeTests
             // theme, the tokens, and the shell styles are the ones that ship.
             var application = new App();
             application.InitializeComponent();
+
+            // The audit listens from before the window exists, because a binding that
+            // resolves to nothing reports the moment its element is created.
+            using MarkupBindingAudit audit = MarkupBindingAudit.Start();
 
             NodeDefinitionCatalog catalog = NodeDefinitionCatalog.FromProviders([new OpenCvNodeDefinitionProvider()]);
             EditorSession session = TestSessions.Create(catalog: catalog);
@@ -118,9 +123,31 @@ public sealed class CanvasSmokeTests
             EditDiagnoseSaveAndReopen(shell, directory, boundaryLog);
             BlockEditsToAnUnsupportedDocument(shell, directory);
             RunTheWorkflowAndShowItsPreview(shell, directory, executors);
+            ReportEveryBindingTheShellFailedToResolve(shell, audit);
 
             window.Close();
         });
+
+    /// <summary>
+    /// Reports every binding the shell failed to resolve. The audit has been listening
+    /// since before the window was built and the flows above have driven it through a
+    /// document, an inspection, and a run, so the pass covers the states a user sees.
+    /// </summary>
+    /// <param name="shell">The shell being driven.</param>
+    /// <param name="audit">The audit that has been listening to the window.</param>
+    private static void ReportEveryBindingTheShellFailedToResolve(Shell shell, MarkupBindingAudit audit)
+    {
+        // The inspector draws its fields from a data template, so a selected node that
+        // carries a parameter is what puts the row a templated control lives in on
+        // screen, together with the tile of the image that node published.
+        Select(shell, "Image Source");
+
+        IReadOnlyList<string> faults = audit.Faults(shell.Window);
+
+        faults.ShouldBeEmpty(
+            $"A selected node's inspector and preview must resolve every binding they draw."
+            + $"{Environment.NewLine}{string.Join(Environment.NewLine, faults)}");
+    }
 
     /// <summary>
     /// The window and the objects it was built with, so each flow drives the shell a

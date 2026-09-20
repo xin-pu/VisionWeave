@@ -574,12 +574,13 @@
                                                             <KeyBinding Command="{Binding ApplyCommand}" Key="Enter" />
                                                         </TextBox.InputBindings>
                                                     </TextBox>
-                                                    <ui:Button Grid.Column="1"
-                                                               Margin="6,0,0,0"
-                                                               Command="{Binding BrowseCommand}"
-                                                               Icon="{ui:SymbolIcon Symbol=FolderOpen20}"
-                                                               Style="{StaticResource Shell.FieldIconButton}"
-                                                               ToolTip="Browse for a location" />
+                                                    <Button Grid.Column="1"
+                                                            Margin="6,0,0,0"
+                                                            Command="{Binding BrowseCommand}"
+                                                            Style="{StaticResource Shell.FieldIconButton}"
+                                                            ToolTip="Browse for a location">
+                                                        <ui:SymbolIcon Symbol="FolderOpen20" />
+                                                    </Button>
                                                 </Grid>
 
                                                 <ui:ToggleSwitch HorizontalAlignment="Right"
