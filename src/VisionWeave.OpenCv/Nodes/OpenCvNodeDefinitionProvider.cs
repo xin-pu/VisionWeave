@@ -23,6 +23,13 @@ namespace VisionWeave.OpenCv.Nodes;
 /// they mark a rectangle, a line, or a circle on the frame they are given.
 /// </para>
 /// <para>
+/// The contour nodes are the first pair in the catalog that does not pass a frame
+/// along: <c>Find Contours</c> reads a mask and reports the boundary of each shape in
+/// it as a contour set, and <c>Draw Contours</c> marks a set on a frame. The value they
+/// share is the third port type this layer uses, and it is what makes the pair a family
+/// rather than two nodes that happen to be named alike.
+/// </para>
+/// <para>
 /// Every definition also carries the words out of <see cref="OpenCvNodeTags"/> that
 /// describe what it does, which is the axis the catalogue's tag filter is built from:
 /// a category says where a node sits in the library, and a tag cuts across the groups
@@ -56,6 +63,8 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
         CreateDrawRectangle(),
         CreateDrawLine(),
         CreateDrawCircle(),
+        CreateFindContours(),
+        CreateDrawContours(),
     ];
 
     /// <inheritdoc />
@@ -1147,6 +1156,84 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
             OpenCvNodeIds.DrawCircleExecutorTypeId)
         {
             Tags = [OpenCvNodeTags.Marking, OpenCvNodeTags.Mask],
+        };
+
+    private static NodeDefinition CreateFindContours()
+        => new(
+            new NodeTypeId(OpenCvNodeIds.FindContoursTypeId),
+            TypeVersion: 1,
+            DisplayName: "Find Contours",
+            OpenCvNodeIds.ContoursCategory,
+            [
+                new PortDefinition(
+                    OpenCvNodeIds.ImagePortId,
+                    PortDirection.Input,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Image"),
+                new PortDefinition(
+                    OpenCvNodeIds.ContoursPortId,
+                    PortDirection.Output,
+                    BuiltInPortTypeIds.ContourCollection,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Contours"),
+            ],
+            [
+                // The default reports the outermost boundary of every shape, which is
+                // what counting and locating what a mask holds asks for; the other
+                // option reports the boundaries inside a shape as well.
+                new ParameterDefinition(
+                    OpenCvNodeIds.RetrievalParameter,
+                    ParameterKind.Option,
+                    IsRequired: false,
+                    DisplayName: "Contours to report",
+                    Options: OpenCvNodeIds.RetrievalOptions,
+                    DefaultValue: OpenCvNodeIds.RetrievalExternal),
+            ],
+            OpenCvNodeIds.FindContoursExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Contour, OpenCvNodeTags.Mask],
+        };
+
+    private static NodeDefinition CreateDrawContours()
+        => new(
+            new NodeTypeId(OpenCvNodeIds.DrawContoursTypeId),
+            TypeVersion: 1,
+            DisplayName: "Draw Contours",
+            OpenCvNodeIds.DrawCategory,
+            [
+                new PortDefinition(
+                    OpenCvNodeIds.ImagePortId,
+                    PortDirection.Input,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Image"),
+                new PortDefinition(
+                    OpenCvNodeIds.ContoursPortId,
+                    PortDirection.Input,
+                    BuiltInPortTypeIds.ContourCollection,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Contours"),
+                new PortDefinition(
+                    OpenCvNodeIds.DrawnPortId,
+                    PortDirection.Output,
+                    BuiltInPortTypeIds.ImageFrame,
+                    PortMultiplicity.Single,
+                    IsOptional: false,
+                    DisplayName: "Drawn"),
+            ],
+            [
+                .. CreateColourParameters(),
+                CreateThicknessParameter(),
+                CreateFilledParameter(),
+            ],
+            OpenCvNodeIds.DrawContoursExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Contour, OpenCvNodeTags.Marking, OpenCvNodeTags.Mask],
         };
 
     private static ParameterDefinition CreateKernelShapeParameter()

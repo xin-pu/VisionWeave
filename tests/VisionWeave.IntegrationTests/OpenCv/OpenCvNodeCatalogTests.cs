@@ -16,10 +16,11 @@ namespace VisionWeave.IntegrationTests.OpenCv;
 /// make a freshly placed node fail on its first run, so both are checked here
 /// rather than discovered by a user. The one parameter a node cannot default is
 /// the file it reads or writes, which is checked to be required of exactly the
-/// nodes that name one. The tags the definitions are filtered by are checked the
-/// same way: the words come from one vocabulary the provider publishes, every
-/// definition carries at least one of them, and no word is published that nothing
-/// carries.
+/// nodes that name one. The ports are checked to declare the values a node of that
+/// kind receives and publishes, under the names those values travel by. The tags the
+/// definitions are filtered by are checked the same way: the words come from one
+/// vocabulary the provider publishes, every definition carries at least one of them,
+/// and no word is published that nothing carries.
 /// </summary>
 public sealed class OpenCvNodeCatalogTests
 {
@@ -55,6 +56,8 @@ public sealed class OpenCvNodeCatalogTests
         catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.DrawRectangleTypeId));
         catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.DrawLineTypeId));
         catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.DrawCircleTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.FindContoursTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.DrawContoursTypeId));
 
         foreach (NodeDefinition definition in Definitions)
         {
@@ -64,32 +67,52 @@ public sealed class OpenCvNodeCatalogTests
     }
 
     [Fact]
-    public void Every_definition_declares_at_most_one_image_input_and_one_image_output()
+    public void Every_definition_declares_the_ports_a_node_of_its_kind_needs()
     {
         Definitions.ShouldNotBeEmpty();
 
         foreach (NodeDefinition definition in Definitions)
         {
-            definition.Ports.ShouldNotBeEmpty($"{definition.TypeId} declares no port, so it can neither receive nor publish an image.");
-            definition.Inputs.Count().ShouldBeLessThanOrEqualTo(1, $"{definition.TypeId} declares more than one input.");
+            definition.Ports.ShouldNotBeEmpty($"{definition.TypeId} declares no port, so it can neither receive nor publish a value.");
+            definition.Inputs.Count().ShouldBeLessThanOrEqualTo(2, $"{definition.TypeId} declares more inputs than the values it can receive.");
             definition.Outputs.Count().ShouldBeLessThanOrEqualTo(1, $"{definition.TypeId} declares more than one output.");
+
+            // One value of each type per direction, because a port carries one value and
+            // two ports of the same type and direction could not be told apart by a
+            // consumer that resolves an input by its type.
+            foreach (IGrouping<PortDirection, PortDefinition> direction in definition.Ports.GroupBy(port => port.Direction))
+            {
+                direction.Select(port => port.TypeId).ShouldBeUnique(
+                    $"{definition.TypeId} declares the same value twice among its {direction.Key} ports.");
+            }
 
             foreach (PortDefinition port in definition.Ports)
             {
-                port.TypeId.ShouldBe(BuiltInPortTypeIds.ImageFrame);
                 port.Multiplicity.ShouldBe(PortMultiplicity.Single);
                 port.IsOptional.ShouldBeFalse();
+
+                // The name a value travels under says what the value is, so a reader of a
+                // document can tell which port a connection reaches without the definition:
+                // an image travels through 'image' and a contour set through 'contours'.
+                if (port.Id == OpenCvNodeIds.ContoursPortId)
+                {
+                    port.TypeId.ShouldBe(BuiltInPortTypeIds.ContourCollection);
+                }
+                else
+                {
+                    port.TypeId.ShouldBe(BuiltInPortTypeIds.ImageFrame);
+                }
             }
 
             // A node that reads a file starts a workflow with an image, one that
             // writes a file ends one, and a transform does both under a name that
             // says what it produced.
-            foreach (PortDefinition input in definition.Inputs)
+            foreach (PortDefinition input in definition.Inputs.Where(port => port.TypeId == BuiltInPortTypeIds.ImageFrame))
             {
                 input.Id.ShouldBe(OpenCvNodeIds.ImagePortId);
             }
 
-            foreach (PortDefinition output in definition.Outputs)
+            foreach (PortDefinition output in definition.Outputs.Where(port => port.TypeId == BuiltInPortTypeIds.ImageFrame))
             {
                 output.Id.ShouldBeOneOf(
                     OpenCvNodeIds.ImagePortId,

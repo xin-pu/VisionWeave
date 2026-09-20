@@ -47,6 +47,8 @@ public static class OpenCvExecutors
             [OpenCvNodeIds.DrawRectangleExecutorTypeId] = new DrawRectangleExecutor(ledger),
             [OpenCvNodeIds.DrawLineExecutorTypeId] = new DrawLineExecutor(ledger),
             [OpenCvNodeIds.DrawCircleExecutorTypeId] = new DrawCircleExecutor(ledger),
+            [OpenCvNodeIds.FindContoursExecutorTypeId] = new FindContoursExecutor(),
+            [OpenCvNodeIds.DrawContoursExecutorTypeId] = new DrawContoursExecutor(ledger),
         }.ToFrozenDictionary(StringComparer.Ordinal);
     }
 }
