@@ -41,8 +41,9 @@ namespace VisionWeave.App.Tests.Canvas;
 /// they are bound to. One test walks every flow the shell promises — placing,
 /// connecting, selecting, deleting, and rewinding a workflow; editing a parameter,
 /// reading the condition it earned, saving, and opening the file again; running a
-/// stored workflow over a real image and seeing what it produced; and reporting every
-/// binding the shell failed to resolve — because the window is built here under one
+/// stored workflow over a real image and seeing what it produced, including the
+/// several images one node publishes at once; and reporting every binding the shell
+/// failed to resolve — because the window is built here under one
 /// <see cref="System.Windows.Application"/> for the process, which is what WPF allows.
 /// Each step asserts on the elements a user would be looking at.
 /// </summary>
@@ -123,31 +124,11 @@ public sealed class CanvasSmokeTests
             EditDiagnoseSaveAndReopen(shell, directory, boundaryLog);
             BlockEditsToAnUnsupportedDocument(shell, directory);
             RunTheWorkflowAndShowItsPreview(shell, directory, executors);
+            SplitAnImageAndShowEveryOutputItPublished(shell, directory, executors);
             ReportEveryBindingTheShellFailedToResolve(shell, audit);
 
             window.Close();
         });
-
-    /// <summary>
-    /// Reports every binding the shell failed to resolve. The audit has been listening
-    /// since before the window was built and the flows above have driven it through a
-    /// document, an inspection, and a run, so the pass covers the states a user sees.
-    /// </summary>
-    /// <param name="shell">The shell being driven.</param>
-    /// <param name="audit">The audit that has been listening to the window.</param>
-    private static void ReportEveryBindingTheShellFailedToResolve(Shell shell, MarkupBindingAudit audit)
-    {
-        // The inspector draws its fields from a data template, so a selected node that
-        // carries a parameter is what puts the row a templated control lives in on
-        // screen, together with the tile of the image that node published.
-        Select(shell, "Image Source");
-
-        IReadOnlyList<string> faults = audit.Faults(shell.Window);
-
-        faults.ShouldBeEmpty(
-            $"A selected node's inspector and preview must resolve every binding they draw."
-            + $"{Environment.NewLine}{string.Join(Environment.NewLine, faults)}");
-    }
 
     /// <summary>
     /// The window and the objects it was built with, so each flow drives the shell a
@@ -727,15 +708,24 @@ public sealed class CanvasSmokeTests
 
         Image drawn = Descendants<Image>(Named<Border>(window, "PreviewRegion")).ShouldHaveSingleItem();
 
-        // The region draws the preview's own image, and what it draws is a frozen copy:
-        // the window is redrawn on this thread long after the run gave the frame back.
+        // The region draws the image the node published, and what it draws is a frozen
+        // copy: the window is redrawn on this thread long after the run gave the frame back.
         drawn.GetBindingExpression(Image.SourceProperty).ShouldNotBeNull()
-            .ParentBinding.Path.Path.ShouldBe("Preview.Image");
+            .ParentBinding.Path.Path.ShouldBe("Image");
         drawn.Source.ShouldBeAssignableTo<BitmapSource>().PixelWidth.ShouldBe(16);
         drawn.Source.ShouldBeAssignableTo<BitmapSource>().PixelHeight.ShouldBe(8);
 
-        shell.Preview.Image.ShouldNotBeNull();
-        shell.Preview.Image!.IsFrozen.ShouldBeTrue();
+        PreviewImage shown = shell.Preview.Images.ShouldHaveSingleItem();
+
+        shown.Image.IsFrozen.ShouldBeTrue();
+        shown.Caption.ShouldBe("Resize");
+
+        // One tile, and no name on it: the output is what tells a node's images apart,
+        // and a node that published one image has nothing to tell apart.
+        Descendants<TextBlock>(Named<Border>(window, "PreviewRegion"))
+            .Single(block => block.DataContext is PreviewImage)
+            .Visibility.ShouldBe(Visibility.Collapsed);
+
         waiting.Visibility.ShouldBe(Visibility.Collapsed);
 
         shell.Ledger.Created.ShouldBe(2);
@@ -796,6 +786,133 @@ public sealed class CanvasSmokeTests
         cancel.Command.CanExecute(null).ShouldBeFalse();
         shell.Ledger.Outstanding.ShouldBe(0);
         shell.Ledger.ReservationsOutstanding.ShouldBe(0);
+    }
+
+    /// <summary>
+    /// Runs a workflow whose one node publishes three images — the channels of a colour
+    /// image — and reads the region a user reads: one tile per output, each named after
+    /// the output it arrived on, each holding the pixels of that output.
+    /// </summary>
+    /// <param name="shell">The shell being driven.</param>
+    /// <param name="directory">The folder the document and its images live in.</param>
+    /// <param name="executors">The executors the run resolves, which hold nothing this flow.</param>
+    private static void SplitAnImageAndShowEveryOutputItPublished(
+        Shell shell,
+        TemporaryWorkflowDirectory directory,
+        RunHold executors)
+    {
+        Window window = shell.Window;
+        CanvasViewModel canvas = shell.Canvas;
+        EditorSession session = shell.Session;
+
+        executors.Hold.ShouldBeFalse("the flow before this one released the node it held.");
+
+        // The three channels carry three different values, so a tile holding the wrong
+        // channel is a tile holding the wrong pixels rather than three tiles of one colour.
+        using var plate = new Mat(24, 32, MatType.CV_8UC3, new Scalar(10, 20, 30));
+        Cv2.ImWrite(directory.PathOf("channels.png"), plate).ShouldBeTrue();
+
+        session.New("A workflow that splits an image");
+        Lay(window);
+
+        Button entry = Button(window, OpenCvNodeIds.ImageSourceTypeId);
+        entry.Command.Execute(entry.CommandParameter);
+        Lay(window);
+
+        Button(window, OpenCvNodeIds.SplitChannelsTypeId).Command.Execute(OpenCvNodeIds.SplitChannelsTypeId);
+        Lay(window);
+
+        WorkflowNodeViewModel image = canvas.Nodes.Single(node => node.DisplayName == "Image Source");
+        WorkflowNodeViewModel split = canvas.Nodes.Single(node => node.DisplayName == "Split Channels");
+
+        // The split node draws one connector per output, which is what the catalogue
+        // promises: the three images are published together rather than one at a time.
+        split.Outputs.Count.ShouldBe(3);
+
+        Drag(window, image.Outputs.ShouldHaveSingleItem(), split.Inputs.ShouldHaveSingleItem());
+        Lay(window);
+
+        canvas.Connectors.ShouldHaveSingleItem();
+
+        SetParameter(shell, image.InstanceId, OpenCvNodeIds.PathParameter, "channels.png");
+
+        string documentPath = directory.PathOf("channels.vwflow");
+        shell.Chooser.AnswerSave(documentPath);
+        Button(window, "_Save").Command.Execute(null);
+        Settle(shell, () => session.Path == documentPath);
+        Lay(window);
+
+        Button run = Button(window, "_Run");
+
+        run.Command.Execute(null);
+
+        SettleRun(shell, ShellStatus.RanText);
+        Lay(window);
+
+        // The node published three images and the region holds all three, in the order
+        // the definition declares its outputs, which is the order their tiles stand in.
+        shell.Preview.PreviewTitle.ShouldBe("Split Channels");
+        shell.Preview.PreviewDetail.ShouldBe("3 images, 32 × 24 pixels, Gray8");
+
+        IReadOnlyList<PreviewImage> images = shell.Preview.Images;
+
+        images.Count.ShouldBe(3);
+        images.Select(tile => tile.Label).ShouldBe(["Blue", "Green", "Red"]);
+        images.ShouldAllBe(tile => tile.ShowsLabel);
+        images.Select(tile => BitmapPixels.First(tile.Image)).ShouldBe<byte>([10, 20, 30]);
+        images.ShouldAllBe(tile => tile.Image.IsFrozen);
+
+        // What the window draws is that set: one tile per image, each labelled with its
+        // own output, each opening the node and the output it came from by name.
+        Border region = Named<Border>(window, "PreviewRegion");
+        IReadOnlyList<Image> drawn = [.. Descendants<Image>(region)];
+        IReadOnlyList<TextBlock> captions = [.. Descendants<TextBlock>(region).Where(block => block.DataContext is PreviewImage)];
+        IReadOnlyList<PreviewImageButton> openers = [.. Descendants<PreviewImageButton>(region)];
+
+        drawn.Count.ShouldBe(3);
+        drawn.Select(tile => tile.GetBindingExpression(Image.SourceProperty).ShouldNotBeNull().ParentBinding.Path.Path)
+            .ShouldAllBe(path => path == "Image");
+        drawn.Select(tile => ((BitmapSource)tile.Source).PixelWidth).ShouldAllBe(width => width == 32);
+
+        captions.Select(block => block.Text).ShouldBe(["Blue", "Green", "Red"]);
+        captions.ShouldAllBe(block => block.Visibility == Visibility.Visible);
+
+        openers.Select(opener => opener.ImageTitle).ShouldBe(
+            ["Split Channels — Blue", "Split Channels — Green", "Split Channels — Red"]);
+
+        shell.Ledger.Outstanding.ShouldBe(0);
+        shell.Ledger.ReservationsOutstanding.ShouldBe(0);
+    }
+
+    /// <summary>
+    /// Reports every binding the shell failed to resolve. The audit has been listening
+    /// since before the window was built and the flows above have driven it through a
+    /// document, an inspection, and two runs, so each pass covers a state a user sees.
+    /// </summary>
+    /// <param name="shell">The shell being driven.</param>
+    /// <param name="audit">The audit that has been listening to the window.</param>
+    private static void ReportEveryBindingTheShellFailedToResolve(Shell shell, MarkupBindingAudit audit)
+    {
+        // The inspector draws its fields from a data template, so a selected node that
+        // carries a parameter is what puts the row a templated control lives in on
+        // screen, together with the tile of the image that node published.
+        Select(shell, "Image Source");
+
+        IReadOnlyList<string> inspectorFaults = audit.Faults(shell.Window);
+
+        inspectorFaults.ShouldBeEmpty(
+            $"A selected node's inspector and preview must resolve every binding they draw."
+            + $"{Environment.NewLine}{string.Join(Environment.NewLine, inspectorFaults)}");
+
+        // And the node that published three images draws one tile per output, which is
+        // the markup a node with a single image never reaches.
+        Select(shell, "Split Channels");
+
+        IReadOnlyList<string> galleryFaults = audit.Faults(shell.Window);
+
+        galleryFaults.ShouldBeEmpty(
+            $"The preview of a node with several images must resolve every binding it draws."
+            + $"{Environment.NewLine}{string.Join(Environment.NewLine, galleryFaults)}");
     }
 
     /// <summary>Gives a node a parameter value, which is the command a field's commit produces.</summary>

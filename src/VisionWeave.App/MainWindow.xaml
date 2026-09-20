@@ -373,13 +373,16 @@
                         </TextBlock>
 
                         <!--
-                            What the last run produced: the newest image a node
-                            published, the node that published it, and the size and
-                            pixel layout it arrived with. The image is a copy, so it
-                            stays readable after the run that produced it has ended
-                            and released every frame it held, and it is drawn from
-                            below the work surface so the document keeps the room it
-                            is edited in.
+                            What the last run produced: every image the node published,
+                            the node that published them, and how many there are with
+                            the shape and pixel layout they arrived with. The images are
+                            copies, so they stay readable after the run that produced
+                            them has ended and released every frame it held, and they are
+                            drawn from below the work surface so the document keeps the
+                            room it is edited in. A node with one image draws one tile
+                            and needs no name for it; a node that split an image into
+                            channels draws one tile per channel, each named, because
+                            that name is what tells them apart.
                         -->
                         <Border x:Name="PreviewRegion"
                                 Grid.Row="1"
@@ -420,19 +423,44 @@
                                     </TextBlock.Style>
                                 </TextBlock>
 
-                                <preview:PreviewImageButton Margin="0,8,0,0"
-                                                            Padding="0"
-                                                            HorizontalAlignment="Left"
-                                                            Background="Transparent"
-                                                            BorderThickness="0"
-                                                            Cursor="Hand"
-                                                            ImageSource="{Binding Preview.Image}"
-                                                            ImageTitle="{Binding Preview.PreviewTitle}"
-                                                            ToolTip="Open the image at full size">
-                                    <Image MaxHeight="200"
-                                           Source="{Binding Preview.Image}"
-                                           Stretch="Uniform" />
-                                </preview:PreviewImageButton>
+                                <!--
+                                    A node with several outputs scrolls rather than
+                                    growing without bound, so the work surface above
+                                    keeps the room it is edited in.
+                                -->
+                                <ScrollViewer Margin="0,8,0,0"
+                                              MaxHeight="320"
+                                              VerticalScrollBarVisibility="Auto">
+                                    <ItemsControl ItemsSource="{Binding Preview.Images}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel Orientation="Horizontal" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate DataType="preview:PreviewImage">
+                                                <StackPanel Margin="0,0,16,0">
+                                                    <TextBlock Margin="0,0,0,2"
+                                                               Style="{StaticResource Shell.RegionNote}"
+                                                               Text="{Binding Label}"
+                                                               Visibility="{Binding ShowsLabel, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                                    <preview:PreviewImageButton Padding="0"
+                                                                                HorizontalAlignment="Left"
+                                                                                Background="Transparent"
+                                                                                BorderThickness="0"
+                                                                                Cursor="Hand"
+                                                                                ImageSource="{Binding Image}"
+                                                                                ImageTitle="{Binding Caption}"
+                                                                                ToolTip="Open the image at full size">
+                                                        <Image MaxHeight="200"
+                                                               Source="{Binding Image}"
+                                                               Stretch="Uniform" />
+                                                    </preview:PreviewImageButton>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
                             </DockPanel>
                         </Border>
                     </Grid>

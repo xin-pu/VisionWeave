@@ -36,9 +36,9 @@ public sealed class ShellMarkupTests
     /// <summary>
     /// The objects the shell's markup binds against: the window's view model, the
     /// regions it presents — the status area, the inspector, the preview, and the
-    /// prompt — the command the run actions share, the records the catalogue is
-    /// drawn from, and the types the canvas and inspector templates take as their
-    /// data context.
+    /// prompt — the command the run actions share, the records the catalogue and the
+    /// preview tiles are drawn from, and the types the canvas and inspector templates
+    /// take as their data context.
     /// </summary>
     private static readonly Type[] BindingRoots =
     [
@@ -50,6 +50,7 @@ public sealed class ShellMarkupTests
         typeof(ShellPromptViewModel),
         typeof(RunWorkflowCommand),
         typeof(PreviewViewModel),
+        typeof(PreviewImage),
         typeof(ShellCatalogueGroup),
         typeof(ShellCatalogueEntry),
         typeof(ShellCatalogueTag),
@@ -350,7 +351,7 @@ public sealed class ShellMarkupTests
     }
 
     [Fact]
-    public void The_preview_region_draws_the_selected_nodes_image_and_opens_it_on_click()
+    public void The_preview_region_draws_every_image_of_the_selected_node_and_opens_each_on_click()
     {
         XElement preview = Region("PreviewRegion");
 
@@ -364,17 +365,35 @@ public sealed class ShellMarkupTests
         Texts(preview).ShouldContain("{Binding Preview.PreviewDetail}");
         Texts(preview).ShouldContain("{Binding Preview.PreviewNotice}");
 
-        XElement image = preview
+        // The images are the set the node published rather than one image the region
+        // chose, so they are drawn as a list the view model fills.
+        XElement gallery = preview
             .Descendants()
-            .Single(element => element.Name.LocalName == "Image");
+            .Single(element => (string?)element.Attribute("ItemsSource") == "{Binding Preview.Images}");
+        XElement tile = gallery
+            .Descendants()
+            .Single(element => element.Name.LocalName == "DataTemplate");
 
-        AttributeText(image, "Source").ShouldBe("{Binding Preview.Image}");
+        AttributeText(tile, "DataType").ShouldBe("preview:PreviewImage");
 
-        XElement imageButton = preview
+        XElement image = tile.Descendants().Single(element => element.Name.LocalName == "Image");
+
+        AttributeText(image, "Source").ShouldBe("{Binding Image}");
+
+        // A node that split an image into channels has to say which tile is which, and a
+        // node with one image has nothing to say, so the label is the port name bound to
+        // the one state that shows it.
+        XElement label = tile
+            .Descendants()
+            .Single(element => (string?)element.Attribute("Text") == "{Binding Label}");
+
+        AttributeText(label, "Visibility").ShouldBe("{Binding ShowsLabel, Converter={StaticResource BooleanToVisibilityConverter}}");
+
+        XElement imageButton = tile
             .Descendants()
             .Single(element => element.Name.LocalName == "PreviewImageButton");
-        AttributeText(imageButton, "ImageSource").ShouldBe("{Binding Preview.Image}");
-        AttributeText(imageButton, "ImageTitle").ShouldBe("{Binding Preview.PreviewTitle}");
+        AttributeText(imageButton, "ImageSource").ShouldBe("{Binding Image}");
+        AttributeText(imageButton, "ImageTitle").ShouldBe("{Binding Caption}");
 
         // The notice is the one part of the region that is a state rather than a
         // value, so it is the part that shows and hides with the state behind it.

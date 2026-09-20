@@ -8,10 +8,10 @@ using VisionWeave.OpenCv.Preview;
 namespace VisionWeave.App.Preview;
 
 /// <summary>
-/// Converts the image a node published into a preview and hands it to the shell. It
-/// runs while the runtime still owns the published frame — the task it returns is the
-/// fence that keeps the lease alive — so it reads a frame that cannot be released
-/// underneath it and hands on a copy that no longer depends on the lease.
+/// Converts the images a node published into previews and hands them to the shell. It
+/// runs while the runtime still owns the published frames — the task it returns is the
+/// fence that keeps the leases alive — so it reads frames that cannot be released
+/// underneath it and hands on copies that no longer depend on a lease.
 /// </summary>
 internal sealed class RunPreviewObserver : IExecutionOutputObserver
 {
@@ -34,64 +34,94 @@ internal sealed class RunPreviewObserver : IExecutionOutputObserver
     }
 
     /// <summary>
-    /// Converts the image a node published, if it published one, and shows it. A
-    /// stopping run is not consulted: the newest image it produced is still worth
-    /// showing, and the readout says how the run ended either way.
+    /// Converts the images the node published on its image outputs and shows them
+    /// together, so a node that splits an image into channels is inspected as a whole
+    /// rather than one channel at a time. A stopping run is not consulted: the newest
+    /// images it produced are still worth showing, and the readout says how the run
+    /// ended either way.
     /// </summary>
     public async Task ObserveAsync(NodeOutputs outputs, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(outputs);
 
-        if (SelectFrame(outputs) is not { } frame)
+        // The leases are still alive here because the runtime waits for this task.
+        IReadOnlyList<RunPreview> previews = await Task
+            .Run(() => Convert(outputs), CancellationToken.None)
+            .ConfigureAwait(false);
+
+        if (previews.Count == 0)
         {
             return;
         }
 
-        // The lease is still alive here because the runtime waits for this task.
-        RunPreview preview = await Task
-            .Run(() => Convert(outputs, frame), CancellationToken.None)
-            .ConfigureAwait(false);
-
-        await _presenter.PresentAsync(preview).ConfigureAwait(false);
+        await _presenter.PresentAsync(previews).ConfigureAwait(false);
     }
 
     /// <summary>
-    /// Selects the first image output in port order, so which image is shown is a
-    /// property of the node's declaration rather than of the order a dictionary
-    /// happened to enumerate in. A frame this build cannot convert is passed over: the
-    /// node succeeded, and the shell simply has nothing to draw.
+    /// Converts every frame the node published, in the order its definition declares the
+    /// outputs, so which image stands where is a property of the node's schema rather
+    /// than of the order a dictionary happened to enumerate in. A frame this build
+    /// cannot convert is passed over: the node succeeded, and the shell draws one image
+    /// fewer than the node published rather than refusing the whole node.
     /// </summary>
-    private static MatFrameLease? SelectFrame(NodeOutputs outputs)
+    private List<RunPreview> Convert(NodeOutputs outputs)
     {
-        foreach (KeyValuePair<string, PortValue> published in outputs.Values.OrderBy(value => value.Key, StringComparer.Ordinal))
+        NodeDefinition? definition = _catalog.TryResolveLatest(outputs.NodeTypeId, out NodeDefinition? resolved)
+            ? resolved
+            : null;
+
+        // A definition the catalog no longer holds leaves the identifier, which is still
+        // worth more than an empty field.
+        string title = definition?.DisplayName ?? outputs.NodeTypeId.Value;
+
+        List<RunPreview> previews = [];
+
+        foreach ((string portId, MatFrameLease frame) in PublishedFrames(outputs, definition))
         {
-            if (published.Value is ImageFrameValue image && image.Lease is MatFrameLease frame)
+            PreviewFrame converted;
+            try
             {
-                return frame;
+                converted = _converter.Convert(frame);
             }
+            catch (NotSupportedException)
+            {
+                continue;
+            }
+
+            previews.Add(new RunPreview(
+                RunPreviewImage.Create(converted),
+                outputs.OperationId,
+                outputs.NodeInstanceId,
+                title,
+                portId,
+                definition?.FindPort(portId)?.DisplayName ?? portId,
+                converted.Width,
+                converted.Height,
+                converted.PixelFormat));
         }
 
-        return null;
+        return previews;
     }
 
-    /// <summary>Converts a frame and names the node that published it.</summary>
-    private RunPreview Convert(NodeOutputs outputs, MatFrameLease frame)
+    /// <summary>
+    /// The frames a node published, its declared outputs first and any port the
+    /// definition does not name after them, so a catalog that has moved on still shows
+    /// what the run produced.
+    /// </summary>
+    private static IEnumerable<(string PortId, MatFrameLease Frame)> PublishedFrames(
+        NodeOutputs outputs,
+        NodeDefinition? definition)
     {
-        PreviewFrame converted = _converter.Convert(frame);
+        IEnumerable<string> declared = definition is null ? [] : definition.Outputs.Select(port => port.Id);
+        IEnumerable<string> published = outputs.Values.Keys.OrderBy(key => key, StringComparer.Ordinal);
 
-        // A definition the catalog no longer holds leaves the identifier, which is
-        // still worth more than an empty field.
-        string title = _catalog.TryResolveLatest(outputs.NodeTypeId, out NodeDefinition? definition) && definition is not null
-            ? definition.DisplayName
-            : outputs.NodeTypeId.Value;
-
-        return new RunPreview(
-            RunPreviewImage.Create(converted),
-            outputs.OperationId,
-            outputs.NodeInstanceId,
-            title,
-            converted.Width,
-            converted.Height,
-            converted.PixelFormat);
+        foreach (string portId in declared.Concat(published).Distinct(StringComparer.Ordinal))
+        {
+            if (outputs.Values.TryGetValue(portId, out PortValue? value)
+                && value is ImageFrameValue { Lease: MatFrameLease frame })
+            {
+                yield return (portId, frame);
+            }
+        }
     }
 }

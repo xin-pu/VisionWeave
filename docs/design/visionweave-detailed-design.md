@@ -754,19 +754,29 @@ cancellation of each node that never started is not repeated as a condition per 
 because the run outcome already names the gesture.
 
 The preview is a seam rather than a call inside the command: `RunPreviewObserver`
-serves `IExecutionOutputObserver`, converts the first image output of a node while
-the runtime still owns the frame — the task it returns is the fence that keeps the
-lease alive — and hands a frozen copy to an `IRunPreviewPresenter`. Converts run
-where the run executes, so `IRunPreviewPresenter` decides where a preview may touch
-the bindings; the shell's implementation marshals to the window's dispatcher and
-waits, which keeps the run's completion ordered after the preview it produced.
-`PreviewViewModel` holds that copy, the node that published it, and its size and
-pixel layout, and it forgets all three when the document is replaced, because a
-preview of a document that is no longer open describes nothing. The region's note
-stands in for the image while nothing has run, so an empty frame never reads as a
-preview that failed to draw. The composite — a real image read from the document's
+serves `IExecutionOutputObserver`, converts every image a node published while the
+runtime still owns the frames — the task it returns is the fence that keeps the leases
+alive — and hands frozen copies to an `IRunPreviewPresenter`. Converts run where the run
+executes, so `IRunPreviewPresenter` decides where a preview may touch the bindings; the
+shell's implementation marshals to the window's dispatcher and waits, which keeps the
+run's completion ordered after the previews it produced. What a node publishes is a set
+rather than one image: the observer orders the images by the definition's output
+declaration rather than by the order a dictionary enumerated in, names each after the
+port it arrived on, and passes over a frame this build cannot convert — the node
+succeeded, so the region draws one image fewer rather than refusing the node.
+`PreviewViewModel` holds that set per node, and it forgets every set when the document
+is replaced, because a preview of a document that is no longer open describes nothing.
+The region draws one tile per image, each labelled with its output name — a node with a
+single image draws one tile and no name, because there is nothing to tell apart — each
+opening the full-size viewer titled after the node and the output, and the bounded
+gallery scrolls so a node with many outputs does not squeeze the work surface. The note
+stands in for the images while nothing has run, so an empty frame never reads as a
+preview that failed to draw. The composites — a real image read from the document's
 folder, resized, written beside it, drawn in the region, and stopped while a node is
-executing — is covered by the shell's own smoke test (10).
+executing; and a colour image split into its three channels, which draws three named
+tiles holding the pixels of their own channel — are covered by the shell's own smoke
+test (10), together with the data-binding audit that fails the shell for a binding it
+declared and did not resolve.
 
 ### 6.9 Run marks on the canvas as built
 
@@ -1062,7 +1072,7 @@ trusted code; sandboxing is a future feature, not an implied security boundary.
 | Persistence integration tests | Save/load round trip, malformed document rejection, migrations, missing-node placeholders, autosave policy validation. |
 | Architecture tests | Dependency direction, no WPF/OpenCV/host stack reference in Domain, and no host stack reference in any core assembly. |
 | Shell tests | The six documented regions and their named elements, token values and brush aliases, contrast of text and of the focus ring, no colour literal outside the token dictionary, every bound path resolvable through a public member, every declared key used and declared before it is reached for, the canvas wiring of items, wires, commands, and shortcuts, the inspector's field per declared kind and the gesture that applies what was typed, prompt questions and their three answers, status transitions including the four ways a run can end, and announcements by severity. |
-| UI smoke tests | The real window, drawn with the shipped theme: placing a node from the catalogue, connecting two ports, selecting, deleting, undo, redo, and the surface a refused connection leaves unchanged; editing a parameter, reading the condition a refused value earned, undoing and redoing one parameter edit as one unit, saving, opening the file again over unsaved changes and answering the prompt; opening a document this build must not write back, which is shown read-only and changes nothing when a gesture reaches it; and running a saved workflow over a real image — three nodes placed and wired by the gestures the canvas offers, the output file read back from the document's own folder, the newest published image drawn in the preview region with the note that stood in for it gone, the counts of the ledger flat, and a run stopped while a node is executing, which keeps the preview the source had already published, writes nothing, reports no condition, and returns both gestures to the state they started in. |
+| UI smoke tests | The real window, drawn with the shipped theme: placing a node from the catalogue, connecting two ports, selecting, deleting, undo, redo, and the surface a refused connection leaves unchanged; editing a parameter, reading the condition a refused value earned, undoing and redoing one parameter edit as one unit, saving, opening the file again over unsaved changes and answering the prompt; opening a document this build must not write back, which is shown read-only and changes nothing when a gesture reaches it; running a saved workflow over a real image — three nodes placed and wired by the gestures the canvas offers, the output file read back from the document's own folder, the newest published image drawn in the preview region with the note that stood in for it gone, the counts of the ledger flat, and a run stopped while a node is executing, which keeps the preview the source had already published, writes nothing, reports no condition, and returns both gestures to the state they started in; splitting a colour image, which draws one named tile per channel, each holding the pixels of its own channel and opening a viewer titled after the node and the output; and a pass over the states those flows reach that fails on any binding the shell declared and did not resolve, whether WPF reported it or left it to a control's template to fail silently. |
 
 Tests use xUnit and Shouldly. Test names use the form
 `Member_condition_expected_result`, e.g.
