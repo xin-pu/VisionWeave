@@ -27,7 +27,37 @@ before beginning visual UI work.
   and the [documentation map](docs/README.md).
 - `scripts/` — repeatable repository quality checks.
 
-## Run locally
+## Run a packaged build
+
+```powershell
+./scripts/Publish-Release.ps1
+```
+
+The one command that makes a package. It publishes a self-contained folder for
+64-bit Windows to `artifacts/VisionWeave-<version>-win-x64`, where the version is
+the one `Directory.Build.props` states and the assemblies in the folder carry it.
+Copy the folder anywhere on a Windows 10 or 11 x64 machine and run
+`VisionWeave.App.exe`: it holds the .NET runtime, the OpenCV native library, and
+the settings file, so the machine needs nothing else installed. It is deliberately
+not an installer, not signed, and not a single file
+([ADR-0014](docs/adr/0014-packaging.md)).
+
+A published folder can be asked to prove it starts instead of opening a window:
+
+```powershell
+$process = Start-Process -FilePath .\VisionWeave.App.exe -ArgumentList '--check' -Wait -PassThru -RedirectStandardOutput check.txt
+Get-Content check.txt
+$process.ExitCode
+```
+
+`--check` composes the host the way startup does, resolves the node catalogue,
+and runs one operation through OpenCV's native entry point, writing one line and
+exiting instead of opening a window. Exit code 0 means the build starts, 1 means
+the settings beside it were rejected, and 2 means the host or the native operation
+failed. CI runs the same switch against the folder it published, and uploads that
+folder as the `VisionWeave-win-x64` artifact.
+
+## Run from source
 
 ```powershell
 dotnet run --project src/VisionWeave.App

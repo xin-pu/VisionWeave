@@ -1,10 +1,25 @@
 <Project>
   <PropertyGroup>
+    <!-- The one version this repository states. It stamps every assembly and it
+         names the folder the publish script produces, so a package cannot claim a
+         version the assemblies do not carry. -->
+    <Version>0.1.0</Version>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>
+  </PropertyGroup>
+  <PropertyGroup>
+    <!-- What a packaged build is, declared once so `scripts/Publish-Release.ps1`
+         and the packaging test cannot drift into producing something other than
+         what this file describes (ADR-0014). MSBuild itself reads none of these
+         names, so they change no ordinary build. -->
+    <VisionWeavePublishProject>src/VisionWeave.App/VisionWeave.App.csproj</VisionWeavePublishProject>
+    <VisionWeavePublishConfiguration>Release</VisionWeavePublishConfiguration>
+    <VisionWeavePublishRuntimeIdentifier>win-x64</VisionWeavePublishRuntimeIdentifier>
+    <VisionWeavePublishSelfContained>true</VisionWeavePublishSelfContained>
+    <VisionWeavePublishOutputRoot>artifacts</VisionWeavePublishOutputRoot>
   </PropertyGroup>
   <ItemGroup>
     <CompilerVisibleProperty Include="RootNamespace" />

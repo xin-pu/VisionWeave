@@ -120,4 +120,5 @@ stable.
 - [ADR-0011: resource references and remembered port schemas](../adr/0011-resource-references-and-port-schema-snapshots.md)
 - [ADR-0012: file access and the working directory](../adr/0012-file-access-and-the-working-directory.md)
 - [ADR-0013: execution timing ownership](../adr/0013-execution-timing-ownership.md)
+- [ADR-0014: the shape of a package](../adr/0014-packaging.md)
 - [Project improvements ledger](../ledger/project-improvements.md)

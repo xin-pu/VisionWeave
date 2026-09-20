@@ -38,3 +38,73 @@ jobs:
       - name: Validate project documents
         shell: pwsh
         run: ./scripts/Test-ProjectDocuments.ps1
+
+  package:
+    # The artifact is worth downloading only when the build a maintainer would
+    # produce from the same commit has passed, so this job waits for the gate.
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Publish the Windows folder
+        shell: pwsh
+        run: ./scripts/Publish-Release.ps1
+
+      - name: Ask the published build to prove it starts
+        shell: pwsh
+        run: |
+          $folder = Get-ChildItem -Path artifacts -Directory | Select-Object -First 1
+
+          if ($null -eq $folder) {
+              throw 'The publish produced no folder under artifacts/.'
+          }
+
+          Write-Host "Checking $($folder.Name)"
+
+          foreach ($name in @('VisionWeave.App.exe', 'appsettings.json', 'OpenCvSharpExtern.dll')) {
+              if (-not (Test-Path -LiteralPath (Join-Path $folder.FullName $name) -PathType Leaf)) {
+                  throw "The published folder does not hold $name."
+              }
+          }
+
+          # The published folder is the one under test, not the build output: a
+          # self-contained folder is a different deployment of the same code, and
+          # only this run proves the native library and the settings file travelled.
+          $linePath = Join-Path $env:RUNNER_TEMP 'release-check.txt'
+          $errorPath = Join-Path $env:RUNNER_TEMP 'release-check-error.txt'
+
+          $process = Start-Process -FilePath (Join-Path $folder.FullName 'VisionWeave.App.exe') `
+              -ArgumentList '--check' -Wait -PassThru `
+              -RedirectStandardOutput $linePath -RedirectStandardError $errorPath
+
+          $line = Get-Content -LiteralPath $linePath -Raw
+          Write-Host $line
+
+          if ($process.ExitCode -ne 0) {
+              Get-Content -LiteralPath $errorPath
+              throw "The published build refused to start: exit code $($process.ExitCode)."
+          }
+
+          # The folder says which version it holds, and the assemblies in it have to
+          # agree, or the package is named after a version it does not carry.
+          $version = ($folder.Name -split '-')[1]
+
+          if ($line -notmatch [regex]::Escape($version)) {
+              throw "The folder is named after $version, but the build reported: $line"
+          }
+
+      - name: Upload the folder
+        uses: actions/upload-artifact@v4
+        with:
+          name: VisionWeave-win-x64
+          path: artifacts/
+          if-no-files-found: error
