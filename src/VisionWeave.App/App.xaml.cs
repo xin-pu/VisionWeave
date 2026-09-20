@@ -21,30 +21,33 @@ public partial class App : System.Windows.Application
     {
         base.OnStartup(e);
 
-        SettingsLoadResult load = VisionWeaveSettings.Load(AppContext.BaseDirectory);
-        if (!load.Succeeded)
+        // A published build can be asked to prove it starts instead of opening a
+        // window: the same composition, one native operation, one line, and a code.
+        if (ReleaseCheck.IsRequested(e.Args))
+        {
+            Shutdown(ReleaseCheck.Run(Console.Out, AppContext.BaseDirectory));
+            return;
+        }
+
+        HostStartup startup = HostStartup.Compose(AppContext.BaseDirectory);
+
+        if (startup.Services is null)
         {
             using ILoggerFactory bootstrapFactory = LoggerFactory.Create(
                 builder => builder.AddDebug().SetMinimumLevel(LogLevel.Information));
-            ReportRejectedSettings(bootstrapFactory.CreateLogger<App>(), load.Diagnostics);
+            ReportRejectedSettings(bootstrapFactory.CreateLogger<App>(), startup.Problems);
             Shutdown(1);
             return;
         }
 
-        VisionWeaveSettings settings = load.Settings!;
-        IReadOnlyList<NodeDiagnostic> problems = settings.Validate();
-
-        ServiceCollection services = new();
-        services.AddLogging(builder => builder.AddDebug().SetMinimumLevel(LogLevel.Information));
-        services.AddVisionWeave(settings);
-        _services = services.BuildServiceProvider();
+        _services = startup.Services;
 
         ILogger logger = _services.GetRequiredService<ILoggerFactory>().CreateLogger<App>();
-        LogSettings(logger, settings);
+        LogSettings(logger, startup.Settings!);
 
-        if (problems.Count > 0)
+        if (!startup.Succeeded)
         {
-            ReportRejectedSettings(logger, problems);
+            ReportRejectedSettings(logger, startup.Problems);
             Shutdown(1);
             return;
         }

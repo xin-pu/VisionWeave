@@ -13,7 +13,12 @@
   path of 6.8, the run marks of 6.9, and the tags the catalogue is filtered by; the
   node catalog holds every family section 8 has migrated, the contour pair of that
   section's sixth batch included, and the remaining node families and the minimap,
-  copy and paste, and automatic layout are not.
+  copy and paste, and automatic layout are not. The build is packaged as well:
+  `scripts/Publish-Release.ps1` produces the self-contained `win-x64` folder a user
+  runs, CI uploads that folder as an artifact, and `VisionWeave.App.exe --check`
+  turns "the folder was produced" into "the folder starts" (ADR-0014), while the
+  hand check of that folder on a machine without the SDK is outstanding
+  (PL-2026-024).
 - **Owner:** VisionWeave maintainers.
 - **Scope:** New WPF desktop application. This document does not prescribe an
   in-place migration of the legacy Aries solution.
@@ -1093,10 +1098,29 @@ must open the documented regions, and once with a settings file that holds
 rejected values, which must report `VW-CONFIG-001` and exit without opening a
 document.
 
+Packaging is checked in two places, and the split is deliberate. A packaging test
+in the architecture suite holds the settings the repository declares in
+`Directory.Build.props` — the publish project, the configuration, the runtime
+identifier, whether the runtime travels inside, and the output root — to the plan
+`scripts/Publish-Release.ps1` states, so the two cannot drift into a folder that is
+not the one the script claims to make; the same suite refuses a project that states
+a version of its own, since the folder is named after the one version the
+repository declares. The artifact's own check is the executable: `--check` composes
+the host the way startup does and runs one node through the native OpenCV entry
+point, and CI runs it against the published folder rather than the build output,
+because a self-contained folder is a different deployment of the same code and only
+that run proves the native library and the settings file travelled with it. A
+runner is not a clean Windows host and cannot see a window, so the stage's gate
+keeps one hand check: a maintainer starts a published folder on a machine with no
+SDK, sees the window, and records it in PL-2026-024.
+
 The initial CI command sequence is restore, build, test, format verification,
 and analyzer verification. `global.json`, `.editorconfig`, analyzer choices,
 and suppression records are all versioned. NuGet audit remains enabled;
-dependency versions are centralized in `Directory.Packages.props`.
+dependency versions are centralized in `Directory.Packages.props`. A `package` job
+runs that same publish command after the verification job passes and uploads the
+folder it produced, so a green build hands over a build a maintainer can try
+without building it.
 
 ## 11. Delivery plan
 
