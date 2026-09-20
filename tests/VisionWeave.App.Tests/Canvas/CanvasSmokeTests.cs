@@ -655,6 +655,23 @@ public sealed class CanvasSmokeTests
         shell.Preview.PreviewTitle.ShouldBe("Resize");
         shell.Preview.PreviewDetail.ShouldBe("16 × 8 pixels, Bgr24");
 
+        // Every node the run covered says so on the surface itself, with the time the
+        // run measured for it — the path from the runner's report to the node the user
+        // is looking at, driven through the window rather than asserted in pieces.
+        foreach (WorkflowNodeViewModel covered in canvas.Nodes)
+        {
+            covered.RunState.ShouldBe(NodeRunState.Succeeded);
+            covered.RunDetail.ShouldStartWith("Succeeded in ");
+            covered.Summary.ShouldContain(covered.RunDetail);
+        }
+
+        WorkflowNodeViewModel drawnNode = canvas.Nodes.Single(node => node.DisplayName == "Resize");
+        ItemContainer drawnContainer = Containers(window)
+            .Single(container => ReferenceEquals(container.DataContext, drawnNode));
+
+        Descendants<TextBlock>(drawnContainer)
+            .ShouldContain(block => block.Text == drawnNode.RunDetail);
+
         Image drawn = Descendants<Image>(Named<Border>(window, "PreviewRegion")).ShouldHaveSingleItem();
 
         // The region draws the preview's own image, and what it draws is a frozen copy:
@@ -676,6 +693,15 @@ public sealed class CanvasSmokeTests
         // A run the user stops: the other file name is what shows a stopped run wrote
         // nothing, and the hold is what makes the stop a moment this flow can act on.
         SetParameter(shell, save.InstanceId, OpenCvNodeIds.PathParameter, "stopped.png");
+        Lay(window);
+
+        // Editing the document is what makes the marks of the run before it untrue:
+        // the graph on screen is no longer the graph that ran, so a node stops claiming
+        // an outcome the edit may have changed.
+        canvas.Nodes.ShouldAllBe(node => node.RunState == null);
+        Descendants<TextBlock>(Containers(window).First())
+            .ShouldNotContain(block => block.Text == drawnNode.RunDetail);
+
         executors.Hold = true;
 
         Button cancel = Button(window, "_Cancel");
@@ -704,6 +730,15 @@ public sealed class CanvasSmokeTests
         System.IO.File.Exists(directory.PathOf("done.png")).ShouldBeTrue();
         shell.Status.Condition.ShouldBe(ShellStatus.NoConditionText);
         shell.Preview.PreviewTitle.ShouldBe("Image Source");
+
+        // The stopped run says where it stopped, on the surface: the node it was
+        // executing is named as cancelled and the one it never reached as not run,
+        // which is the reading a user wants from a graph they stopped.
+        canvas.Nodes.Single(node => node.DisplayName == "Image Source").RunState.ShouldBe(NodeRunState.Succeeded);
+        canvas.Nodes.Single(node => node.DisplayName == "Resize").RunState.ShouldBe(NodeRunState.Cancelled);
+        canvas.Nodes.Single(node => node.DisplayName == "Resize").RunDetail.ShouldBe("Cancelled");
+        canvas.Nodes.Single(node => node.DisplayName == "Save Image").RunState.ShouldBe(NodeRunState.NotRun);
+
         run.Command.CanExecute(null).ShouldBeTrue();
         cancel.Command.CanExecute(null).ShouldBeFalse();
         shell.Ledger.Outstanding.ShouldBe(0);

@@ -1,5 +1,6 @@
 ﻿using VisionWeave.App.Presentation;
 using VisionWeave.Application.Definitions;
+using VisionWeave.Application.Execution;
 using VisionWeave.Application.Validation;
 using VisionWeave.Contracts.Diagnostics;
 using VisionWeave.Contracts.Nodes;
@@ -24,18 +25,21 @@ internal static class CanvasProjection
     /// <param name="catalog">The catalog each node type is resolved against.</param>
     /// <param name="validation">The validation projection that answers for this document revision.</param>
     /// <param name="selection">The selected instances, which mark nodes without changing the document.</param>
+    /// <param name="run">The newest run, or <see langword="null"/> when nothing has run.</param>
     /// <returns>What the canvas draws.</returns>
     internal static CanvasProjectedDocument Project(
         WorkflowDocument document,
         NodeDefinitionCatalog catalog,
         ValidationProjection validation,
-        IReadOnlyList<Guid> selection)
+        IReadOnlyList<Guid> selection,
+        WorkflowRunSummary? run)
     {
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(validation);
         ArgumentNullException.ThrowIfNull(selection);
 
+        IReadOnlyDictionary<Guid, NodeRunMark> marks = RunMarks(document, run);
         HashSet<Guid> selected = [.. selection];
         List<WorkflowNodeViewModel> nodes = [];
         Dictionary<(Guid Node, string Port), PortViewModel> ports = [];
@@ -69,7 +73,8 @@ internal static class CanvasProjection
                 inputs,
                 outputs,
                 validation.SeverityOf(instance.InstanceId),
-                Describe(validation.DiagnosticsFor(instance.InstanceId)))
+                Describe(validation.DiagnosticsFor(instance.InstanceId)),
+                marks.GetValueOrDefault(instance.InstanceId))
             {
                 IsSelected = selected.Contains(instance.InstanceId),
             };
@@ -137,6 +142,38 @@ internal static class CanvasProjection
         {
             yield return (entry.PortId, entry.DisplayName ?? entry.PortId, entry.Direction);
         }
+    }
+
+    /// <summary>
+    /// Reads the newest run as a mark for each node of the document on screen. A run
+    /// describes one execution of one revision, so a summary of another document, or
+    /// of a revision this one has moved past, marks nothing: the graph that ran is
+    /// not the graph being drawn, and a mark left standing would report a failure an
+    /// edit has since fixed. A node the run never covered — one that is switched off,
+    /// or one this build cannot resolve — has no mark either, rather than being
+    /// reported as a node the run skipped.
+    /// </summary>
+    /// <param name="document">The document being drawn.</param>
+    /// <param name="run">The newest run, or <see langword="null"/>.</param>
+    /// <returns>A mark per instance the run covered.</returns>
+    private static IReadOnlyDictionary<Guid, NodeRunMark> RunMarks(WorkflowDocument document, WorkflowRunSummary? run)
+    {
+        Dictionary<Guid, NodeRunMark> marks = [];
+
+        if (run is null || run.DocumentId != document.Id || run.Revision != document.Revision)
+        {
+            return marks;
+        }
+
+        foreach (NodeRunReport report in run.Nodes)
+        {
+            marks[report.NodeInstanceId] = new NodeRunMark(
+                report.State,
+                report.Duration,
+                Describe(report.Diagnostics));
+        }
+
+        return marks;
     }
 
     /// <summary>

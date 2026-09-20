@@ -181,6 +181,37 @@ public sealed class ShellStatusTests : IDisposable
         status.RunOutcome.ShouldBe("Not run: the workflow has not been saved yet");
     }
 
+    [Fact]
+    public void The_newest_run_is_kept_for_the_surfaces_that_mark_their_nodes_with_it()
+    {
+        ShellStatus status = new(TestSessions.Create());
+        WorkflowRunSummary summary = Run();
+
+        status.BeginRun();
+        status.LastRun.ShouldBeNull("a run in flight has no report yet, so the canvas has none to draw.");
+
+        status.ReportRun(summary);
+
+        status.LastRun.ShouldBeSameAs(summary);
+    }
+
+    [Fact]
+    public void A_run_that_never_started_leaves_no_run_to_mark_anything_with()
+    {
+        ShellStatus status = new(TestSessions.Create());
+        status.ReportRun(Run());
+
+        // A refusal is a state rather than a history, exactly as the readout is: the
+        // marks of the run before it describe work the user asked for again and did
+        // not get.
+        status.BeginRun();
+        status.LastRun.ShouldBeNull();
+
+        status.ReportRun(Run());
+        status.ReportRunRefused("the document reports 1 condition");
+        status.LastRun.ShouldBeNull();
+    }
+
     /// <inheritdoc />
     public void Dispose() => _directory.Dispose();
 

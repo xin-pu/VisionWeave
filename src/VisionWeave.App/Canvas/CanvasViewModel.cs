@@ -85,6 +85,11 @@ internal sealed partial class CanvasViewModel : ObservableObject
         // anywhere in the shell, including an undo, redraws this surface.
         _session.PropertyChanged += OnSessionPropertyChanged;
 
+        // A run is not an edit: it changes nothing the document holds, so its report
+        // arrives through the status area instead, and what the run did to a node is
+        // read from there like every other thing the projection draws.
+        _status.PropertyChanged += OnStatusPropertyChanged;
+
         Rebuild();
     }
 
@@ -284,7 +289,8 @@ internal sealed partial class CanvasViewModel : ObservableObject
             _session.Document,
             _catalog,
             _session.Projection,
-            _session.Selection);
+            _session.Selection,
+            _status.LastRun);
 
         foreach (WorkflowNodeViewModel node in projected.Nodes)
         {
@@ -362,6 +368,19 @@ internal sealed partial class CanvasViewModel : ObservableObject
             case nameof(EditorSession.CanRedo):
                 RedoCommand.NotifyCanExecuteChanged();
                 break;
+        }
+    }
+
+    /// <summary>
+    /// Redraws when a run reports what it did. The marks of the run before it were
+    /// cleared when the new run started, and the summary that replaces them marks
+    /// nothing unless it describes the document and revision on screen.
+    /// </summary>
+    private void OnStatusPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ShellStatus.LastRun))
+        {
+            Rebuild();
         }
     }
 
