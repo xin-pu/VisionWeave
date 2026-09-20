@@ -76,10 +76,11 @@ public sealed class MainWindowViewModelTests : IDisposable
     {
         Shell shell = Create(_directory.SaveReadableDocument(), OpenCvCatalog());
 
-        shell.ViewModel.NodeCatalogSummary.ShouldBe("25 node types available");
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("38 node types available");
         shell.ViewModel.CatalogueGroups.Select(group => group.Category)
             .ShouldBe(
             [
+                OpenCvNodeIds.ChannelCategory,
                 OpenCvNodeIds.ContoursCategory,
                 OpenCvNodeIds.DrawCategory,
                 OpenCvNodeIds.FilterCategory,
@@ -89,10 +90,12 @@ public sealed class MainWindowViewModelTests : IDisposable
                 OpenCvNodeIds.TransformCategory,
             ]);
         shell.ViewModel.CatalogueGroups[0].Entries.Select(entry => entry.DisplayName)
-            .ShouldBe(["Find Contours"]);
+            .ShouldBe(["Extract Channel", "Merge Channels", "Split Channels"]);
         shell.ViewModel.CatalogueGroups[1].Entries.Select(entry => entry.DisplayName)
-            .ShouldBe(["Draw Circle", "Draw Contours", "Draw Line", "Draw Rectangle"]);
+            .ShouldBe(["Find Contours"]);
         shell.ViewModel.CatalogueGroups[2].Entries.Select(entry => entry.DisplayName)
+            .ShouldBe(["Draw Circle", "Draw Contours", "Draw Line", "Draw Rectangle"]);
+        shell.ViewModel.CatalogueGroups[3].Entries.Select(entry => entry.DisplayName)
             .ShouldBe(
             [
                 "Bilateral Filter",
@@ -102,16 +105,32 @@ public sealed class MainWindowViewModelTests : IDisposable
                 "Laplacian",
                 "Median Blur",
                 "Scharr",
+                "Sharpen",
                 "Sobel",
             ]);
-        shell.ViewModel.CatalogueGroups[3].Entries.Select(entry => entry.DisplayName)
-            .ShouldBe(["Image Source", "Save Image"]);
         shell.ViewModel.CatalogueGroups[4].Entries.Select(entry => entry.DisplayName)
-            .ShouldBe(["Dilate", "Erode", "Morphology Ex"]);
+            .ShouldBe(["Image Source", "Save Image"]);
         shell.ViewModel.CatalogueGroups[5].Entries.Select(entry => entry.DisplayName)
-            .ShouldBe(["Adaptive Threshold", "Threshold"]);
+            .ShouldBe(["Dilate", "Erode", "Morphology Ex"]);
         shell.ViewModel.CatalogueGroups[6].Entries.Select(entry => entry.DisplayName)
-            .ShouldBe(["Colour Conversion", "Crop", "Pyramid Down", "Pyramid Up", "Resize"]);
+            .ShouldBe(["Adaptive Threshold", "In Range", "Threshold"]);
+        shell.ViewModel.CatalogueGroups[7].Entries.Select(entry => entry.DisplayName)
+            .ShouldBe(
+            [
+                "Add Border",
+                "Bitwise Not",
+                "Brightness / Contrast",
+                "Colour Conversion",
+                "Crop",
+                "Equalize Histogram",
+                "Flip",
+                "Normalize",
+                "Pyramid Down",
+                "Pyramid Up",
+                "Resize",
+                "Rotate",
+                "Transpose",
+            ]);
     }
 
     [Fact]
@@ -352,7 +371,7 @@ public sealed class MainWindowViewModelTests : IDisposable
             .ShouldBe([OpenCvNodeIds.FilterCategory]);
         shell.ViewModel.CatalogueGroups[0].Entries.Select(entry => entry.DisplayName)
             .ShouldBe(["Blur", "Gaussian Blur", "Median Blur"]);
-        shell.ViewModel.NodeCatalogSummary.ShouldBe("3 of 25 node types match “blur”");
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("3 of 38 node types match “blur”");
         shell.ViewModel.CatalogueNotice.ShouldBeEmpty();
     }
 
@@ -378,7 +397,7 @@ public sealed class MainWindowViewModelTests : IDisposable
         // so the region explains itself instead.
         shell.ViewModel.CatalogueGroups.ShouldBeEmpty();
         shell.ViewModel.CatalogueNotice.ShouldBe("No node type matches this search.");
-        shell.ViewModel.NodeCatalogSummary.ShouldBe("0 of 25 node types match “nothing-like-this”");
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("0 of 38 node types match “nothing-like-this”");
     }
 
     [Fact]
@@ -389,8 +408,8 @@ public sealed class MainWindowViewModelTests : IDisposable
 
         shell.ViewModel.CatalogueSearch = string.Empty;
 
-        shell.ViewModel.CatalogueGroups.Count.ShouldBe(7);
-        shell.ViewModel.NodeCatalogSummary.ShouldBe("25 node types available");
+        shell.ViewModel.CatalogueGroups.Count.ShouldBe(8);
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("38 node types available");
         shell.ViewModel.CatalogueNotice.ShouldBeEmpty();
     }
 
@@ -427,8 +446,8 @@ public sealed class MainWindowViewModelTests : IDisposable
         shell.ViewModel.CatalogueGroups.Select(group => group.Category)
             .ShouldBe([OpenCvNodeIds.TransformCategory]);
         shell.ViewModel.CatalogueGroups[0].Entries.Select(entry => entry.DisplayName)
-            .ShouldBe(["Crop", "Pyramid Down", "Pyramid Up", "Resize"]);
-        shell.ViewModel.NodeCatalogSummary.ShouldBe("4 of 25 node types carry the “geometry” tag");
+            .ShouldBe(["Add Border", "Crop", "Flip", "Pyramid Down", "Pyramid Up", "Resize", "Rotate", "Transpose"]);
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("8 of 38 node types carry the “geometry” tag");
         shell.ViewModel.CatalogueNotice.ShouldBeEmpty();
     }
 
@@ -448,7 +467,7 @@ public sealed class MainWindowViewModelTests : IDisposable
             .ShouldBe(["Find Contours"]);
         shell.ViewModel.CatalogueGroups[1].Entries.Select(entry => entry.DisplayName)
             .ShouldBe(["Draw Contours"]);
-        shell.ViewModel.NodeCatalogSummary.ShouldBe("2 of 25 node types carry the “contour” tag");
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("2 of 38 node types carry the “contour” tag");
     }
 
     [Fact]
@@ -462,8 +481,8 @@ public sealed class MainWindowViewModelTests : IDisposable
         shell.ViewModel.ToggleTagCommand.Execute(OpenCvNodeTags.Threshold);
 
         shell.ViewModel.CatalogueGroups.ShouldHaveSingleItem().Entries.Select(entry => entry.DisplayName)
-            .ShouldBe(["Adaptive Threshold", "Threshold"]);
-        shell.ViewModel.NodeCatalogSummary.ShouldBe("2 of 25 node types carry the “mask” and “threshold” tags");
+            .ShouldBe(["Adaptive Threshold", "In Range", "Threshold"]);
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("3 of 38 node types carry the “mask” and “threshold” tags");
     }
 
     [Fact]
@@ -476,7 +495,7 @@ public sealed class MainWindowViewModelTests : IDisposable
 
         shell.ViewModel.CatalogueGroups.ShouldHaveSingleItem().Entries.Select(entry => entry.DisplayName)
             .ShouldBe(["Canny"]);
-        shell.ViewModel.NodeCatalogSummary.ShouldBe("1 of 25 node types carry the “mask” tag and match “canny”");
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("1 of 38 node types carry the “mask” tag and match “canny”");
     }
 
     [Fact]
@@ -489,7 +508,7 @@ public sealed class MainWindowViewModelTests : IDisposable
 
         shell.ViewModel.CatalogueGroups.ShouldBeEmpty();
         shell.ViewModel.CatalogueNotice.ShouldBe("No node type carries the “file” tag and matches this search.");
-        shell.ViewModel.NodeCatalogSummary.ShouldBe("0 of 25 node types carry the “file” tag and match “blur”");
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("0 of 38 node types carry the “file” tag and match “blur”");
     }
 
     [Fact]
@@ -500,8 +519,8 @@ public sealed class MainWindowViewModelTests : IDisposable
         shell.ViewModel.ToggleTagCommand.Execute(OpenCvNodeTags.Edges);
         shell.ViewModel.ToggleTagCommand.Execute(OpenCvNodeTags.Edges);
 
-        shell.ViewModel.CatalogueGroups.Count.ShouldBe(7);
-        shell.ViewModel.NodeCatalogSummary.ShouldBe("25 node types available");
+        shell.ViewModel.CatalogueGroups.Count.ShouldBe(8);
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("38 node types available");
         shell.ViewModel.CatalogueTags[0].IsSelected.ShouldBeTrue();
     }
 
@@ -513,7 +532,7 @@ public sealed class MainWindowViewModelTests : IDisposable
 
         shell.ViewModel.ToggleTagCommand.Execute(null);
 
-        shell.ViewModel.CatalogueGroups.Count.ShouldBe(7);
+        shell.ViewModel.CatalogueGroups.Count.ShouldBe(8);
         shell.ViewModel.CatalogueTags[0].IsSelected.ShouldBeTrue();
         shell.ViewModel.CatalogueTags.ShouldAllBe(chip => chip.IsSelected == (chip.Tag == null));
         shell.ViewModel.CatalogueNotice.ShouldBeEmpty();

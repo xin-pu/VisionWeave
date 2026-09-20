@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using VisionWeave.App.Commands;
+using VisionWeave.App.Inspector;
 using VisionWeave.App.Composition;
 using VisionWeave.App.Notifications;
 using VisionWeave.App.Preview;
@@ -81,7 +82,8 @@ public partial class App : System.Windows.Application
                 _services.GetRequiredService<PreviewViewModel>(),
                 fileChooser,
                 new ShellPromptViewModel(),
-                status),
+                status,
+                _services.GetRequiredService<IParameterPathChooser>()),
             _services.GetRequiredService<SnackbarNotificationPresenter>());
 
         MainWindow = shell;

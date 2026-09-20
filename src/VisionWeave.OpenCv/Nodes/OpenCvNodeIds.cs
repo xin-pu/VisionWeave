@@ -26,6 +26,45 @@ public static class OpenCvNodeIds
     /// <summary>The node type that converts a frame between colour spaces.</summary>
     public const string CvtColorTypeId = "visionweave.opencv.cvt-color";
 
+    /// <summary>The node type that normalizes pixel values into a requested range.</summary>
+    public const string NormalizeTypeId = "visionweave.opencv.normalize";
+
+    /// <summary>The node type that applies a linear brightness and contrast conversion.</summary>
+    public const string ConvertScaleAbsTypeId = "visionweave.opencv.convert-scale-abs";
+
+    /// <summary>The node type that mirrors a frame around one or both axes.</summary>
+    public const string FlipTypeId = "visionweave.opencv.flip";
+
+    /// <summary>The node type that sharpens edges with a convolution kernel.</summary>
+    public const string SharpenTypeId = "visionweave.opencv.sharpen";
+
+    /// <summary>The node type that keeps pixels inside an inclusive range.</summary>
+    public const string InRangeTypeId = "visionweave.opencv.in-range";
+
+    /// <summary>The node type that inverts every bit of every pixel.</summary>
+    public const string BitwiseNotTypeId = "visionweave.opencv.bitwise-not";
+
+    /// <summary>The node type that equalizes a grayscale histogram.</summary>
+    public const string EqualizeHistTypeId = "visionweave.opencv.equalize-hist";
+
+    /// <summary>The node type that rotates a frame around its centre.</summary>
+    public const string RotateTypeId = "visionweave.opencv.rotate";
+
+    /// <summary>The node type that separates a BGR image into three grayscale channels.</summary>
+    public const string SplitChannelsTypeId = "visionweave.opencv.split-channels";
+
+    /// <summary>The node type that combines three grayscale channels into a BGR image.</summary>
+    public const string MergeChannelsTypeId = "visionweave.opencv.merge-channels";
+
+    /// <summary>The node type that extracts one channel from an image.</summary>
+    public const string ExtractChannelTypeId = "visionweave.opencv.extract-channel";
+
+    /// <summary>The node type that adds pixels around the edge of an image.</summary>
+    public const string CopyMakeBorderTypeId = "visionweave.opencv.copy-make-border";
+
+    /// <summary>The node type that exchanges the rows and columns of an image.</summary>
+    public const string TransposeTypeId = "visionweave.opencv.transpose";
+
     /// <summary>The node type that keeps one rectangle of a frame.</summary>
     public const string CropTypeId = "visionweave.opencv.crop";
 
@@ -101,6 +140,45 @@ public static class OpenCvNodeIds
     /// <summary>The executor registration of the colour conversion node.</summary>
     public const string CvtColorExecutorTypeId = "visionweave.opencv.executor.cvt-color";
 
+    /// <summary>The executor registration of the normalize node.</summary>
+    public const string NormalizeExecutorTypeId = "visionweave.opencv.executor.normalize";
+
+    /// <summary>The executor registration of the linear conversion node.</summary>
+    public const string ConvertScaleAbsExecutorTypeId = "visionweave.opencv.executor.convert-scale-abs";
+
+    /// <summary>The executor registration of the flip node.</summary>
+    public const string FlipExecutorTypeId = "visionweave.opencv.executor.flip";
+
+    /// <summary>The executor registration of the sharpen node.</summary>
+    public const string SharpenExecutorTypeId = "visionweave.opencv.executor.sharpen";
+
+    /// <summary>The executor registration of the in-range node.</summary>
+    public const string InRangeExecutorTypeId = "visionweave.opencv.executor.in-range";
+
+    /// <summary>The executor registration of the bitwise-not node.</summary>
+    public const string BitwiseNotExecutorTypeId = "visionweave.opencv.executor.bitwise-not";
+
+    /// <summary>The executor registration of the histogram equalization node.</summary>
+    public const string EqualizeHistExecutorTypeId = "visionweave.opencv.executor.equalize-hist";
+
+    /// <summary>The executor registration of the rotate node.</summary>
+    public const string RotateExecutorTypeId = "visionweave.opencv.executor.rotate";
+
+    /// <summary>The executor registration of the channel split node.</summary>
+    public const string SplitChannelsExecutorTypeId = "visionweave.opencv.executor.split-channels";
+
+    /// <summary>The executor registration of the channel merge node.</summary>
+    public const string MergeChannelsExecutorTypeId = "visionweave.opencv.executor.merge-channels";
+
+    /// <summary>The executor registration of the channel extraction node.</summary>
+    public const string ExtractChannelExecutorTypeId = "visionweave.opencv.executor.extract-channel";
+
+    /// <summary>The executor registration of the border node.</summary>
+    public const string CopyMakeBorderExecutorTypeId = "visionweave.opencv.executor.copy-make-border";
+
+    /// <summary>The executor registration of the transpose node.</summary>
+    public const string TransposeExecutorTypeId = "visionweave.opencv.executor.transpose";
+
     /// <summary>The executor registration of the crop node.</summary>
     public const string CropExecutorTypeId = "visionweave.opencv.executor.crop";
 
@@ -173,6 +251,24 @@ public static class OpenCvNodeIds
     /// <summary>The identifier of the image the colour conversion node publishes.</summary>
     public const string ConvertedPortId = "converted";
 
+    /// <summary>The identifier of a normalized image output.</summary>
+    public const string NormalizedPortId = "normalized";
+
+    /// <summary>The identifier of a mirrored image output.</summary>
+    public const string FlippedPortId = "flipped";
+
+    /// <summary>The identifier of an image produced by the additional Aries operations.</summary>
+    public const string ResultPortId = "result";
+
+    /// <summary>The blue image channel port.</summary>
+    public const string BlueChannelPortId = "blue";
+
+    /// <summary>The green image channel port.</summary>
+    public const string GreenChannelPortId = "green";
+
+    /// <summary>The red image channel port.</summary>
+    public const string RedChannelPortId = "red";
+
     /// <summary>The identifier of the image the crop node publishes.</summary>
     public const string CroppedPortId = "cropped";
 
@@ -233,6 +329,45 @@ public static class OpenCvNodeIds
 
     /// <summary>The colour conversion the colour conversion node performs.</summary>
     public const string ConversionParameter = "conversion";
+
+    /// <summary>The multiplier used by a numeric image conversion.</summary>
+    public const string AlphaParameter = "alpha";
+
+    /// <summary>The offset or upper range used by an image conversion.</summary>
+    public const string BetaParameter = "beta";
+
+    /// <summary>The axis or axes around which a frame is mirrored.</summary>
+    public const string FlipModeParameter = "flipMode";
+
+    /// <summary>The inclusive low pixel value of a range.</summary>
+    public const string LowerParameter = "lower";
+
+    /// <summary>The inclusive high pixel value of a range.</summary>
+    public const string UpperParameter = "upper";
+
+    /// <summary>The clockwise angle of a geometric rotation.</summary>
+    public const string AngleParameter = "angle";
+
+    /// <summary>The channel selected by a channel extraction node.</summary>
+    public const string ChannelParameter = "channel";
+
+    /// <summary>The number of rows added above an image.</summary>
+    public const string TopParameter = "top";
+
+    /// <summary>The number of rows added below an image.</summary>
+    public const string BottomParameter = "bottom";
+
+    /// <summary>The number of columns added to the left of an image.</summary>
+    public const string LeftParameter = "left";
+
+    /// <summary>The number of columns added to the right of an image.</summary>
+    public const string RightParameter = "right";
+
+    /// <summary>The rule used to fill an added border.</summary>
+    public const string BorderTypeParameter = "borderType";
+
+    /// <summary>The intensity used by a constant border.</summary>
+    public const string BorderValueParameter = "borderValue";
 
     /// <summary>The left edge of a rectangle the node keeps or marks.</summary>
     public const string XParameter = "x";
@@ -354,6 +489,33 @@ public static class OpenCvNodeIds
     /// <summary>The option that converts a BGR frame to CIELAB.</summary>
     public const string ConversionLab = "lab";
 
+    /// <summary>Mirror a frame from left to right.</summary>
+    public const string FlipHorizontal = "horizontal";
+
+    /// <summary>Mirror a frame from top to bottom.</summary>
+    public const string FlipVertical = "vertical";
+
+    /// <summary>Mirror a frame around both axes.</summary>
+    public const string FlipBoth = "both";
+
+    /// <summary>The blue channel option.</summary>
+    public const string ChannelBlue = "blue";
+
+    /// <summary>The green channel option.</summary>
+    public const string ChannelGreen = "green";
+
+    /// <summary>The red channel option.</summary>
+    public const string ChannelRed = "red";
+
+    /// <summary>Fill a border with one constant intensity.</summary>
+    public const string BorderConstant = "constant";
+
+    /// <summary>Repeat the nearest edge pixel into the border.</summary>
+    public const string BorderReplicate = "replicate";
+
+    /// <summary>Reflect pixels across the image edge.</summary>
+    public const string BorderReflect = "reflect";
+
     /// <summary>The threshold rule that keeps the pixels above the threshold.</summary>
     public const string ThresholdBinary = "binary";
 
@@ -433,6 +595,9 @@ public static class OpenCvNodeIds
     /// <summary>The category of nodes that find or draw the boundary of a shape.</summary>
     public const string ContoursCategory = "Contours";
 
+    /// <summary>The category of nodes that separate or combine image channels.</summary>
+    public const string ChannelCategory = "Channel";
+
     /// <summary>The interpolation options the resize node accepts, in the order the editor shows them.</summary>
     public static IReadOnlyList<string> InterpolationOptions { get; } =
     [
@@ -449,6 +614,30 @@ public static class OpenCvNodeIds
         ConversionRgb,
         ConversionHsv,
         ConversionLab,
+    ];
+
+    /// <summary>The axes the flip node accepts.</summary>
+    public static IReadOnlyList<string> FlipModeOptions { get; } =
+    [
+        FlipHorizontal,
+        FlipVertical,
+        FlipBoth,
+    ];
+
+    /// <summary>The channels an extraction node accepts.</summary>
+    public static IReadOnlyList<string> ChannelOptions { get; } =
+    [
+        ChannelBlue,
+        ChannelGreen,
+        ChannelRed,
+    ];
+
+    /// <summary>The border rules the border node accepts.</summary>
+    public static IReadOnlyList<string> BorderTypeOptions { get; } =
+    [
+        BorderConstant,
+        BorderReplicate,
+        BorderReflect,
     ];
 
     /// <summary>The threshold rules the threshold node accepts, in the order the editor shows them.</summary>

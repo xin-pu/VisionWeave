@@ -36,9 +36,9 @@ public sealed class ShellMarkupTests
     /// <summary>
     /// The objects the shell's markup binds against: the window's view model, the
     /// regions it presents — the status area, the inspector, the preview, and the
-    /// prompt — the command the run actions share, the records the catalogue is
-    /// drawn from, and the types the canvas and inspector templates take as their
-    /// data context.
+    /// prompt — the command the run actions share, the records the catalogue and the
+    /// preview tiles are drawn from, and the types the canvas and inspector templates
+    /// take as their data context.
     /// </summary>
     private static readonly Type[] BindingRoots =
     [
@@ -50,6 +50,7 @@ public sealed class ShellMarkupTests
         typeof(ShellPromptViewModel),
         typeof(RunWorkflowCommand),
         typeof(PreviewViewModel),
+        typeof(PreviewImage),
         typeof(ShellCatalogueGroup),
         typeof(ShellCatalogueEntry),
         typeof(ShellCatalogueTag),
@@ -165,6 +166,7 @@ public sealed class ShellMarkupTests
             .Load(PathOf("MainWindow.xaml"))
             .Descendants()
             .Where(element => element.Name.LocalName == "KeyBinding")
+            .Where(element => (string?)element.Attribute("Key") != "Enter")
             .ToDictionary(
                 element => (string)element.Attribute("Key")!,
                 element => ((string?)element.Attribute("Modifiers"), (string?)element.Attribute("Command")));
@@ -265,16 +267,26 @@ public sealed class ShellMarkupTests
     {
         XElement inspector = Region("InspectorRegion");
 
-        // Text, a switch, and a list of options are three projections of one
+        // Text, number, path, switch, and option controls are projections of one
         // parameter; the declared kind picks one of them, so the region never shows
         // two ways of editing the same value.
         string markup = inspector.ToString();
 
         markup.ShouldContain("IsBoolean");
+        markup.ShouldContain("IsNumeric");
+        markup.ShouldContain("IsPath");
         markup.ShouldContain("HasOptions");
+        markup.ShouldContain("NumberBox");
+        markup.ShouldContain("BrowseCommand");
         markup.ShouldContain("{Binding IsChecked}");
         markup.ShouldContain("{Binding SelectedOption}");
         markup.ShouldContain("{Binding Options}");
+
+        XElement options = inspector.Descendants().Single(element => element.Name.LocalName == "ComboBox");
+        options.Attribute("Style").ShouldBeNull();
+        options.Attribute("Foreground").ShouldBeNull();
+        options.Attribute("Background").ShouldBeNull();
+        options.Attribute("BorderBrush").ShouldBeNull();
 
         // A value that has to be typed in is applied with Enter. The gesture is
         // written inside the field's own template, so it resolves against the field
@@ -282,7 +294,7 @@ public sealed class ShellMarkupTests
         // to commit what it holds.
         XElement keys = inspector
             .Descendants()
-            .Single(element => element.Name.LocalName.EndsWith(".InputBindings", StringComparison.Ordinal));
+            .First(element => element.Name.LocalName.EndsWith(".InputBindings", StringComparison.Ordinal));
 
         keys.Name.LocalName.ShouldBe("TextBox.InputBindings");
 
@@ -339,7 +351,7 @@ public sealed class ShellMarkupTests
     }
 
     [Fact]
-    public void The_preview_region_draws_the_newest_image_a_run_published()
+    public void The_preview_region_draws_every_image_of_the_selected_node_and_opens_each_on_click()
     {
         XElement preview = Region("PreviewRegion");
 
@@ -353,11 +365,35 @@ public sealed class ShellMarkupTests
         Texts(preview).ShouldContain("{Binding Preview.PreviewDetail}");
         Texts(preview).ShouldContain("{Binding Preview.PreviewNotice}");
 
-        XElement image = preview
+        // The images are the set the node published rather than one image the region
+        // chose, so they are drawn as a list the view model fills.
+        XElement gallery = preview
             .Descendants()
-            .Single(element => element.Name.LocalName == "Image");
+            .Single(element => (string?)element.Attribute("ItemsSource") == "{Binding Preview.Images}");
+        XElement tile = gallery
+            .Descendants()
+            .Single(element => element.Name.LocalName == "DataTemplate");
 
-        AttributeText(image, "Source").ShouldBe("{Binding Preview.Image}");
+        AttributeText(tile, "DataType").ShouldBe("preview:PreviewImage");
+
+        XElement image = tile.Descendants().Single(element => element.Name.LocalName == "Image");
+
+        AttributeText(image, "Source").ShouldBe("{Binding Image}");
+
+        // A node that split an image into channels has to say which tile is which, and a
+        // node with one image has nothing to say, so the label is the port name bound to
+        // the one state that shows it.
+        XElement label = tile
+            .Descendants()
+            .Single(element => (string?)element.Attribute("Text") == "{Binding Label}");
+
+        AttributeText(label, "Visibility").ShouldBe("{Binding ShowsLabel, Converter={StaticResource BooleanToVisibilityConverter}}");
+
+        XElement imageButton = tile
+            .Descendants()
+            .Single(element => element.Name.LocalName == "PreviewImageButton");
+        AttributeText(imageButton, "ImageSource").ShouldBe("{Binding Image}");
+        AttributeText(imageButton, "ImageTitle").ShouldBe("{Binding Caption}");
 
         // The notice is the one part of the region that is a state rather than a
         // value, so it is the part that shows and hides with the state behind it.

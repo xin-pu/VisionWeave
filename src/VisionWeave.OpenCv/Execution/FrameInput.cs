@@ -21,14 +21,22 @@ internal static class FrameInput
     /// <param name="failure">The diagnostic to report when the input is unusable.</param>
     /// <returns><see langword="true"/> when the frame was read.</returns>
     internal static bool TryRead(NodeExecutionRequest request, out MatFrameLease frame, out NodeDiagnostic? failure)
+        => TryRead(request, OpenCvNodeIds.ImagePortId, out frame, out failure);
+
+    /// <summary>Tries to read an image frame from a specifically named input port.</summary>
+    internal static bool TryRead(
+        NodeExecutionRequest request,
+        string portId,
+        out MatFrameLease frame,
+        out NodeDiagnostic? failure)
     {
-        if (!request.Inputs.TryGetValue(OpenCvNodeIds.ImagePortId, out PortValue? value)
+        if (!request.Inputs.TryGetValue(portId, out PortValue? value)
             || value is not ImageFrameValue image)
         {
             frame = null!;
             failure = Rejected(
                 request,
-                $"The input port '{OpenCvNodeIds.ImagePortId}' is not bound to an image frame.");
+                $"The input port '{portId}' is not bound to an image frame.");
             return false;
         }
 
@@ -37,7 +45,7 @@ internal static class FrameInput
             frame = null!;
             failure = Rejected(
                 request,
-                $"The image frame of input port '{OpenCvNodeIds.ImagePortId}' was not created by the OpenCV layer.");
+                $"The image frame of input port '{portId}' was not created by the OpenCV layer.");
             return false;
         }
 

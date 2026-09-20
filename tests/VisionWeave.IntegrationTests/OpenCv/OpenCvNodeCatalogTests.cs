@@ -38,6 +38,19 @@ public sealed class OpenCvNodeCatalogTests
         catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.GaussianBlurTypeId));
         catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.ResizeTypeId));
         catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.CvtColorTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.NormalizeTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.ConvertScaleAbsTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.FlipTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.SharpenTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.InRangeTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.BitwiseNotTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.EqualizeHistTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.RotateTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.SplitChannelsTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.MergeChannelsTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.ExtractChannelTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.CopyMakeBorderTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.TransposeTypeId));
         catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.CropTypeId));
         catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.MedianBlurTypeId));
         catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.ThresholdTypeId));
@@ -74,16 +87,15 @@ public sealed class OpenCvNodeCatalogTests
         foreach (NodeDefinition definition in Definitions)
         {
             definition.Ports.ShouldNotBeEmpty($"{definition.TypeId} declares no port, so it can neither receive nor publish a value.");
-            definition.Inputs.Count().ShouldBeLessThanOrEqualTo(2, $"{definition.TypeId} declares more inputs than the values it can receive.");
-            definition.Outputs.Count().ShouldBeLessThanOrEqualTo(1, $"{definition.TypeId} declares more than one output.");
+            definition.Inputs.Count().ShouldBeLessThanOrEqualTo(3, $"{definition.TypeId} declares more inputs than the values it can receive.");
+            definition.Outputs.Count().ShouldBeLessThanOrEqualTo(3, $"{definition.TypeId} declares more outputs than the values it can publish.");
 
-            // One value of each type per direction, because a port carries one value and
-            // two ports of the same type and direction could not be told apart by a
-            // consumer that resolves an input by its type.
+            // Port identifiers, rather than value types, distinguish channels. This
+            // permits split and merge nodes while keeping every connection unambiguous.
             foreach (IGrouping<PortDirection, PortDefinition> direction in definition.Ports.GroupBy(port => port.Direction))
             {
-                direction.Select(port => port.TypeId).ShouldBeUnique(
-                    $"{definition.TypeId} declares the same value twice among its {direction.Key} ports.");
+                direction.Select(port => port.Id).ShouldBeUnique(
+                    $"{definition.TypeId} repeats a port identifier among its {direction.Key} ports.");
             }
 
             foreach (PortDefinition port in definition.Ports)
@@ -109,7 +121,11 @@ public sealed class OpenCvNodeCatalogTests
             // says what it produced.
             foreach (PortDefinition input in definition.Inputs.Where(port => port.TypeId == BuiltInPortTypeIds.ImageFrame))
             {
-                input.Id.ShouldBe(OpenCvNodeIds.ImagePortId);
+                input.Id.ShouldBeOneOf(
+                    OpenCvNodeIds.ImagePortId,
+                    OpenCvNodeIds.BlueChannelPortId,
+                    OpenCvNodeIds.GreenChannelPortId,
+                    OpenCvNodeIds.RedChannelPortId);
             }
 
             foreach (PortDefinition output in definition.Outputs.Where(port => port.TypeId == BuiltInPortTypeIds.ImageFrame))
@@ -119,6 +135,12 @@ public sealed class OpenCvNodeCatalogTests
                     OpenCvNodeIds.BlurredPortId,
                     OpenCvNodeIds.ResizedPortId,
                     OpenCvNodeIds.ConvertedPortId,
+                    OpenCvNodeIds.NormalizedPortId,
+                    OpenCvNodeIds.FlippedPortId,
+                    OpenCvNodeIds.ResultPortId,
+                    OpenCvNodeIds.BlueChannelPortId,
+                    OpenCvNodeIds.GreenChannelPortId,
+                    OpenCvNodeIds.RedChannelPortId,
                     OpenCvNodeIds.CroppedPortId,
                     OpenCvNodeIds.ThresholdedPortId,
                     OpenCvNodeIds.ReducedPortId,
