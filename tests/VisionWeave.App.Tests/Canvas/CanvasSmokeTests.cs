@@ -189,7 +189,7 @@ public sealed class CanvasSmokeTests
         all.Command.Execute(all.CommandParameter);
         Lay(window);
 
-        viewModel.CatalogueGroups.Sum(group => group.Entries.Count).ShouldBe(25);
+        viewModel.CatalogueGroups.Sum(group => group.Entries.Count).ShouldBe(33);
 
         // The document may be written back, so neither surface it is edited on says
         // otherwise. This is the reading the later flows are compared against.
@@ -730,7 +730,7 @@ public sealed class CanvasSmokeTests
 
         executors.Hold = true;
 
-        Button cancel = Button(window, "_Cancel");
+        Button cancel = Button(window, "_Stop");
         cancel.Command.ShouldBeSameAs(shell.ViewModel.RunWorkflow.CancelCommand);
         cancel.Command.CanExecute(null).ShouldBeFalse("nothing is running yet.");
 
@@ -812,7 +812,8 @@ public sealed class CanvasSmokeTests
     /// <returns>The field.</returns>
     private static TextBox Field(Shell shell, ParameterEditorViewModel parameter)
         => Descendants<TextBox>(shell.Window)
-            .Single(box => ReferenceEquals(box.DataContext, parameter));
+            .First(box => ReferenceEquals(box.DataContext, parameter)
+                && box.InputBindings.OfType<KeyBinding>().Any());
 
     /// <summary>
     /// The gesture a text field binds: what a user presses to apply what they typed.

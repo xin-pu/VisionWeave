@@ -38,6 +38,14 @@ public sealed class OpenCvNodeCatalogTests
         catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.GaussianBlurTypeId));
         catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.ResizeTypeId));
         catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.CvtColorTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.NormalizeTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.ConvertScaleAbsTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.FlipTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.SharpenTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.InRangeTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.BitwiseNotTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.EqualizeHistTypeId));
+        catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.RotateTypeId));
         catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.CropTypeId));
         catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.MedianBlurTypeId));
         catalog.KnownTypeIds.ShouldContain(new NodeTypeId(OpenCvNodeIds.ThresholdTypeId));
@@ -119,6 +127,9 @@ public sealed class OpenCvNodeCatalogTests
                     OpenCvNodeIds.BlurredPortId,
                     OpenCvNodeIds.ResizedPortId,
                     OpenCvNodeIds.ConvertedPortId,
+                    OpenCvNodeIds.NormalizedPortId,
+                    OpenCvNodeIds.FlippedPortId,
+                    OpenCvNodeIds.ResultPortId,
                     OpenCvNodeIds.CroppedPortId,
                     OpenCvNodeIds.ThresholdedPortId,
                     OpenCvNodeIds.ReducedPortId,

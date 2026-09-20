@@ -26,6 +26,30 @@ public static class OpenCvNodeIds
     /// <summary>The node type that converts a frame between colour spaces.</summary>
     public const string CvtColorTypeId = "visionweave.opencv.cvt-color";
 
+    /// <summary>The node type that normalizes pixel values into a requested range.</summary>
+    public const string NormalizeTypeId = "visionweave.opencv.normalize";
+
+    /// <summary>The node type that applies a linear brightness and contrast conversion.</summary>
+    public const string ConvertScaleAbsTypeId = "visionweave.opencv.convert-scale-abs";
+
+    /// <summary>The node type that mirrors a frame around one or both axes.</summary>
+    public const string FlipTypeId = "visionweave.opencv.flip";
+
+    /// <summary>The node type that sharpens edges with a convolution kernel.</summary>
+    public const string SharpenTypeId = "visionweave.opencv.sharpen";
+
+    /// <summary>The node type that keeps pixels inside an inclusive range.</summary>
+    public const string InRangeTypeId = "visionweave.opencv.in-range";
+
+    /// <summary>The node type that inverts every bit of every pixel.</summary>
+    public const string BitwiseNotTypeId = "visionweave.opencv.bitwise-not";
+
+    /// <summary>The node type that equalizes a grayscale histogram.</summary>
+    public const string EqualizeHistTypeId = "visionweave.opencv.equalize-hist";
+
+    /// <summary>The node type that rotates a frame around its centre.</summary>
+    public const string RotateTypeId = "visionweave.opencv.rotate";
+
     /// <summary>The node type that keeps one rectangle of a frame.</summary>
     public const string CropTypeId = "visionweave.opencv.crop";
 
@@ -101,6 +125,30 @@ public static class OpenCvNodeIds
     /// <summary>The executor registration of the colour conversion node.</summary>
     public const string CvtColorExecutorTypeId = "visionweave.opencv.executor.cvt-color";
 
+    /// <summary>The executor registration of the normalize node.</summary>
+    public const string NormalizeExecutorTypeId = "visionweave.opencv.executor.normalize";
+
+    /// <summary>The executor registration of the linear conversion node.</summary>
+    public const string ConvertScaleAbsExecutorTypeId = "visionweave.opencv.executor.convert-scale-abs";
+
+    /// <summary>The executor registration of the flip node.</summary>
+    public const string FlipExecutorTypeId = "visionweave.opencv.executor.flip";
+
+    /// <summary>The executor registration of the sharpen node.</summary>
+    public const string SharpenExecutorTypeId = "visionweave.opencv.executor.sharpen";
+
+    /// <summary>The executor registration of the in-range node.</summary>
+    public const string InRangeExecutorTypeId = "visionweave.opencv.executor.in-range";
+
+    /// <summary>The executor registration of the bitwise-not node.</summary>
+    public const string BitwiseNotExecutorTypeId = "visionweave.opencv.executor.bitwise-not";
+
+    /// <summary>The executor registration of the histogram equalization node.</summary>
+    public const string EqualizeHistExecutorTypeId = "visionweave.opencv.executor.equalize-hist";
+
+    /// <summary>The executor registration of the rotate node.</summary>
+    public const string RotateExecutorTypeId = "visionweave.opencv.executor.rotate";
+
     /// <summary>The executor registration of the crop node.</summary>
     public const string CropExecutorTypeId = "visionweave.opencv.executor.crop";
 
@@ -173,6 +221,15 @@ public static class OpenCvNodeIds
     /// <summary>The identifier of the image the colour conversion node publishes.</summary>
     public const string ConvertedPortId = "converted";
 
+    /// <summary>The identifier of a normalized image output.</summary>
+    public const string NormalizedPortId = "normalized";
+
+    /// <summary>The identifier of a mirrored image output.</summary>
+    public const string FlippedPortId = "flipped";
+
+    /// <summary>The identifier of an image produced by the additional Aries operations.</summary>
+    public const string ResultPortId = "result";
+
     /// <summary>The identifier of the image the crop node publishes.</summary>
     public const string CroppedPortId = "cropped";
 
@@ -233,6 +290,24 @@ public static class OpenCvNodeIds
 
     /// <summary>The colour conversion the colour conversion node performs.</summary>
     public const string ConversionParameter = "conversion";
+
+    /// <summary>The multiplier used by a numeric image conversion.</summary>
+    public const string AlphaParameter = "alpha";
+
+    /// <summary>The offset or upper range used by an image conversion.</summary>
+    public const string BetaParameter = "beta";
+
+    /// <summary>The axis or axes around which a frame is mirrored.</summary>
+    public const string FlipModeParameter = "flipMode";
+
+    /// <summary>The inclusive low pixel value of a range.</summary>
+    public const string LowerParameter = "lower";
+
+    /// <summary>The inclusive high pixel value of a range.</summary>
+    public const string UpperParameter = "upper";
+
+    /// <summary>The clockwise angle of a geometric rotation.</summary>
+    public const string AngleParameter = "angle";
 
     /// <summary>The left edge of a rectangle the node keeps or marks.</summary>
     public const string XParameter = "x";
@@ -354,6 +429,15 @@ public static class OpenCvNodeIds
     /// <summary>The option that converts a BGR frame to CIELAB.</summary>
     public const string ConversionLab = "lab";
 
+    /// <summary>Mirror a frame from left to right.</summary>
+    public const string FlipHorizontal = "horizontal";
+
+    /// <summary>Mirror a frame from top to bottom.</summary>
+    public const string FlipVertical = "vertical";
+
+    /// <summary>Mirror a frame around both axes.</summary>
+    public const string FlipBoth = "both";
+
     /// <summary>The threshold rule that keeps the pixels above the threshold.</summary>
     public const string ThresholdBinary = "binary";
 
@@ -449,6 +533,14 @@ public static class OpenCvNodeIds
         ConversionRgb,
         ConversionHsv,
         ConversionLab,
+    ];
+
+    /// <summary>The axes the flip node accepts.</summary>
+    public static IReadOnlyList<string> FlipModeOptions { get; } =
+    [
+        FlipHorizontal,
+        FlipVertical,
+        FlipBoth,
     ];
 
     /// <summary>The threshold rules the threshold node accepts, in the order the editor shows them.</summary>

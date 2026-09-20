@@ -45,6 +45,14 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
         CreateGaussianBlur(),
         CreateResize(),
         CreateCvtColor(),
+        CreateNormalize(),
+        CreateConvertScaleAbs(),
+        CreateFlip(),
+        CreateSharpen(),
+        CreateInRange(),
+        CreateBitwiseNot(),
+        CreateEqualizeHist(),
+        CreateRotate(),
         CreateCrop(),
         CreateMedianBlur(),
         CreateThreshold(),
@@ -97,7 +105,8 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
                     OpenCvNodeIds.PathParameter,
                     ParameterKind.Path,
                     IsRequired: true,
-                    DisplayName: "File"),
+                    DisplayName: "File",
+                    PathSelection: PathSelectionMode.OpenFile),
             ],
             OpenCvNodeIds.ImageSourceExecutorTypeId)
         {
@@ -124,7 +133,8 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
                     OpenCvNodeIds.PathParameter,
                     ParameterKind.Path,
                     IsRequired: true,
-                    DisplayName: "File"),
+                    DisplayName: "File",
+                    PathSelection: PathSelectionMode.SaveFile),
                 new ParameterDefinition(
                     OpenCvNodeIds.OverwriteParameter,
                     ParameterKind.Boolean,
@@ -268,6 +278,200 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
             OpenCvNodeIds.CvtColorExecutorTypeId)
         {
             Tags = [OpenCvNodeTags.Colour],
+        };
+
+    private static NodeDefinition CreateNormalize()
+        => new(
+            new NodeTypeId(OpenCvNodeIds.NormalizeTypeId),
+            TypeVersion: 1,
+            DisplayName: "Normalize",
+            OpenCvNodeIds.TransformCategory,
+            ImageTransformPorts(OpenCvNodeIds.NormalizedPortId),
+            [
+                new ParameterDefinition(
+                    OpenCvNodeIds.AlphaParameter,
+                    ParameterKind.Number,
+                    IsRequired: false,
+                    DisplayName: "Minimum",
+                    Minimum: 0,
+                    Maximum: 255,
+                    DefaultValue: 0d),
+                new ParameterDefinition(
+                    OpenCvNodeIds.BetaParameter,
+                    ParameterKind.Number,
+                    IsRequired: false,
+                    DisplayName: "Maximum",
+                    Minimum: 0,
+                    Maximum: 255,
+                    DefaultValue: 255d),
+            ],
+            OpenCvNodeIds.NormalizeExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Colour],
+        };
+
+    private static NodeDefinition CreateConvertScaleAbs()
+        => new(
+            new NodeTypeId(OpenCvNodeIds.ConvertScaleAbsTypeId),
+            TypeVersion: 1,
+            DisplayName: "Brightness / Contrast",
+            OpenCvNodeIds.TransformCategory,
+            ImageTransformPorts(OpenCvNodeIds.ConvertedPortId),
+            [
+                new ParameterDefinition(
+                    OpenCvNodeIds.AlphaParameter,
+                    ParameterKind.Number,
+                    IsRequired: false,
+                    DisplayName: "Contrast",
+                    Minimum: 0,
+                    Maximum: 10,
+                    DefaultValue: 1d),
+                new ParameterDefinition(
+                    OpenCvNodeIds.BetaParameter,
+                    ParameterKind.Number,
+                    IsRequired: false,
+                    DisplayName: "Brightness",
+                    Minimum: -255,
+                    Maximum: 255,
+                    DefaultValue: 0d),
+            ],
+            OpenCvNodeIds.ConvertScaleAbsExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Colour],
+        };
+
+    private static NodeDefinition CreateFlip()
+        => new(
+            new NodeTypeId(OpenCvNodeIds.FlipTypeId),
+            TypeVersion: 1,
+            DisplayName: "Flip",
+            OpenCvNodeIds.TransformCategory,
+            ImageTransformPorts(OpenCvNodeIds.FlippedPortId),
+            [
+                new ParameterDefinition(
+                    OpenCvNodeIds.FlipModeParameter,
+                    ParameterKind.Option,
+                    IsRequired: false,
+                    DisplayName: "Direction",
+                    Options: OpenCvNodeIds.FlipModeOptions,
+                    DefaultValue: OpenCvNodeIds.FlipHorizontal),
+            ],
+            OpenCvNodeIds.FlipExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Geometry],
+        };
+
+    private static IReadOnlyList<PortDefinition> ImageTransformPorts(string outputId)
+        =>
+        [
+            new PortDefinition(
+                OpenCvNodeIds.ImagePortId,
+                PortDirection.Input,
+                BuiltInPortTypeIds.ImageFrame,
+                PortMultiplicity.Single,
+                IsOptional: false,
+                DisplayName: "Image"),
+            new PortDefinition(
+                outputId,
+                PortDirection.Output,
+                BuiltInPortTypeIds.ImageFrame,
+                PortMultiplicity.Single,
+                IsOptional: false,
+                DisplayName: "Image"),
+        ];
+
+    private static NodeDefinition CreateSharpen()
+        => SimpleImageNode(
+            OpenCvNodeIds.SharpenTypeId,
+            "Sharpen",
+            OpenCvNodeIds.FilterCategory,
+            OpenCvNodeIds.SharpenExecutorTypeId,
+            [OpenCvNodeTags.Edges]);
+
+    private static NodeDefinition CreateInRange()
+        => new(
+            new NodeTypeId(OpenCvNodeIds.InRangeTypeId),
+            TypeVersion: 1,
+            DisplayName: "In Range",
+            OpenCvNodeIds.ThresholdCategory,
+            ImageTransformPorts(OpenCvNodeIds.ResultPortId),
+            [
+                new ParameterDefinition(
+                    OpenCvNodeIds.LowerParameter,
+                    ParameterKind.Number,
+                    IsRequired: false,
+                    DisplayName: "Lower",
+                    Minimum: 0,
+                    Maximum: 255,
+                    DefaultValue: 0d),
+                new ParameterDefinition(
+                    OpenCvNodeIds.UpperParameter,
+                    ParameterKind.Number,
+                    IsRequired: false,
+                    DisplayName: "Upper",
+                    Minimum: 0,
+                    Maximum: 255,
+                    DefaultValue: 255d),
+            ],
+            OpenCvNodeIds.InRangeExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Mask, OpenCvNodeTags.Threshold],
+        };
+
+    private static NodeDefinition CreateBitwiseNot()
+        => SimpleImageNode(
+            OpenCvNodeIds.BitwiseNotTypeId,
+            "Bitwise Not",
+            OpenCvNodeIds.TransformCategory,
+            OpenCvNodeIds.BitwiseNotExecutorTypeId,
+            [OpenCvNodeTags.Mask]);
+
+    private static NodeDefinition CreateEqualizeHist()
+        => SimpleImageNode(
+            OpenCvNodeIds.EqualizeHistTypeId,
+            "Equalize Histogram",
+            OpenCvNodeIds.TransformCategory,
+            OpenCvNodeIds.EqualizeHistExecutorTypeId,
+            [OpenCvNodeTags.Colour]);
+
+    private static NodeDefinition CreateRotate()
+        => new(
+            new NodeTypeId(OpenCvNodeIds.RotateTypeId),
+            TypeVersion: 1,
+            DisplayName: "Rotate",
+            OpenCvNodeIds.TransformCategory,
+            ImageTransformPorts(OpenCvNodeIds.ResultPortId),
+            [
+                new ParameterDefinition(
+                    OpenCvNodeIds.AngleParameter,
+                    ParameterKind.Number,
+                    IsRequired: false,
+                    DisplayName: "Angle",
+                    Minimum: -360,
+                    Maximum: 360,
+                    DefaultValue: 0d),
+            ],
+            OpenCvNodeIds.RotateExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Geometry],
+        };
+
+    private static NodeDefinition SimpleImageNode(
+        string typeId,
+        string displayName,
+        string category,
+        string executorTypeId,
+        IReadOnlyList<string> tags)
+        => new(
+            new NodeTypeId(typeId),
+            TypeVersion: 1,
+            displayName,
+            category,
+            ImageTransformPorts(OpenCvNodeIds.ResultPortId),
+            [],
+            executorTypeId)
+        {
+            Tags = tags,
         };
 
     private static NodeDefinition CreateCrop()
