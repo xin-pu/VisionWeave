@@ -40,7 +40,8 @@ internal sealed partial class MainWindowViewModel : ObservableObject
         PreviewViewModel preview,
         IWorkflowFileChooser fileChooser,
         ShellPromptViewModel prompt,
-        ShellStatus status)
+        ShellStatus status,
+        IParameterPathChooser? parameterPathChooser = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(catalog);
@@ -63,7 +64,7 @@ internal sealed partial class MainWindowViewModel : ObservableObject
         SaveDocument = saveDocument;
         RunWorkflow = runWorkflow;
         Canvas = new CanvasViewModel(session, catalog, validator, status);
-        Inspector = new InspectorViewModel(session, catalog, status);
+        Inspector = new InspectorViewModel(session, catalog, status, parameterPathChooser);
         CatalogueSearch = string.Empty;
         CatalogueTags = TagChips();
         CatalogueGroups = Grouped(null, _selectedTags);

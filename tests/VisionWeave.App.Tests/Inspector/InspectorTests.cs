@@ -46,11 +46,11 @@ public sealed class InspectorTests
         kernel.DisplayName.ShouldBe("Kernel size");
         kernel.Kind.ShouldBe(ParameterKind.Integer);
 
-        // Nothing is stored yet, so the field shows the default and says so. A field
-        // that has to be typed in also says how what is typed in gets applied.
+        // Nothing is stored yet, so the field shows the default and says so. Numeric
+        // fields commit through their dedicated editor and need no typing hint.
         kernel.Text.ShouldBe("5");
         kernel.HasStoredValue.ShouldBeFalse();
-        kernel.Caption.ShouldBe("whole number · 1 to 99 · default 5 · press Enter to apply");
+        kernel.Caption.ShouldBe("whole number · 1 to 99 · default 5");
         kernel.Condition.ShouldBeEmpty();
 
         session.Document.Nodes.ShouldHaveSingleItem();
@@ -69,7 +69,7 @@ public sealed class InspectorTests
 
         // The caption keeps the range and drops the default, because the value on
         // screen is the document's rather than the definition's.
-        kernel.Caption.ShouldBe("whole number · 1 to 99 · press Enter to apply");
+        kernel.Caption.ShouldBe("whole number · 1 to 99");
     }
 
     [Fact]

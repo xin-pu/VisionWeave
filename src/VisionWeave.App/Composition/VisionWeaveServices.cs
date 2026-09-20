@@ -1,6 +1,7 @@
 ﻿using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using VisionWeave.App.Commands;
+using VisionWeave.App.Inspector;
 using VisionWeave.App.Notifications;
 using VisionWeave.App.Preview;
 using VisionWeave.App.Sessions;
@@ -64,6 +65,7 @@ internal static class VisionWeaveServices
         // The shell's one question about a file. It is a seam with a Windows
         // implementation behind it, so the open flow is testable without a window.
         services.AddSingleton<IWorkflowFileChooser, WindowsWorkflowFileChooser>();
+        services.AddSingleton<IParameterPathChooser, WindowsParameterPathChooser>();
 
         // The one editing session the shell presents. It composes the document, its
         // undo stack, the selection, and the validation projection, so the layers

@@ -17,6 +17,8 @@ namespace VisionWeave.App.Inspector;
 internal sealed partial class ParameterEditorViewModel : ObservableObject
 {
     private readonly ParameterDefinition _definition;
+    private readonly IParameterPathChooser? _pathChooser;
+    private readonly Func<string?>? _workingDirectory;
 
     /// <summary>
     /// True while the document's value is being written into the field, so a value
@@ -35,12 +37,16 @@ internal sealed partial class ParameterEditorViewModel : ObservableObject
         ParameterDefinition definition,
         object? value,
         DiagnosticSeverity? severity,
-        string condition)
+        string condition,
+        IParameterPathChooser? pathChooser = null,
+        Func<string?>? workingDirectory = null)
     {
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(condition);
 
         _definition = definition;
+        _pathChooser = pathChooser;
+        _workingDirectory = workingDirectory;
         HasStoredValue = value is not null;
         Severity = severity;
         Condition = condition;
@@ -50,7 +56,15 @@ internal sealed partial class ParameterEditorViewModel : ObservableObject
         Kind = definition.Kind;
         Options = definition.Options ?? [];
         IsBoolean = definition.Kind == ParameterKind.Boolean;
+        IsInteger = definition.Kind == ParameterKind.Integer;
+        IsNumber = definition.Kind == ParameterKind.Number;
+        IsNumeric = IsInteger || IsNumber;
+        IsPath = definition.Kind == ParameterKind.Path;
+        IsText = definition.Kind == ParameterKind.Text;
         HasOptions = Options.Count > 0;
+        Minimum = definition.Minimum ?? double.MinValue;
+        Maximum = definition.Maximum ?? double.MaxValue;
+        SmallChange = IsInteger ? 1 : NumericStep(definition);
         Caption = string.Empty;
         Summary = string.Empty;
         Reword();
@@ -73,8 +87,48 @@ internal sealed partial class ParameterEditorViewModel : ObservableObject
     /// <summary>Gets a value indicating whether the row offers a switch.</summary>
     public bool IsBoolean { get; }
 
+    /// <summary>
+    ///     Gets a value indicating whether the field accepts a whole number.
+    /// </summary>
+    public bool IsInteger { get; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the field accepts a floating-point number.
+    /// </summary>
+    public bool IsNumber { get; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the field uses a numeric editor.
+    /// </summary>
+    public bool IsNumeric { get; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the field asks for a path.
+    /// </summary>
+    public bool IsPath { get; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the field accepts unrestricted text.
+    /// </summary>
+    public bool IsText { get; }
+
     /// <summary>Gets a value indicating whether the row offers a list of options.</summary>
     public bool HasOptions { get; }
+
+    /// <summary>
+    ///     Gets the smallest value the numeric editor accepts.
+    /// </summary>
+    public double Minimum { get; }
+
+    /// <summary>
+    ///     Gets the largest value the numeric editor accepts.
+    /// </summary>
+    public double Maximum { get; }
+
+    /// <summary>
+    ///     Gets the increment used by the numeric editor's step buttons.
+    /// </summary>
+    public double SmallChange { get; }
 
     /// <summary>
     /// Gets the line under the field: what the parameter is, the range it accepts,
@@ -120,6 +174,12 @@ internal sealed partial class ParameterEditorViewModel : ObservableObject
     [ObservableProperty]
     public partial string Text { get; set; }
 
+    /// <summary>
+    ///     Gets or sets the value shown by a numeric editor.
+    /// </summary>
+    [ObservableProperty]
+    public partial double NumericValue { get; set; }
+
     /// <summary>Gets or sets the switch, which is the projection a boolean uses.</summary>
     [ObservableProperty]
     public partial bool IsChecked { get; set; }
@@ -140,6 +200,50 @@ internal sealed partial class ParameterEditorViewModel : ObservableObject
     partial void OnIsCheckedChanged(bool value) => Ask();
 
     partial void OnSelectedOptionChanged(string? value) => Ask();
+
+    partial void OnNumericValueChanged(double value)
+    {
+        if (_projecting)
+        {
+            return;
+        }
+
+        Text = IsInteger
+            ? value.ToString("0", CultureInfo.InvariantCulture)
+            : value.ToString(CultureInfo.InvariantCulture);
+        Ask();
+    }
+
+    /// <summary>
+    ///     Opens the picker appropriate for a path parameter and commits its result.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanBrowse))]
+    private void Browse()
+    {
+        ParameterPathChoice choice = _pathChooser?.ChoosePath(
+            _definition.PathSelection,
+            Text,
+            _workingDirectory?.Invoke()) ?? ParameterPathChoice.Dismissed;
+
+        if (choice.Refusal is { } refusal)
+        {
+            Refuse(new NodeDiagnostic(
+                DiagnosticCodes.InvalidParameterValue,
+                DiagnosticSeverity.Error,
+                refusal));
+            return;
+        }
+
+        if (choice.Path is not { } path)
+        {
+            return;
+        }
+
+        Text = path;
+        Ask();
+    }
+
+    private bool CanBrowse() => IsPath && _pathChooser is not null;
 
     /// <summary>
     /// Asks for the value to be applied. A value the shell projected into the field is
@@ -311,6 +415,13 @@ internal sealed partial class ParameterEditorViewModel : ObservableObject
                 Text = value is null
                     ? string.Empty
                     : Convert.ToDouble(value, CultureInfo.InvariantCulture).ToString("0", CultureInfo.InvariantCulture);
+                NumericValue = value is null ? 0 : Convert.ToDouble(value, CultureInfo.InvariantCulture);
+                break;
+            case ParameterKind.Number:
+                NumericValue = value is null ? 0 : Convert.ToDouble(value, CultureInfo.InvariantCulture);
+                Text = value is null
+                    ? string.Empty
+                    : Convert.ToDouble(value, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture);
                 break;
             default:
                 Text = value switch
@@ -378,7 +489,7 @@ internal sealed partial class ParameterEditorViewModel : ObservableObject
     /// <param name="kind">The declared kind.</param>
     /// <returns><see langword="true"/> when the field holds text the user applied.</returns>
     private static bool IsTyped(ParameterKind kind)
-        => kind is not (ParameterKind.Boolean or ParameterKind.Option);
+        => kind is ParameterKind.Text or ParameterKind.Path;
 
     private static string Range(ParameterDefinition definition)
         => (definition.Minimum, definition.Maximum) switch
@@ -390,6 +501,20 @@ internal sealed partial class ParameterEditorViewModel : ObservableObject
         };
 
     private static string Format(double value) => value.ToString(CultureInfo.InvariantCulture);
+
+    private static double NumericStep(ParameterDefinition definition)
+    {
+        if (definition.Minimum is { } minimum && definition.Maximum is { } maximum)
+        {
+            double span = maximum - minimum;
+            if (span > 0)
+            {
+                return Math.Max(span / 100, 0.01);
+            }
+        }
+
+        return 0.1;
+    }
 
     private static string KindWord(ParameterKind kind)
         => kind switch

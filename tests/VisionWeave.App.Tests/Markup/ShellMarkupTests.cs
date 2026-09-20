@@ -165,6 +165,7 @@ public sealed class ShellMarkupTests
             .Load(PathOf("MainWindow.xaml"))
             .Descendants()
             .Where(element => element.Name.LocalName == "KeyBinding")
+            .Where(element => (string?)element.Attribute("Key") != "Enter")
             .ToDictionary(
                 element => (string)element.Attribute("Key")!,
                 element => ((string?)element.Attribute("Modifiers"), (string?)element.Attribute("Command")));
@@ -265,16 +266,26 @@ public sealed class ShellMarkupTests
     {
         XElement inspector = Region("InspectorRegion");
 
-        // Text, a switch, and a list of options are three projections of one
+        // Text, number, path, switch, and option controls are projections of one
         // parameter; the declared kind picks one of them, so the region never shows
         // two ways of editing the same value.
         string markup = inspector.ToString();
 
         markup.ShouldContain("IsBoolean");
+        markup.ShouldContain("IsNumeric");
+        markup.ShouldContain("IsPath");
         markup.ShouldContain("HasOptions");
+        markup.ShouldContain("NumberBox");
+        markup.ShouldContain("BrowseCommand");
         markup.ShouldContain("{Binding IsChecked}");
         markup.ShouldContain("{Binding SelectedOption}");
         markup.ShouldContain("{Binding Options}");
+
+        XElement options = inspector.Descendants().Single(element => element.Name.LocalName == "ComboBox");
+        options.Attribute("Style").ShouldBeNull();
+        options.Attribute("Foreground").ShouldBeNull();
+        options.Attribute("Background").ShouldBeNull();
+        options.Attribute("BorderBrush").ShouldBeNull();
 
         // A value that has to be typed in is applied with Enter. The gesture is
         // written inside the field's own template, so it resolves against the field
@@ -282,7 +293,7 @@ public sealed class ShellMarkupTests
         // to commit what it holds.
         XElement keys = inspector
             .Descendants()
-            .Single(element => element.Name.LocalName.EndsWith(".InputBindings", StringComparison.Ordinal));
+            .First(element => element.Name.LocalName.EndsWith(".InputBindings", StringComparison.Ordinal));
 
         keys.Name.LocalName.ShouldBe("TextBox.InputBindings");
 
@@ -339,7 +350,7 @@ public sealed class ShellMarkupTests
     }
 
     [Fact]
-    public void The_preview_region_draws_the_newest_image_a_run_published()
+    public void The_preview_region_draws_the_selected_nodes_image_and_opens_it_on_click()
     {
         XElement preview = Region("PreviewRegion");
 
@@ -358,6 +369,12 @@ public sealed class ShellMarkupTests
             .Single(element => element.Name.LocalName == "Image");
 
         AttributeText(image, "Source").ShouldBe("{Binding Preview.Image}");
+
+        XElement imageButton = preview
+            .Descendants()
+            .Single(element => element.Name.LocalName == "PreviewImageButton");
+        AttributeText(imageButton, "ImageSource").ShouldBe("{Binding Preview.Image}");
+        AttributeText(imageButton, "ImageTitle").ShouldBe("{Binding Preview.PreviewTitle}");
 
         // The notice is the one part of the region that is a state rather than a
         // value, so it is the part that shows and hides with the state behind it.

@@ -49,7 +49,7 @@ internal sealed class RunPreviewObserver : IExecutionOutputObserver
 
         // The lease is still alive here because the runtime waits for this task.
         RunPreview preview = await Task
-            .Run(() => Convert(outputs.NodeTypeId, frame), CancellationToken.None)
+            .Run(() => Convert(outputs, frame), CancellationToken.None)
             .ConfigureAwait(false);
 
         await _presenter.PresentAsync(preview).ConfigureAwait(false);
@@ -75,18 +75,20 @@ internal sealed class RunPreviewObserver : IExecutionOutputObserver
     }
 
     /// <summary>Converts a frame and names the node that published it.</summary>
-    private RunPreview Convert(NodeTypeId nodeTypeId, MatFrameLease frame)
+    private RunPreview Convert(NodeOutputs outputs, MatFrameLease frame)
     {
         PreviewFrame converted = _converter.Convert(frame);
 
         // A definition the catalog no longer holds leaves the identifier, which is
         // still worth more than an empty field.
-        string title = _catalog.TryResolveLatest(nodeTypeId, out NodeDefinition? definition) && definition is not null
+        string title = _catalog.TryResolveLatest(outputs.NodeTypeId, out NodeDefinition? definition) && definition is not null
             ? definition.DisplayName
-            : nodeTypeId.Value;
+            : outputs.NodeTypeId.Value;
 
         return new RunPreview(
             RunPreviewImage.Create(converted),
+            outputs.OperationId,
+            outputs.NodeInstanceId,
             title,
             converted.Width,
             converted.Height,

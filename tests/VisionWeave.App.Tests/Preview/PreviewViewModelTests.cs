@@ -2,7 +2,9 @@
 using VisionWeave.App.Preview;
 using VisionWeave.App.Sessions;
 using VisionWeave.App.Tests.Support;
+using VisionWeave.Contracts.Nodes;
 using VisionWeave.Contracts.Values;
+using VisionWeave.Domain.Workflows;
 using VisionWeave.OpenCv.Preview;
 
 namespace VisionWeave.App.Tests.Preview;
@@ -78,7 +80,31 @@ public sealed class PreviewViewModelTests
         preview.PreviewNotice.ShouldBe(PreviewViewModel.NoPreviewText);
     }
 
-    private static RunPreview Frame(string title, int width, int height)
+    [Fact]
+    public void Selecting_a_node_shows_that_nodes_cached_output()
+    {
+        EditorSession session = TestSessions.Create();
+        Guid first = session.Document.AddNode(
+            new NodeTypeId("visionweave.test.first"), 1, new CanvasPosition(0, 0)).InstanceId;
+        Guid second = session.Document.AddNode(
+            new NodeTypeId("visionweave.test.second"), 1, new CanvasPosition(100, 0)).InstanceId;
+        PreviewViewModel preview = new(session);
+        Guid operation = Guid.NewGuid();
+
+        preview.Show(Frame("First", 16, 8, operation, first));
+        preview.Show(Frame("Second", 8, 4, operation, second));
+        session.Select([first]);
+
+        preview.PreviewTitle.ShouldBe("First");
+        preview.PreviewDetail.ShouldStartWith("16 × 8");
+    }
+
+    private static RunPreview Frame(
+        string title,
+        int width,
+        int height,
+        Guid? operationId = null,
+        Guid? nodeInstanceId = null)
         => new(
             RunPreviewImage.Create(new PreviewFrame(
                 width,
@@ -86,6 +112,8 @@ public sealed class PreviewViewModelTests
                 FramePixelFormat.Bgr24,
                 width * 3,
                 new byte[width * height * 3])),
+            operationId ?? Guid.NewGuid(),
+            nodeInstanceId ?? Guid.NewGuid(),
             title,
             width,
             height,

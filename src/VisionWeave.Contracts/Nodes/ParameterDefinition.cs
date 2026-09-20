@@ -12,6 +12,7 @@
 /// <param name="Maximum">The inclusive upper bound for numeric parameters.</param>
 /// <param name="Options">The accepted values for an option parameter.</param>
 /// <param name="DefaultValue">The value applied when the document omits the parameter.</param>
+/// <param name="PathSelection">The kind of location a path parameter asks the user to choose.</param>
 public sealed record ParameterDefinition(
     string Name,
     ParameterKind Kind,
@@ -20,4 +21,5 @@ public sealed record ParameterDefinition(
     double? Minimum = null,
     double? Maximum = null,
     IReadOnlyList<string>? Options = null,
-    object? DefaultValue = null);
+    object? DefaultValue = null,
+    PathSelectionMode PathSelection = PathSelectionMode.OpenFile);

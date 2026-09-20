@@ -9,12 +9,16 @@ namespace VisionWeave.App.Preview;
 /// is never a claim on a lease the runtime has released.
 /// </summary>
 /// <param name="Image">The bitmap to draw, frozen: it is built where the frame was converted and read where the window is drawn.</param>
+/// <param name="OperationId">The run that produced the image.</param>
+/// <param name="NodeInstanceId">The node instance that produced the image.</param>
 /// <param name="NodeTitle">The node that published it, named the way the catalogue names it.</param>
 /// <param name="Width">The bitmap's width, which is the frame's own unless it was larger than a preview may be.</param>
 /// <param name="Height">The bitmap's height.</param>
 /// <param name="PixelFormat">The pixel layout the node produced.</param>
 internal sealed record RunPreview(
     BitmapSource Image,
+    Guid OperationId,
+    Guid NodeInstanceId,
     string NodeTitle,
     int Width,
     int Height,

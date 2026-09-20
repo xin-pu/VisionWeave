@@ -23,6 +23,7 @@ internal sealed partial class InspectorViewModel : ObservableObject
     private readonly EditorSession _session;
     private readonly NodeDefinitionCatalog _catalog;
     private readonly ShellStatus _status;
+    private readonly IParameterPathChooser? _pathChooser;
 
     /// <summary>
     /// The node the current parameter list was built for. A list is kept while its
@@ -43,7 +44,11 @@ internal sealed partial class InspectorViewModel : ObservableObject
     /// <param name="session">The session the document, the selection, and the projection come from.</param>
     /// <param name="catalog">The catalog each selected node's definition is resolved against.</param>
     /// <param name="status">The shell state a refused edit is reported to.</param>
-    internal InspectorViewModel(EditorSession session, NodeDefinitionCatalog catalog, ShellStatus status)
+    internal InspectorViewModel(
+        EditorSession session,
+        NodeDefinitionCatalog catalog,
+        ShellStatus status,
+        IParameterPathChooser? pathChooser = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(catalog);
@@ -52,6 +57,7 @@ internal sealed partial class InspectorViewModel : ObservableObject
         _session = session;
         _catalog = catalog;
         _status = status;
+        _pathChooser = pathChooser;
 
         NodeTitle = string.Empty;
         NodeCaption = string.Empty;
@@ -203,7 +209,9 @@ internal sealed partial class InspectorViewModel : ObservableObject
                     parameter,
                     StoredValue(instance, parameter.Name),
                     _session.Projection.SeverityOfParameter(instance.InstanceId, parameter.Name),
-                    Condition(instance.InstanceId, parameter.Name));
+                    Condition(instance.InstanceId, parameter.Name),
+                    _pathChooser,
+                    () => _session.Path is null ? null : System.IO.Path.GetDirectoryName(_session.Path));
 
                 // The field asks; the inspector turns what it asks into a document
                 // command, so no field holds a rule about parameters.

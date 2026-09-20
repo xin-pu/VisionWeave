@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:design="clr-namespace:VisionWeave.App.Design"
         xmlns:nodify="https://miroiu.github.io/nodify"
+        xmlns:preview="clr-namespace:VisionWeave.App.Preview"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         mc:Ignorable="d"
         d:DataContext="{x:Static design:ShellDesignData.ViewModel}"
@@ -16,6 +17,10 @@
         Background="{DynamicResource Brush.Background.Canvas}"
         Foreground="{DynamicResource Brush.Text.Primary}"
         WindowStartupLocation="CenterScreen">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+    </Window.Resources>
 
     <Window.InputBindings>
         <KeyBinding Key="O"
@@ -72,51 +77,52 @@
                 <StackPanel Grid.Column="1"
                             Margin="32,0,0,0"
                             Orientation="Horizontal">
-                    <Button Command="{Binding OpenCommand}"
-                            Content="_Open…"
-                            Style="{StaticResource Shell.ActionButton}"
-                            ToolTip="Open a workflow document (Ctrl+O)" />
-                    <TextBlock Margin="8,0,0,0"
-                               VerticalAlignment="Center"
-                               Foreground="{DynamicResource Brush.Text.Secondary}"
-                               Text="Ctrl+O" />
+                    <ui:Button Command="{Binding OpenCommand}"
+                               Content="_Open"
+                               Icon="{ui:SymbolIcon Symbol=FolderOpen20}"
+                               Style="{StaticResource Shell.CommandButton}"
+                               ToolTip="Open a workflow document (Ctrl+O)" />
+                    <ui:Button Command="{Binding SaveCommand}"
+                               Content="_Save"
+                               Icon="{ui:SymbolIcon Symbol=Save20}"
+                               Style="{StaticResource Shell.CommandButton}"
+                               ToolTip="Write the document to its file (Ctrl+S)" />
 
-                    <Button Margin="16,0,0,0"
-                            Command="{Binding SaveCommand}"
-                            Content="_Save"
-                            Style="{StaticResource Shell.ActionButton}"
-                            ToolTip="Write the document to its file (Ctrl+S)" />
-                    <TextBlock Margin="8,0,0,0"
-                               VerticalAlignment="Center"
-                               Foreground="{DynamicResource Brush.Text.Secondary}"
-                               Text="Ctrl+S" />
+                    <Border Width="1"
+                            Margin="8,4,14,4"
+                            Background="{DynamicResource Brush.Border.Subtle}" />
 
-                    <Button Margin="16,0,0,0"
-                            Command="{Binding Canvas.UndoCommand}"
-                            Content="_Undo"
-                            Style="{StaticResource Shell.ActionButton}"
-                            ToolTip="Undo the last edit (Ctrl+Z)" />
-                    <Button Margin="6,0,0,0"
-                            Command="{Binding Canvas.RedoCommand}"
-                            Content="_Redo"
-                            Style="{StaticResource Shell.ActionButton}"
-                            ToolTip="Redo the last undone edit (Ctrl+Y)" />
+                    <ui:Button Command="{Binding Canvas.UndoCommand}"
+                               Content="_Undo"
+                               Icon="{ui:SymbolIcon Symbol=ArrowLeft20}"
+                               Style="{StaticResource Shell.CommandButton}"
+                               ToolTip="Undo the last edit (Ctrl+Z)" />
+                    <ui:Button Command="{Binding Canvas.RedoCommand}"
+                               Content="_Redo"
+                               Icon="{ui:SymbolIcon Symbol=ArrowRight20}"
+                               Style="{StaticResource Shell.CommandButton}"
+                               ToolTip="Redo the last undone edit (Ctrl+Y)" />
 
                     <!--
                         Running and stopping are the two gestures over one running
                         state: the Run action is disabled while a run is executing,
-                        and Cancel is enabled exactly while there is one to stop.
+                        and Stop is enabled exactly while there is one to stop.
                     -->
-                    <Button Margin="24,0,0,0"
-                            Command="{Binding RunWorkflow.Command}"
-                            Content="_Run"
-                            Style="{StaticResource Shell.ActionButton}"
-                            ToolTip="Run the workflow and show the newest image it produces (Ctrl+R)" />
-                    <Button Margin="6,0,0,0"
-                            Command="{Binding RunWorkflow.CancelCommand}"
-                            Content="_Cancel"
-                            Style="{StaticResource Shell.ActionButton}"
-                            ToolTip="Stop the run. Everything the run already produced is kept." />
+                    <Border Width="1"
+                            Margin="8,4,14,4"
+                            Background="{DynamicResource Brush.Border.Subtle}" />
+
+                    <ui:Button Appearance="Primary"
+                               Command="{Binding RunWorkflow.Command}"
+                               Content="_Run"
+                               Icon="{ui:SymbolIcon Symbol=Play20}"
+                               Style="{StaticResource Shell.CommandButton}"
+                               ToolTip="Run the workflow and show the newest image it produces (Ctrl+R)" />
+                    <ui:Button Command="{Binding RunWorkflow.CancelCommand}"
+                               Content="_Stop"
+                               Icon="{ui:SymbolIcon Symbol=Stop20}"
+                               Style="{StaticResource Shell.CommandButton}"
+                               ToolTip="Stop the run. Everything the run already produced is kept." />
                 </StackPanel>
 
                 <StackPanel Grid.Column="3" Orientation="Horizontal">
@@ -146,19 +152,24 @@
                     <TextBlock DockPanel.Dock="Top"
                                Style="{StaticResource Shell.RegionHeader}"
                                Text="Node catalogue" />
-                    <TextBlock DockPanel.Dock="Top"
-                               Margin="0,8,0,0"
-                               Style="{StaticResource Shell.FieldLabel}"
-                               Text="Search" />
                     <!--
                         The search filters what exists rather than changing it, so it
                         is a query over the catalog and never an edit of anything.
                     -->
-                    <TextBox DockPanel.Dock="Top"
-                             Margin="0,4,0,0"
-                             Style="{StaticResource Shell.InputField}"
-                             Text="{Binding CatalogueSearch, UpdateSourceTrigger=PropertyChanged}"
-                             ToolTip="Match the name a node type is shown under, or its identifier" />
+                    <Grid DockPanel.Dock="Top" Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <ui:SymbolIcon Margin="8,0"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource Brush.Text.Secondary}"
+                                       Symbol="Search20" />
+                        <TextBox Grid.Column="1"
+                                 Style="{StaticResource Shell.InputField}"
+                                 Text="{Binding CatalogueSearch, UpdateSourceTrigger=PropertyChanged}"
+                                 ToolTip="Search by node name or identifier" />
+                    </Grid>
                     <!--
                         The tag row is the catalogue's second axis: a category says
                         where a type sits in the library, and a tag cuts across the
@@ -177,10 +188,7 @@
                                 </Style.Triggers>
                             </Style>
                         </StackPanel.Style>
-                        <TextBlock Margin="0,8,0,0"
-                                   Style="{StaticResource Shell.FieldLabel}"
-                                   Text="Tag" />
-                        <ItemsControl Margin="0,4,0,0" ItemsSource="{Binding CatalogueTags}">
+                        <ItemsControl Margin="0,6,0,0" ItemsSource="{Binding CatalogueTags}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <WrapPanel />
@@ -206,14 +214,11 @@
                     <TextBlock DockPanel.Dock="Bottom"
                                Style="{StaticResource Shell.RegionNote}"
                                Text="{Binding CatalogueNotice}" />
-                    <TextBlock DockPanel.Dock="Bottom"
-                               Style="{StaticResource Shell.RegionNote}"
-                               Text="Choosing a type adds it to the middle of the canvas." />
-                    <ScrollViewer Margin="0,8,0,0" VerticalScrollBarVisibility="Auto">
+                    <ScrollViewer Margin="0,6,0,0" VerticalScrollBarVisibility="Auto">
                         <ItemsControl ItemsSource="{Binding CatalogueGroups}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <StackPanel Margin="0,0,0,12">
+                                    <StackPanel Margin="0,0,0,8">
                                         <TextBlock FontWeight="SemiBold"
                                                    Foreground="{DynamicResource Brush.Accent.Primary}"
                                                    Text="{Binding Category}" />
@@ -415,11 +420,19 @@
                                     </TextBlock.Style>
                                 </TextBlock>
 
-                                <Image Margin="0,8,0,0"
-                                       HorizontalAlignment="Left"
-                                       MaxHeight="200"
-                                       Source="{Binding Preview.Image}"
-                                       Stretch="Uniform" />
+                                <preview:PreviewImageButton Margin="0,8,0,0"
+                                                            Padding="0"
+                                                            HorizontalAlignment="Left"
+                                                            Background="Transparent"
+                                                            BorderThickness="0"
+                                                            Cursor="Hand"
+                                                            ImageSource="{Binding Preview.Image}"
+                                                            ImageTitle="{Binding Preview.PreviewTitle}"
+                                                            ToolTip="Open the image at full size">
+                                    <Image MaxHeight="200"
+                                           Source="{Binding Preview.Image}"
+                                           Stretch="Uniform" />
+                                </preview:PreviewImageButton>
                             </DockPanel>
                         </Border>
                     </Grid>
@@ -481,11 +494,23 @@
                                           ItemsSource="{Binding Inspector.Parameters}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <StackPanel Margin="0,0,0,12" ToolTip="{Binding Summary}">
-                                            <TextBlock Style="{StaticResource Shell.FieldLabel}"
+                                        <Grid Style="{StaticResource Shell.ParameterRow}"
+                                              ToolTip="{Binding Summary}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="104" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+
+                                            <TextBlock Grid.Column="0"
+                                                       Margin="0,0,10,0"
+                                                       Style="{StaticResource Shell.FieldLabel}"
                                                        Text="{Binding DisplayName}" />
 
-                                            <Grid Margin="0,4,0,0">
+                                            <Grid Grid.Column="1">
                                                 <TextBox Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}">
                                                     <!--
                                                         Typing a value is not a whole gesture
@@ -500,19 +525,65 @@
                                                     </TextBox.InputBindings>
                                                     <TextBox.Style>
                                                         <Style BasedOn="{StaticResource Shell.InputField}" TargetType="TextBox">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
                                                             <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding IsBoolean}" Value="True">
-                                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                                </DataTrigger>
-                                                                <DataTrigger Binding="{Binding HasOptions}" Value="True">
-                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                <DataTrigger Binding="{Binding IsText}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Visible" />
                                                                 </DataTrigger>
                                                             </Style.Triggers>
                                                         </Style>
                                                     </TextBox.Style>
                                                 </TextBox>
 
-                                                <ui:ToggleSwitch IsChecked="{Binding IsChecked}">
+                                                <ui:NumberBox Maximum="{Binding Maximum}"
+                                                              Minimum="{Binding Minimum}"
+                                                              SmallChange="{Binding SmallChange}"
+                                                              Value="{Binding NumericValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                                                    <ui:NumberBox.Style>
+                                                        <Style BasedOn="{StaticResource {x:Type ui:NumberBox}}"
+                                                               TargetType="ui:NumberBox">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsNumeric}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </ui:NumberBox.Style>
+                                                </ui:NumberBox>
+
+                                                <Grid>
+                                                    <Grid.Style>
+                                                        <Style TargetType="Grid">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsPath}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Grid.Style>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBox Grid.Column="0"
+                                                             Style="{StaticResource Shell.InputField}"
+                                                             Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}">
+                                                        <TextBox.InputBindings>
+                                                            <KeyBinding Command="{Binding ApplyCommand}" Key="Enter" />
+                                                        </TextBox.InputBindings>
+                                                    </TextBox>
+                                                    <ui:Button Grid.Column="1"
+                                                               Margin="6,0,0,0"
+                                                               Command="{Binding BrowseCommand}"
+                                                               Icon="{ui:SymbolIcon Symbol=FolderOpen20}"
+                                                               Style="{StaticResource Shell.FieldIconButton}"
+                                                               ToolTip="Browse for a location" />
+                                                </Grid>
+
+                                                <ui:ToggleSwitch HorizontalAlignment="Right"
+                                                                 IsChecked="{Binding IsChecked}">
                                                     <ui:ToggleSwitch.Style>
                                                         <Style TargetType="ui:ToggleSwitch">
                                                             <Setter Property="Visibility" Value="Collapsed" />
@@ -525,29 +596,16 @@
                                                     </ui:ToggleSwitch.Style>
                                                 </ui:ToggleSwitch>
 
-                                                <ComboBox Background="{DynamicResource Brush.Background.SurfaceRaised}"
-                                                          BorderBrush="{DynamicResource Brush.Border.Subtle}"
-                                                          Foreground="{DynamicResource Brush.Text.Primary}"
-                                                          ItemsSource="{Binding Options}"
-                                                          SelectedItem="{Binding SelectedOption}">
-                                                    <ComboBox.Style>
-                                                        <Style TargetType="ComboBox">
-                                                            <Setter Property="Visibility" Value="Collapsed" />
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding HasOptions}" Value="True">
-                                                                    <Setter Property="Visibility" Value="Visible" />
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </ComboBox.Style>
-                                                </ComboBox>
+                                                <ComboBox ItemsSource="{Binding Options}"
+                                                          SelectedItem="{Binding SelectedOption}"
+                                                          Visibility="{Binding HasOptions, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                             </Grid>
 
-                                            <TextBlock Style="{StaticResource Shell.RegionNote}"
-                                                       Text="{Binding Caption}" />
-                                            <TextBlock Style="{StaticResource Shell.FieldCondition}"
+                                            <TextBlock Grid.Row="1"
+                                                       Grid.Column="1"
+                                                       Style="{StaticResource Shell.FieldCondition}"
                                                        Text="{Binding Condition}" />
-                                        </StackPanel>
+                                        </Grid>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
