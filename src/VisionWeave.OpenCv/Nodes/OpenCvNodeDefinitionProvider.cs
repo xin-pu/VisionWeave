@@ -53,6 +53,11 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
         CreateBitwiseNot(),
         CreateEqualizeHist(),
         CreateRotate(),
+        CreateSplitChannels(),
+        CreateMergeChannels(),
+        CreateExtractChannel(),
+        CreateCopyMakeBorder(),
+        CreateTranspose(),
         CreateCrop(),
         CreateMedianBlur(),
         CreateThreshold(),
@@ -455,6 +460,123 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
         {
             Tags = [OpenCvNodeTags.Geometry],
         };
+
+    private static NodeDefinition CreateSplitChannels()
+        => new(
+            new NodeTypeId(OpenCvNodeIds.SplitChannelsTypeId),
+            TypeVersion: 1,
+            DisplayName: "Split Channels",
+            OpenCvNodeIds.ChannelCategory,
+            [
+                ImagePort(OpenCvNodeIds.ImagePortId, PortDirection.Input, "Image"),
+                ImagePort(OpenCvNodeIds.BlueChannelPortId, PortDirection.Output, "Blue"),
+                ImagePort(OpenCvNodeIds.GreenChannelPortId, PortDirection.Output, "Green"),
+                ImagePort(OpenCvNodeIds.RedChannelPortId, PortDirection.Output, "Red"),
+            ],
+            [],
+            OpenCvNodeIds.SplitChannelsExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Colour],
+        };
+
+    private static NodeDefinition CreateMergeChannels()
+        => new(
+            new NodeTypeId(OpenCvNodeIds.MergeChannelsTypeId),
+            TypeVersion: 1,
+            DisplayName: "Merge Channels",
+            OpenCvNodeIds.ChannelCategory,
+            [
+                ImagePort(OpenCvNodeIds.BlueChannelPortId, PortDirection.Input, "Blue"),
+                ImagePort(OpenCvNodeIds.GreenChannelPortId, PortDirection.Input, "Green"),
+                ImagePort(OpenCvNodeIds.RedChannelPortId, PortDirection.Input, "Red"),
+                ImagePort(OpenCvNodeIds.ResultPortId, PortDirection.Output, "Image"),
+            ],
+            [],
+            OpenCvNodeIds.MergeChannelsExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Colour],
+        };
+
+    private static NodeDefinition CreateExtractChannel()
+        => new(
+            new NodeTypeId(OpenCvNodeIds.ExtractChannelTypeId),
+            TypeVersion: 1,
+            DisplayName: "Extract Channel",
+            OpenCvNodeIds.ChannelCategory,
+            ImageTransformPorts(OpenCvNodeIds.ResultPortId),
+            [
+                new ParameterDefinition(
+                    OpenCvNodeIds.ChannelParameter,
+                    ParameterKind.Option,
+                    IsRequired: false,
+                    DisplayName: "Channel",
+                    Options: OpenCvNodeIds.ChannelOptions,
+                    DefaultValue: OpenCvNodeIds.ChannelBlue),
+            ],
+            OpenCvNodeIds.ExtractChannelExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Colour],
+        };
+
+    private static NodeDefinition CreateCopyMakeBorder()
+        => new(
+            new NodeTypeId(OpenCvNodeIds.CopyMakeBorderTypeId),
+            TypeVersion: 1,
+            DisplayName: "Add Border",
+            OpenCvNodeIds.TransformCategory,
+            ImageTransformPorts(OpenCvNodeIds.ResultPortId),
+            [
+                BorderSize(OpenCvNodeIds.TopParameter, "Top"),
+                BorderSize(OpenCvNodeIds.BottomParameter, "Bottom"),
+                BorderSize(OpenCvNodeIds.LeftParameter, "Left"),
+                BorderSize(OpenCvNodeIds.RightParameter, "Right"),
+                new ParameterDefinition(
+                    OpenCvNodeIds.BorderTypeParameter,
+                    ParameterKind.Option,
+                    IsRequired: false,
+                    DisplayName: "Fill",
+                    Options: OpenCvNodeIds.BorderTypeOptions,
+                    DefaultValue: OpenCvNodeIds.BorderConstant),
+                new ParameterDefinition(
+                    OpenCvNodeIds.BorderValueParameter,
+                    ParameterKind.Number,
+                    IsRequired: false,
+                    DisplayName: "Constant value",
+                    Minimum: 0,
+                    Maximum: 255,
+                    DefaultValue: 0d),
+            ],
+            OpenCvNodeIds.CopyMakeBorderExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Geometry],
+        };
+
+    private static NodeDefinition CreateTranspose()
+        => SimpleImageNode(
+            OpenCvNodeIds.TransposeTypeId,
+            "Transpose",
+            OpenCvNodeIds.TransformCategory,
+            OpenCvNodeIds.TransposeExecutorTypeId,
+            [OpenCvNodeTags.Geometry]);
+
+    private static PortDefinition ImagePort(string id, PortDirection direction, string displayName)
+        => new(
+            id,
+            direction,
+            BuiltInPortTypeIds.ImageFrame,
+            PortMultiplicity.Single,
+            IsOptional: false,
+            displayName);
+
+    private static ParameterDefinition BorderSize(string id, string displayName)
+        => new(
+            id,
+            ParameterKind.Integer,
+            IsRequired: false,
+            displayName,
+            Minimum: 0,
+            Maximum: OpenCvParameterBounds.MaxDimension,
+            DefaultValue: 0);
 
     private static NodeDefinition SimpleImageNode(
         string typeId,

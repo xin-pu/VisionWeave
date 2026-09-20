@@ -50,6 +50,21 @@ public static class OpenCvNodeIds
     /// <summary>The node type that rotates a frame around its centre.</summary>
     public const string RotateTypeId = "visionweave.opencv.rotate";
 
+    /// <summary>The node type that separates a BGR image into three grayscale channels.</summary>
+    public const string SplitChannelsTypeId = "visionweave.opencv.split-channels";
+
+    /// <summary>The node type that combines three grayscale channels into a BGR image.</summary>
+    public const string MergeChannelsTypeId = "visionweave.opencv.merge-channels";
+
+    /// <summary>The node type that extracts one channel from an image.</summary>
+    public const string ExtractChannelTypeId = "visionweave.opencv.extract-channel";
+
+    /// <summary>The node type that adds pixels around the edge of an image.</summary>
+    public const string CopyMakeBorderTypeId = "visionweave.opencv.copy-make-border";
+
+    /// <summary>The node type that exchanges the rows and columns of an image.</summary>
+    public const string TransposeTypeId = "visionweave.opencv.transpose";
+
     /// <summary>The node type that keeps one rectangle of a frame.</summary>
     public const string CropTypeId = "visionweave.opencv.crop";
 
@@ -149,6 +164,21 @@ public static class OpenCvNodeIds
     /// <summary>The executor registration of the rotate node.</summary>
     public const string RotateExecutorTypeId = "visionweave.opencv.executor.rotate";
 
+    /// <summary>The executor registration of the channel split node.</summary>
+    public const string SplitChannelsExecutorTypeId = "visionweave.opencv.executor.split-channels";
+
+    /// <summary>The executor registration of the channel merge node.</summary>
+    public const string MergeChannelsExecutorTypeId = "visionweave.opencv.executor.merge-channels";
+
+    /// <summary>The executor registration of the channel extraction node.</summary>
+    public const string ExtractChannelExecutorTypeId = "visionweave.opencv.executor.extract-channel";
+
+    /// <summary>The executor registration of the border node.</summary>
+    public const string CopyMakeBorderExecutorTypeId = "visionweave.opencv.executor.copy-make-border";
+
+    /// <summary>The executor registration of the transpose node.</summary>
+    public const string TransposeExecutorTypeId = "visionweave.opencv.executor.transpose";
+
     /// <summary>The executor registration of the crop node.</summary>
     public const string CropExecutorTypeId = "visionweave.opencv.executor.crop";
 
@@ -230,6 +260,15 @@ public static class OpenCvNodeIds
     /// <summary>The identifier of an image produced by the additional Aries operations.</summary>
     public const string ResultPortId = "result";
 
+    /// <summary>The blue image channel port.</summary>
+    public const string BlueChannelPortId = "blue";
+
+    /// <summary>The green image channel port.</summary>
+    public const string GreenChannelPortId = "green";
+
+    /// <summary>The red image channel port.</summary>
+    public const string RedChannelPortId = "red";
+
     /// <summary>The identifier of the image the crop node publishes.</summary>
     public const string CroppedPortId = "cropped";
 
@@ -308,6 +347,27 @@ public static class OpenCvNodeIds
 
     /// <summary>The clockwise angle of a geometric rotation.</summary>
     public const string AngleParameter = "angle";
+
+    /// <summary>The channel selected by a channel extraction node.</summary>
+    public const string ChannelParameter = "channel";
+
+    /// <summary>The number of rows added above an image.</summary>
+    public const string TopParameter = "top";
+
+    /// <summary>The number of rows added below an image.</summary>
+    public const string BottomParameter = "bottom";
+
+    /// <summary>The number of columns added to the left of an image.</summary>
+    public const string LeftParameter = "left";
+
+    /// <summary>The number of columns added to the right of an image.</summary>
+    public const string RightParameter = "right";
+
+    /// <summary>The rule used to fill an added border.</summary>
+    public const string BorderTypeParameter = "borderType";
+
+    /// <summary>The intensity used by a constant border.</summary>
+    public const string BorderValueParameter = "borderValue";
 
     /// <summary>The left edge of a rectangle the node keeps or marks.</summary>
     public const string XParameter = "x";
@@ -438,6 +498,24 @@ public static class OpenCvNodeIds
     /// <summary>Mirror a frame around both axes.</summary>
     public const string FlipBoth = "both";
 
+    /// <summary>The blue channel option.</summary>
+    public const string ChannelBlue = "blue";
+
+    /// <summary>The green channel option.</summary>
+    public const string ChannelGreen = "green";
+
+    /// <summary>The red channel option.</summary>
+    public const string ChannelRed = "red";
+
+    /// <summary>Fill a border with one constant intensity.</summary>
+    public const string BorderConstant = "constant";
+
+    /// <summary>Repeat the nearest edge pixel into the border.</summary>
+    public const string BorderReplicate = "replicate";
+
+    /// <summary>Reflect pixels across the image edge.</summary>
+    public const string BorderReflect = "reflect";
+
     /// <summary>The threshold rule that keeps the pixels above the threshold.</summary>
     public const string ThresholdBinary = "binary";
 
@@ -517,6 +595,9 @@ public static class OpenCvNodeIds
     /// <summary>The category of nodes that find or draw the boundary of a shape.</summary>
     public const string ContoursCategory = "Contours";
 
+    /// <summary>The category of nodes that separate or combine image channels.</summary>
+    public const string ChannelCategory = "Channel";
+
     /// <summary>The interpolation options the resize node accepts, in the order the editor shows them.</summary>
     public static IReadOnlyList<string> InterpolationOptions { get; } =
     [
@@ -541,6 +622,22 @@ public static class OpenCvNodeIds
         FlipHorizontal,
         FlipVertical,
         FlipBoth,
+    ];
+
+    /// <summary>The channels an extraction node accepts.</summary>
+    public static IReadOnlyList<string> ChannelOptions { get; } =
+    [
+        ChannelBlue,
+        ChannelGreen,
+        ChannelRed,
+    ];
+
+    /// <summary>The border rules the border node accepts.</summary>
+    public static IReadOnlyList<string> BorderTypeOptions { get; } =
+    [
+        BorderConstant,
+        BorderReplicate,
+        BorderReflect,
     ];
 
     /// <summary>The threshold rules the threshold node accepts, in the order the editor shows them.</summary>

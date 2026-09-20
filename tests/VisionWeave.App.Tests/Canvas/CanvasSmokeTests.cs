@@ -189,7 +189,7 @@ public sealed class CanvasSmokeTests
         all.Command.Execute(all.CommandParameter);
         Lay(window);
 
-        viewModel.CatalogueGroups.Sum(group => group.Entries.Count).ShouldBe(33);
+        viewModel.CatalogueGroups.Sum(group => group.Entries.Count).ShouldBe(38);
 
         // The document may be written back, so neither surface it is edited on says
         // otherwise. This is the reading the later flows are compared against.
