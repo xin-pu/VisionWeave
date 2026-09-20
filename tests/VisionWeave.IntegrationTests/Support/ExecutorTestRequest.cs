@@ -50,15 +50,26 @@ internal static class ExecutorTestRequest
         };
 
     /// <summary>
-    /// Binds an image frame to the image input port.
+    /// Binds an image frame to the image input port, and a contour set to the contours
+    /// input port when the node under test receives one as well.
     /// </summary>
     /// <param name="lease">The frame to bind.</param>
+    /// <param name="contours">The contour set to bind, when the node reads one.</param>
     /// <returns>The inputs.</returns>
-    internal static Dictionary<string, PortValue> ImageInput(ImageFrameLease lease)
-        => new(StringComparer.Ordinal)
+    internal static Dictionary<string, PortValue> ImageInput(ImageFrameLease lease, ContourCollection? contours = null)
+    {
+        Dictionary<string, PortValue> inputs = new(StringComparer.Ordinal)
         {
             [OpenCvNodeIds.ImagePortId] = new ImageFrameValue(lease),
         };
+
+        if (contours is not null)
+        {
+            inputs[OpenCvNodeIds.ContoursPortId] = new ContourCollectionValue(contours);
+        }
+
+        return inputs;
+    }
 
     /// <summary>
     /// Reads the frame a node published.
@@ -75,5 +86,22 @@ internal static class ExecutorTestRequest
         return result.Outputs[portId]
             .ShouldBeOfType<ImageFrameValue>()
             .Lease.ShouldBeOfType<MatFrameLease>();
+    }
+
+    /// <summary>
+    /// Reads the contour set a node published.
+    /// </summary>
+    /// <param name="result">The result to read from.</param>
+    /// <param name="portId">The output port that carries the contours.</param>
+    /// <returns>The produced contour set.</returns>
+    internal static ContourCollection ContourOutput(NodeExecutionResult result, string portId)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+
+        result.Outputs.ShouldContainKey(portId);
+
+        return result.Outputs[portId]
+            .ShouldBeOfType<ContourCollectionValue>()
+            .Contours;
     }
 }

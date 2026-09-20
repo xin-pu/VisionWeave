@@ -17,6 +17,9 @@ public static class OpenCvNodeTags
     /// <summary>A node that reads or writes the channels a pixel is made of.</summary>
     public const string Colour = "colour";
 
+    /// <summary>A node that finds the boundary of a shape in a mask, or draws one onto a frame.</summary>
+    public const string Contour = "contour";
+
     /// <summary>A node that measures how fast an image changes, or where it changes fastest.</summary>
     public const string Edges = "edges";
 
@@ -53,6 +56,7 @@ public static class OpenCvNodeTags
     public static IReadOnlyList<string> All { get; } =
     [
         Colour,
+        Contour,
         Edges,
         File,
         Geometry,

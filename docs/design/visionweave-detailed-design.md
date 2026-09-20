@@ -11,8 +11,9 @@
   Nodify canvas, `.vwflow` read/write, and the inspector and document commands of
   sections 6.5 to 6.7 are implemented, together with the run, cancel, and preview
   path of 6.8, the run marks of 6.9, and the tags the catalogue is filtered by; the
-  remaining node families and the minimap, copy and paste, and automatic layout are
-  not.
+  node catalog holds every family section 8 has migrated, the contour pair of that
+  section's sixth batch included, and the remaining node families and the minimap,
+  copy and paste, and automatic layout are not.
 - **Owner:** VisionWeave maintainers.
 - **Scope:** New WPF desktop application. This document does not prescribe an
   in-place migration of the legacy Aries solution.
@@ -161,7 +162,7 @@ The initial catalog supports the following typed ports:
 | Port value | Meaning | Typical producer / consumer |
 | --- | --- | --- |
 | `ImageFrame` | Read-only leased image result backed by `Mat`. | Image Source -> Blur |
-| `Contours` | Immutable contour collection. | Find Contours -> Bounding Rect |
+| `Contours` | Immutable contour collection. | Find Contours -> Draw Contours |
 | `Rect` / `RectCollection` | Geometric output. | Bounding Rect -> Draw Rectangles |
 | `Scalar`, `Number`, `Boolean`, `Text` | Scalar controls or measurements. | Contour Area -> comparison/output |
 | `PointCollection` | Geometry for draw and calibration nodes. | Fetch Points -> Draw Points |
@@ -958,13 +959,33 @@ region at the border means, and because the call reads pixels and writes the sam
 back, every layout is accepted and reported, as the two pyramid nodes and the
 morphology nodes do. The tests state the whole result of a shape as a picture of the
 marked pixels, so the rasterisation and the clipping are what is asserted rather than
-described.
+described. The sixth took the contour pair, which is the first family whose value is
+not a frame: `Find Contours` in the Contours category, which reads a mask and reports
+the boundary of each shape in it as a contour set, and `Draw Contours` in Draw, which
+marks such a set on a frame. It exists for one decision, and it is what a contour set
+holds: an ordered point sequence per shape, and nothing else. The call also reports
+which shape encloses which, and the value has no field for it, so the two retrieval
+modes that exist to express nesting are not offered — they would return what the other
+option returns and call it something else — and the same absence answers what a filled
+draw does with a hole, which is that it paints it, because leaving one empty is a
+question about nesting that no node can ask. The finding node states the layout it
+works on and refuses anything else with a diagnostic naming it, because a contour is
+found on the image a decision was expressed in: one channel of eight bits; the drawing
+node reads pixels and writes the same type back, so it accepts every layout the other
+drawing nodes accept. `Find Contours` hands the call a copy of the frame rather than
+the frame itself, because the call rewrites the image it is given in some OpenCV
+builds, and it creates no lease at all, so a contour set passes between two nodes
+without a buffer to keep alive. The pair was expected to be the first batch that needs
+curated images, and it is not: a mask is a picture a test writes as easily as a step or
+a spike — a filled rectangle, and the same rectangle with a hole in it — and the
+boundary of a shape is decidable from the shape.
 What the batches leave out names its reason in the issue that
 migrated them: `Filter2D`, `Normalize`, the point scaling node, and the channel nodes
 wait on a kernel representation, on a decision about masks and depths, on a consumer
-of its own, and on multi-port nodes respectively, and `Draw Contours` — the other node
-the table's Draw row names — waits on the `Contours` value ADR-0003 defers, which is
-also what the contour family waits on.
+of its own, and on multi-port nodes respectively, and the contour property nodes —
+`Bounding Rect`, area, moments, and the rest of what the table's contour row names —
+wait on a consumer of what they produce, since what the value can do with a shape today
+is report it and mark it.
 The two file-backed nodes — `Image Source` and `Save Image` — are the ones that
 name a file, so they are the nodes a working directory is resolved for (5.4): each
 declares a required `path` parameter, the save node additionally declares the
@@ -972,8 +993,8 @@ declares a required `path` parameter, the save node additionally declares the
 folder that holds the document (ADR-0012). The remaining rows are the catalog this
 design aims at rather than a list of what exists, and each arrives with the curated
 regression images its own entry requires. That is also what the operations whose
-result depends on real image content — contours and template matching above
-all — are waiting for.
+result depends on real image content — template matching, OCR, and the histogram and
+corner families above all — are waiting for.
 
 Every migrated node receives output-oriented regression tests, and a node whose result
 depends on real image content receives them against curated sample images. Migration

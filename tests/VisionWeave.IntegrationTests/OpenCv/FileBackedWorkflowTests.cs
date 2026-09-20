@@ -306,6 +306,55 @@ public sealed class FileBackedWorkflowTests
     }
 
     [Fact]
+    public async Task Run_of_the_contour_nodes_writes_what_they_produced_and_releases_every_lease()
+    {
+        using var directory = new TemporaryDirectory();
+        WriteShapePlate(directory.File("plate.png"), width: 32, height: 24, field: 40, shape: 200);
+        WorkflowDocument document = BuildContourWorkflow();
+        string workflowPath = Save(document, directory);
+
+        WorkflowLoadResult loaded = WorkflowDocumentReader.Load(workflowPath);
+        loaded.Succeeded.ShouldBeTrue();
+        loaded.IsReadOnly.ShouldBeFalse();
+
+        LeaseLedger ledger = new();
+        var observer = new ConvertingOutputObserver();
+
+        WorkflowRunSummary summary = await RunAsync(loaded.Document!, ledger, directory, observer);
+
+        summary.Status.ShouldBe(WorkflowRunStatus.Succeeded);
+        summary.Diagnostics.ShouldBeEmpty();
+
+        // The plate is dark with one bright rectangle in it, so the mask the run
+        // thresholds out of it holds exactly that shape and the contour is its border.
+        // Drawing it back on the plate marks the four sides of the rectangle in the
+        // white a placed node starts with, and leaves everything else, inside included,
+        // as the plate was read.
+        using Mat written = Cv2.ImRead(directory.File("found.png"), ImreadModes.Color);
+        written.Cols.ShouldBe(32);
+        written.Rows.ShouldBe(24);
+
+        written.At<Vec3b>(6, 8).Item0.ShouldBe((byte)255);
+        written.At<Vec3b>(6, 23).Item0.ShouldBe((byte)255);
+        written.At<Vec3b>(17, 8).Item0.ShouldBe((byte)255);
+        written.At<Vec3b>(17, 23).Item0.ShouldBe((byte)255);
+        written.At<Vec3b>(10, 15).Item0.ShouldBe((byte)200);
+        written.At<Vec3b>(0, 0).Item0.ShouldBe((byte)40);
+
+        // The four nodes that produce a frame each published one, and the node that
+        // found the contours published a value instead: a contour set is not an image,
+        // so there is nothing for a preview to show and nothing for it to reject.
+        observer.Previews.Count.ShouldBe(4);
+        observer.Previews[^1].PixelFormat.ShouldBe(FramePixelFormat.Bgr24);
+        observer.RejectedFormats.ShouldBe(0);
+
+        ledger.Created.ShouldBe(4);
+        ledger.Released.ShouldBe(4);
+        ledger.Outstanding.ShouldBe(0);
+        ledger.ReservationsOutstanding.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task Run_again_leaves_the_output_alone_until_the_document_allows_replacement()
     {
         using var directory = new TemporaryDirectory();
@@ -475,6 +524,39 @@ public sealed class FileBackedWorkflowTests
     }
 
     /// <summary>
+    /// Builds the workflow of the contour pair: read a plate, convert it to greyscale,
+    /// threshold the greyscale into a mask, find the shapes the mask holds, and mark
+    /// them on the plate that was read. The two nodes sit in different categories and
+    /// pass a value no other node in the catalog produces, which is what makes the pair
+    /// a workflow of its own rather than a step of another one.
+    /// </summary>
+    private static WorkflowDocument BuildContourWorkflow()
+    {
+        WorkflowDocument document = WorkflowDocument.Create("found");
+        NodeInstance source = document.AddNode(new NodeTypeId(OpenCvNodeIds.ImageSourceTypeId), 1, new CanvasPosition(0, 0));
+        NodeInstance conversion = document.AddNode(new NodeTypeId(OpenCvNodeIds.CvtColorTypeId), 1, new CanvasPosition(200, 0));
+        NodeInstance threshold = document.AddNode(new NodeTypeId(OpenCvNodeIds.ThresholdTypeId), 1, new CanvasPosition(400, 0));
+        NodeInstance find = document.AddNode(new NodeTypeId(OpenCvNodeIds.FindContoursTypeId), 1, new CanvasPosition(600, 0));
+        NodeInstance draw = document.AddNode(new NodeTypeId(OpenCvNodeIds.DrawContoursTypeId), 1, new CanvasPosition(600, 200));
+        NodeInstance save = document.AddNode(new NodeTypeId(OpenCvNodeIds.SaveImageTypeId), 1, new CanvasPosition(800, 200));
+
+        document.SetNodeParameter(source.InstanceId, OpenCvNodeIds.PathParameter, "plate.png");
+        document.SetNodeParameter(conversion.InstanceId, OpenCvNodeIds.ConversionParameter, OpenCvNodeIds.ConversionGray);
+        document.SetNodeParameter(threshold.InstanceId, OpenCvNodeIds.ThresholdParameter, 100d);
+        document.SetNodeParameter(threshold.InstanceId, OpenCvNodeIds.MaxValueParameter, 255d);
+        document.SetNodeParameter(save.InstanceId, OpenCvNodeIds.PathParameter, "found.png");
+
+        document.AddConnection(source.InstanceId, OpenCvNodeIds.ImagePortId, conversion.InstanceId, OpenCvNodeIds.ImagePortId);
+        document.AddConnection(conversion.InstanceId, OpenCvNodeIds.ConvertedPortId, threshold.InstanceId, OpenCvNodeIds.ImagePortId);
+        document.AddConnection(threshold.InstanceId, OpenCvNodeIds.ThresholdedPortId, find.InstanceId, OpenCvNodeIds.ImagePortId);
+        document.AddConnection(source.InstanceId, OpenCvNodeIds.ImagePortId, draw.InstanceId, OpenCvNodeIds.ImagePortId);
+        document.AddConnection(find.InstanceId, OpenCvNodeIds.ContoursPortId, draw.InstanceId, OpenCvNodeIds.ContoursPortId);
+        document.AddConnection(draw.InstanceId, OpenCvNodeIds.DrawnPortId, save.InstanceId, OpenCvNodeIds.ImagePortId);
+
+        return document;
+    }
+
+    /// <summary>
     /// Stores the workflow in the folder that also holds the images, because that
     /// folder is what a run resolves the document's relative paths against.
     /// </summary>
@@ -523,6 +605,24 @@ public sealed class FileBackedWorkflowTests
             plate,
             new Rect(width / 2, 0, width - (width / 2), height),
             Scalar.All(bright),
+            thickness: -1);
+
+        Cv2.ImWrite(path, plate).ShouldBeTrue();
+    }
+
+    /// <summary>
+    /// Writes a plate that holds one shape: a frame of the field value with a filled
+    /// rectangle of the shape value in the middle of it, which is what a threshold
+    /// leaves behind as a mask for a node to find the boundary of.
+    /// </summary>
+    private static void WriteShapePlate(string path, int width, int height, byte field, byte shape)
+    {
+        using var plate = new Mat(height, width, MatType.CV_8UC3, Scalar.All(field));
+
+        Cv2.Rectangle(
+            plate,
+            new Rect(width / 4, height / 4, width / 2, height / 2),
+            Scalar.All(shape),
             thickness: -1);
 
         Cv2.ImWrite(path, plate).ShouldBeTrue();

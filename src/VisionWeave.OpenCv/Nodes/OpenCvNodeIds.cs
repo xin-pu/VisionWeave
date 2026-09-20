@@ -80,6 +80,12 @@ public static class OpenCvNodeIds
     /// <summary>The node type that marks a circle on a frame.</summary>
     public const string DrawCircleTypeId = "visionweave.opencv.draw-circle";
 
+    /// <summary>The node type that finds the contours of a mask.</summary>
+    public const string FindContoursTypeId = "visionweave.opencv.find-contours";
+
+    /// <summary>The node type that draws contours onto a frame.</summary>
+    public const string DrawContoursTypeId = "visionweave.opencv.draw-contours";
+
     /// <summary>The executor registration of the Gaussian blur node.</summary>
     public const string GaussianBlurExecutorTypeId = "visionweave.opencv.executor.gaussian-blur";
 
@@ -149,6 +155,12 @@ public static class OpenCvNodeIds
     /// <summary>The executor registration of the draw circle node.</summary>
     public const string DrawCircleExecutorTypeId = "visionweave.opencv.executor.draw-circle";
 
+    /// <summary>The executor registration of the find contours node.</summary>
+    public const string FindContoursExecutorTypeId = "visionweave.opencv.executor.find-contours";
+
+    /// <summary>The executor registration of the draw contours node.</summary>
+    public const string DrawContoursExecutorTypeId = "visionweave.opencv.executor.draw-contours";
+
     /// <summary>The identifier of a node's image port, whether it receives one or publishes one.</summary>
     public const string ImagePortId = "image";
 
@@ -190,6 +202,13 @@ public static class OpenCvNodeIds
 
     /// <summary>The identifier of the image a draw node publishes.</summary>
     public const string DrawnPortId = "drawn";
+
+    /// <summary>
+    /// The identifier of a contour set: the output of the node that finds one, and the
+    /// input of the node that draws one, because the value that leaves the first enters
+    /// the second under the same name.
+    /// </summary>
+    public const string ContoursPortId = "contours";
 
     /// <summary>The Gaussian kernel size parameter.</summary>
     public const string KernelSizeParameter = "kernelSize";
@@ -308,6 +327,9 @@ public static class OpenCvNodeIds
     /// <summary>The switch that makes a draw node mark the inside of its shape as well as its outline.</summary>
     public const string FilledParameter = "filled";
 
+    /// <summary>The switch that decides which contours the find contours node reports.</summary>
+    public const string RetrievalParameter = "retrieval";
+
     /// <summary>The nearest-neighbour interpolation option.</summary>
     public const string InterpolationNearest = "nearest";
 
@@ -377,6 +399,19 @@ public static class OpenCvNodeIds
     /// <summary>The operation that reports what the closing filled.</summary>
     public const string MorphologyBlackHat = "black-hat";
 
+    /// <summary>
+    /// The retrieval option that reports the outermost contours only, which is what
+    /// "how many objects are in this mask, and where" asks for: everything inside a
+    /// hole is part of the shape that surrounds it rather than a shape of its own.
+    /// </summary>
+    public const string RetrievalExternal = "external";
+
+    /// <summary>
+    /// The retrieval option that reports every contour, including the ones inside a
+    /// hole, with no promise about which contour encloses which.
+    /// </summary>
+    public const string RetrievalList = "list";
+
     /// <summary>The category of nodes that mark a shape on a frame.</summary>
     public const string DrawCategory = "Draw";
 
@@ -394,6 +429,9 @@ public static class OpenCvNodeIds
 
     /// <summary>The category of nodes that separate a frame into foreground and background.</summary>
     public const string ThresholdCategory = "Threshold";
+
+    /// <summary>The category of nodes that find or draw the boundary of a shape.</summary>
+    public const string ContoursCategory = "Contours";
 
     /// <summary>The interpolation options the resize node accepts, in the order the editor shows them.</summary>
     public static IReadOnlyList<string> InterpolationOptions { get; } =
@@ -457,5 +495,18 @@ public static class OpenCvNodeIds
         MorphologyGradient,
         MorphologyTopHat,
         MorphologyBlackHat,
+    ];
+
+    /// <summary>
+    /// The contour sets the find contours node reports, in the order the editor shows
+    /// them. The two modes that exist to report which contour encloses which are not
+    /// offered: the value this node publishes is a flat list of contours, so a
+    /// hierarchical mode would return what <see cref="RetrievalList"/> returns and call
+    /// it something else.
+    /// </summary>
+    public static IReadOnlyList<string> RetrievalOptions { get; } =
+    [
+        RetrievalExternal,
+        RetrievalList,
     ];
 }
