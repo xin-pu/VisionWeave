@@ -9,9 +9,10 @@
   The maintainer accepted those ADRs on 2026-09-19 after the review remediation
   of issues #1 and #2. On top of that foundation the shell theme, the projected
   Nodify canvas, `.vwflow` read/write, and the inspector and document commands of
-  sections 6.5 to 6.7 are implemented; the run, cancel, and preview path, the
-  remaining node families, and the minimap, copy and paste, and automatic layout
-  are not.
+  sections 6.5 to 6.7 are implemented, together with the run, cancel, and preview
+  path of 6.8, the run marks of 6.9, and the tags the catalogue is filtered by; the
+  remaining node families and the minimap, copy and paste, and automatic layout are
+  not.
 - **Owner:** VisionWeave maintainers.
 - **Scope:** New WPF desktop application. This document does not prescribe an
   in-place migration of the legacy Aries solution.
@@ -695,6 +696,36 @@ reaches the canvas, or the session directly, changes nothing and reports
 The catalogue is searchable by display name and by type identifier, because the
 identifier is what a document, a diagnostic, and a stored parameter name a node by. A
 search that matches nothing says so instead of showing an empty list.
+
+The catalogue's second axis is the tag, and it is the axis the category cannot be: a
+category says where a type sits in the library, and the categories are deliberately
+coarse — seven types sit in Filter — so "the node that finds edges" is not a thing a
+user can ask for by category. `NodeDefinition.Tags` carries the words a type is
+filtered by, declared by the provider out of one vocabulary rather than written freely
+per definition, because the filter row is built from the words the catalog actually
+holds: one `filter` and one `filtering` would be two chips that each show half the
+answer. `OpenCvNodeTags` is that vocabulary for the built-in nodes, and the catalog's
+tests hold the two ends together — every definition carries at least one word out of
+it, and every word in it is carried by some definition — so a chip can neither appear
+that nothing answers nor be missing for a word the definitions use.
+
+The filter row is built from the definitions rather than from the provider's list, so
+the shell needs no reference to a provider and a plugin's own words are filterable
+without this shell changing. Chips intersect rather than union: each one a user adds
+asks for less, so `mask` and `threshold` together offer the two thresholded nodes and
+not the six that carry either word. The row carries a first chip that clears the
+filter, and the chip whose word is in force is painted in the accent, so which filter
+is on reads without counting what is left. The selected word is not matched by the
+search box: the search matches the name a user reads and the identifier a document
+stores, and a search that answered with a word no entry showed would offer a type whose
+reason for matching the user cannot see. The summary and the notice name whichever two
+filters are in force, and a definition's own words are drawn beside the name it is
+chosen under, because a tag the user cannot see is a tag they cannot learn.
+
+Tags are catalog metadata and not document data: a type's words travel with the
+definition that declares them, no `.vwflow` field records them, and a document written
+before or after this change loads identically. They stay off the canvas as well, which
+has a title line and a caption line and would only repeat what the picker answered.
 
 ### 6.8 Run, cancel, and the managed preview as built
 

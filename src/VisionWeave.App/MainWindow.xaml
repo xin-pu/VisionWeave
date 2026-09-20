@@ -159,6 +159,47 @@
                              Style="{StaticResource Shell.InputField}"
                              Text="{Binding CatalogueSearch, UpdateSourceTrigger=PropertyChanged}"
                              ToolTip="Match the name a node type is shown under, or its identifier" />
+                    <!--
+                        The tag row is the catalogue's second axis: a category says
+                        where a type sits in the library, and a tag cuts across the
+                        groups to say what it does. Choosing a chip narrows the list
+                        beside the search rather than replacing it, so the two are read
+                        as one filter with two parts, and the row is hidden entirely by
+                        a catalog whose definitions carry no tags.
+                    -->
+                    <StackPanel DockPanel.Dock="Top">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasTags}" Value="False">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <TextBlock Margin="0,8,0,0"
+                                   Style="{StaticResource Shell.FieldLabel}"
+                                   Text="Tag" />
+                        <ItemsControl Margin="0,4,0,0" ItemsSource="{Binding CatalogueTags}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <!-- Choosing a chip is the filter's one gesture: it
+                                         reaches the view model rather than filtering a
+                                         copy the region keeps. -->
+                                    <Button Command="{Binding DataContext.ToggleTagCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding Tag}"
+                                            Content="{Binding Label}"
+                                            Style="{StaticResource Shell.CatalogueTag}"
+                                            ToolTip="Show only the node types that carry this tag" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
                     <TextBlock DockPanel.Dock="Top"
                                Style="{StaticResource Shell.RegionNote}"
                                Text="{Binding NodeCatalogSummary}" />
@@ -187,13 +228,32 @@
                                                         offers no addable type at all.
                                                     -->
                                                     <Button Margin="0,1"
-                                                            HorizontalContentAlignment="Left"
                                                             Command="{Binding DataContext.Canvas.AddNodeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                             CommandParameter="{Binding TypeId}"
-                                                            Content="{Binding DisplayName}"
+                                                            Content="{Binding}"
                                                             IsEnabled="{Binding DataContext.Canvas.IsEditable, RelativeSource={RelativeSource AncestorType=Window}}"
                                                             Style="{StaticResource Shell.CatalogueEntry}"
-                                                            ToolTip="Add this node type to the middle of the canvas" />
+                                                            ToolTip="Add this node type to the middle of the canvas">
+                                                        <Button.ContentTemplate>
+                                                            <DataTemplate>
+                                                                <!-- The words the type carries sit
+                                                                     beside the name it is shown under,
+                                                                     so the filter row explains itself. -->
+                                                                <Grid>
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="*" />
+                                                                        <ColumnDefinition Width="Auto" />
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <TextBlock Grid.Column="0"
+                                                                               Text="{Binding DisplayName}"
+                                                                               TextTrimming="CharacterEllipsis" />
+                                                                    <TextBlock Grid.Column="1"
+                                                                               Style="{StaticResource Shell.CatalogueEntryTags}"
+                                                                               Text="{Binding TagLine}" />
+                                                                </Grid>
+                                                            </DataTemplate>
+                                                        </Button.ContentTemplate>
+                                                    </Button>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>

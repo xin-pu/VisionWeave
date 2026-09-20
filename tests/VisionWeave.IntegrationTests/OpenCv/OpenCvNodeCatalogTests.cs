@@ -16,7 +16,10 @@ namespace VisionWeave.IntegrationTests.OpenCv;
 /// make a freshly placed node fail on its first run, so both are checked here
 /// rather than discovered by a user. The one parameter a node cannot default is
 /// the file it reads or writes, which is checked to be required of exactly the
-/// nodes that name one.
+/// nodes that name one. The tags the definitions are filtered by are checked the
+/// same way: the words come from one vocabulary the provider publishes, every
+/// definition carries at least one of them, and no word is published that nothing
+/// carries.
 /// </summary>
 public sealed class OpenCvNodeCatalogTests
 {
@@ -185,6 +188,36 @@ public sealed class OpenCvNodeCatalogTests
                 }
             }
         }
+    }
+
+    [Fact]
+    public void Every_definition_carries_words_the_provider_publishes()
+    {
+        Definitions.ShouldNotBeEmpty();
+
+        foreach (NodeDefinition definition in Definitions)
+        {
+            definition.Tags.ShouldNotBeEmpty(
+                $"{definition.TypeId} carries no tag, so the catalogue can never offer it under one.");
+            definition.Tags.ShouldBeUnique($"{definition.TypeId} names the same tag twice.");
+            definition.Tags.ShouldAllBe(
+                tag => OpenCvNodeTags.All.Contains(tag, StringComparer.Ordinal));
+        }
+    }
+
+    [Fact]
+    public void Every_word_the_provider_publishes_is_carried_by_a_definition()
+    {
+        // A word no definition carries is a filter that could only ever empty the
+        // catalogue. The vocabulary is declared once and in the order the catalogue
+        // offers it, so a node family that needs a new word extends it here rather than
+        // spelling its own version of a word that already exists.
+        OpenCvNodeTags.All.ShouldBeUnique();
+        OpenCvNodeTags.All.ShouldBe(OpenCvNodeTags.All.OrderBy(word => word, StringComparer.Ordinal));
+
+        string[] carried = [.. Definitions.SelectMany(definition => definition.Tags).Distinct(StringComparer.Ordinal)];
+
+        carried.ShouldBe(OpenCvNodeTags.All, ignoreOrder: true);
     }
 
     [Fact]

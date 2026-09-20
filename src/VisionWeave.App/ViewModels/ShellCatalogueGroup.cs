@@ -15,4 +15,18 @@ internal sealed record ShellCatalogueGroup(string Category, IReadOnlyList<ShellC
 /// </summary>
 /// <param name="TypeId">The provider-qualified type identifier an add command names.</param>
 /// <param name="DisplayName">The name the catalogue shows for it.</param>
-internal sealed record ShellCatalogueEntry(string TypeId, string DisplayName);
+/// <param name="TagLine">
+/// The tags the definition carries, joined for the one line the entry shows them
+/// on. They are drawn beside the name rather than kept behind the filter, because a
+/// tag the user cannot see is a tag they cannot learn.
+/// </param>
+internal sealed record ShellCatalogueEntry(string TypeId, string DisplayName, string TagLine);
+
+/// <summary>
+/// One chip of the catalogue's tag filter: the word to narrow the catalogue by, or
+/// the chip that clears the filter when the word is absent.
+/// </summary>
+/// <param name="Label">The word the chip shows.</param>
+/// <param name="Tag">The tag choosing this chip toggles, or <see langword="null"/> to clear the filter.</param>
+/// <param name="IsSelected">Whether this chip's tag is one of the tags in force.</param>
+internal sealed record ShellCatalogueTag(string Label, string? Tag, bool IsSelected);

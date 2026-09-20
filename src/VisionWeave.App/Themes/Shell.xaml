@@ -388,11 +388,54 @@
            BasedOn="{StaticResource Shell.ActionButton}"
            TargetType="Button">
         <Setter Property="HorizontalAlignment" Value="Stretch" />
-        <Setter Property="HorizontalContentAlignment" Value="Left" />
+        <!--
+            The entry spans the column so its name is trimmed rather than overflowing
+            and the words it carries line up along the right edge.
+        -->
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         <Setter Property="Padding" Value="8,3" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderBrush" Value="Transparent" />
         <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+    </Style>
+
+    <!--
+        The words a catalogue entry carries, which are the words the tag filter offers.
+        They are quieter than the name they sit beside and give way entirely to an
+        entry that carries none, so what a type does never competes with what it is
+        called.
+    -->
+    <Style x:Key="Shell.CatalogueEntryTags" TargetType="TextBlock">
+        <Setter Property="Margin" Value="8,0,0,0" />
+        <Setter Property="FontSize" Value="10" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding TagLine}" Value="">
+                <Setter Property="Visibility" Value="Collapsed" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!--
+        One chip of the tag filter. It is a toggle read as one: the chip whose word is
+        in force is painted in the accent, so which tags are narrowing the catalogue is
+        legible without counting the entries that are left.
+    -->
+    <Style x:Key="Shell.CatalogueTag"
+           BasedOn="{StaticResource Shell.ActionButton}"
+           TargetType="Button">
+        <Setter Property="Margin" Value="0,1,4,1" />
+        <Setter Property="Padding" Value="8,2" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                <Setter Property="Background" Value="{DynamicResource Brush.Accent.Primary}" />
+                <Setter Property="Foreground" Value="{DynamicResource Brush.Text.OnAccent}" />
+            </DataTrigger>
+        </Style.Triggers>
     </Style>
 
     <!--

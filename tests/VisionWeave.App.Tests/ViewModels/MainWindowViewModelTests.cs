@@ -391,11 +391,165 @@ public sealed class MainWindowViewModelTests : IDisposable
         shell.ViewModel.CatalogueNotice.ShouldBeEmpty();
     }
 
+    [Fact]
+    public void The_tag_row_offers_the_words_the_catalog_carries_behind_the_chip_that_clears_them()
+    {
+        Shell shell = Create(_directory.SaveReadableDocument(), OpenCvCatalog());
+
+        // The row is the vocabulary the definitions use rather than a list this shell
+        // decides, so a provider that tags a node needs no change here.
+        shell.ViewModel.CatalogueTags.Select(chip => chip.Label)
+            .ShouldBe(["All", .. OpenCvNodeTags.All]);
+        shell.ViewModel.CatalogueTags[0].ShouldBe(new ShellCatalogueTag("All", null, IsSelected: true));
+        shell.ViewModel.CatalogueTags.Count(chip => chip.IsSelected).ShouldBe(1);
+    }
+
+    [Fact]
+    public void A_catalog_whose_definitions_carry_no_tags_offers_no_filter_row()
+    {
+        Shell shell = Create(_directory.SaveReadableDocument());
+
+        // A chip the catalog cannot answer would be a filter that only ever empties the
+        // region, so the region offers none at all.
+        shell.ViewModel.CatalogueTags.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void A_tag_narrows_the_catalogue_to_the_types_that_carry_it()
+    {
+        Shell shell = Create(_directory.SaveReadableDocument(), OpenCvCatalog());
+
+        shell.ViewModel.ToggleTagCommand.Execute(OpenCvNodeTags.Geometry);
+
+        shell.ViewModel.CatalogueGroups.Select(group => group.Category)
+            .ShouldBe([OpenCvNodeIds.TransformCategory]);
+        shell.ViewModel.CatalogueGroups[0].Entries.Select(entry => entry.DisplayName)
+            .ShouldBe(["Crop", "Pyramid Down", "Pyramid Up", "Resize"]);
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("4 of 23 node types carry the “geometry” tag");
+        shell.ViewModel.CatalogueNotice.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Two_tags_narrow_together_rather_than_widening_the_list()
+    {
+        Shell shell = Create(_directory.SaveReadableDocument(), OpenCvCatalog());
+
+        // They intersect rather than union: adding a word to a filter is a user asking
+        // for less, and the six types that carry either word are not what is offered.
+        shell.ViewModel.ToggleTagCommand.Execute(OpenCvNodeTags.Mask);
+        shell.ViewModel.ToggleTagCommand.Execute(OpenCvNodeTags.Threshold);
+
+        shell.ViewModel.CatalogueGroups.ShouldHaveSingleItem().Entries.Select(entry => entry.DisplayName)
+            .ShouldBe(["Adaptive Threshold", "Threshold"]);
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("2 of 23 node types carry the “mask” and “threshold” tags");
+    }
+
+    [Fact]
+    public void A_tag_and_a_search_term_narrow_together()
+    {
+        Shell shell = Create(_directory.SaveReadableDocument(), OpenCvCatalog());
+
+        shell.ViewModel.ToggleTagCommand.Execute(OpenCvNodeTags.Mask);
+        shell.ViewModel.CatalogueSearch = "canny";
+
+        shell.ViewModel.CatalogueGroups.ShouldHaveSingleItem().Entries.Select(entry => entry.DisplayName)
+            .ShouldBe(["Canny"]);
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("1 of 23 node types carry the “mask” tag and match “canny”");
+    }
+
+    [Fact]
+    public void A_tag_and_a_search_that_together_match_nothing_say_so()
+    {
+        Shell shell = Create(_directory.SaveReadableDocument(), OpenCvCatalog());
+
+        shell.ViewModel.ToggleTagCommand.Execute(OpenCvNodeTags.File);
+        shell.ViewModel.CatalogueSearch = "blur";
+
+        shell.ViewModel.CatalogueGroups.ShouldBeEmpty();
+        shell.ViewModel.CatalogueNotice.ShouldBe("No node type carries the “file” tag and matches this search.");
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("0 of 23 node types carry the “file” tag and match “blur”");
+    }
+
+    [Fact]
+    public void Choosing_the_tag_that_is_already_in_force_stops_narrowing_by_it()
+    {
+        Shell shell = Create(_directory.SaveReadableDocument(), OpenCvCatalog());
+
+        shell.ViewModel.ToggleTagCommand.Execute(OpenCvNodeTags.Edges);
+        shell.ViewModel.ToggleTagCommand.Execute(OpenCvNodeTags.Edges);
+
+        shell.ViewModel.CatalogueGroups.Count.ShouldBe(6);
+        shell.ViewModel.NodeCatalogSummary.ShouldBe("23 node types available");
+        shell.ViewModel.CatalogueTags[0].IsSelected.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void The_chip_that_clears_the_filter_offers_every_type_again()
+    {
+        Shell shell = Create(_directory.SaveReadableDocument(), OpenCvCatalog());
+        shell.ViewModel.ToggleTagCommand.Execute(OpenCvNodeTags.File);
+
+        shell.ViewModel.ToggleTagCommand.Execute(null);
+
+        shell.ViewModel.CatalogueGroups.Count.ShouldBe(6);
+        shell.ViewModel.CatalogueTags[0].IsSelected.ShouldBeTrue();
+        shell.ViewModel.CatalogueTags.ShouldAllBe(chip => chip.IsSelected == (chip.Tag == null));
+        shell.ViewModel.CatalogueNotice.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void A_catalogue_entry_shows_the_words_it_carries()
+    {
+        Shell shell = Create(_directory.SaveReadableDocument(), OpenCvCatalog());
+
+        shell.ViewModel.CatalogueGroups
+            .SelectMany(group => group.Entries)
+            .Single(entry => entry.DisplayName == "Threshold")
+            .TagLine.ShouldBe($"{OpenCvNodeTags.Threshold}, {OpenCvNodeTags.Mask}");
+    }
+
+    [Fact]
+    public void A_word_the_catalog_carries_but_the_provider_does_not_declare_still_filters()
+    {
+        // The row is built from the definitions themselves, so a plugin that arrives
+        // with a word of its own is filterable without this shell changing. Keeping the
+        // words consistent is the provider's contract, checked where the provider is.
+        Shell shell = Create(
+            _directory.SaveReadableDocument(),
+            Catalogue(Definition("visionweave.test.figure", "Figure", "figure")));
+
+        shell.ViewModel.CatalogueTags.Select(chip => chip.Label).ShouldBe(["All", "figure"]);
+
+        shell.ViewModel.ToggleTagCommand.Execute("figure");
+
+        shell.ViewModel.CatalogueGroups.ShouldHaveSingleItem().Entries.Select(entry => entry.DisplayName)
+            .ShouldBe(["Figure"]);
+    }
+
     /// <inheritdoc />
     public void Dispose() => _directory.Dispose();
 
     private static NodeDefinitionCatalog OpenCvCatalog()
         => NodeDefinitionCatalog.FromProviders([new OpenCvNodeDefinitionProvider()]);
+
+    private static NodeDefinitionCatalog Catalogue(params NodeDefinition[] definitions) => new(definitions);
+
+    /// <summary>
+    /// One definition that declares nothing but its identity and its tags, so a test
+    /// can present a catalog this build does not ship.
+    /// </summary>
+    private static NodeDefinition Definition(string typeId, string displayName, params string[] tags)
+        => new(
+            new NodeTypeId(typeId),
+            TypeVersion: 1,
+            displayName,
+            Category: "Test",
+            Ports: [],
+            Parameters: [],
+            ExecutorTypeId: "visionweave.test.executor")
+        {
+            Tags = tags,
+        };
 
     private Shell Create(string path) => Create(path, NodeDefinitionCatalog.Empty);
 

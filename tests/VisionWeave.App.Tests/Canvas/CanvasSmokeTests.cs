@@ -158,12 +158,38 @@ public sealed class CanvasSmokeTests
         EditorSession session = shell.Session;
         ShellStatus status = shell.Status;
         RecordingSnackbarService snackbar = shell.Snackbar;
+        MainWindowViewModel viewModel = shell.ViewModel;
 
         // The editor reports where it is looking, which is what lets a node land in
         // the middle of the surface instead of somewhere off it.
         canvas.ViewportSize.Width.ShouldBeGreaterThan(0);
         canvas.ViewportSize.Height.ShouldBeGreaterThan(0);
         canvas.Nodes.ShouldBeEmpty();
+
+        // The tag row narrows the catalogue the user picks from: the chip carries the
+        // command the view model offers, and choosing it leaves the types that carry
+        // the word, which is what makes a tag an axis rather than a label.
+        Button smoothing = Button(window, OpenCvNodeTags.Smoothing);
+        smoothing.Command.ShouldBeSameAs(viewModel.ToggleTagCommand);
+        smoothing.Command.Execute(smoothing.CommandParameter);
+        Lay(window);
+
+        // Rebuilding the row replaces every chip, so the selected one is read again
+        // here rather than kept from the step before.
+        Button inForce = Button(window, OpenCvNodeTags.Smoothing);
+        inForce.DataContext.ShouldBeOfType<ShellCatalogueTag>().IsSelected.ShouldBeTrue();
+        viewModel.CatalogueGroups.SelectMany(group => group.Entries).Select(entry => entry.DisplayName)
+            .ShouldBe(["Bilateral Filter", "Blur", "Gaussian Blur", "Median Blur"]);
+        Descendants<Button>(window).ShouldNotContain(
+            button => (string?)button.CommandParameter == OpenCvNodeIds.DrawCircleTypeId);
+
+        // The first chip clears the filter, so the row offers the whole catalogue
+        // again rather than leaving a second filter in force.
+        Button all = Button(window, "All");
+        all.Command.Execute(all.CommandParameter);
+        Lay(window);
+
+        viewModel.CatalogueGroups.Sum(group => group.Entries.Count).ShouldBe(23);
 
         // The document may be written back, so neither surface it is edited on says
         // otherwise. This is the reading the later flows are compared against.
@@ -947,13 +973,17 @@ public sealed class CanvasSmokeTests
             .Where(connection => connection.DataContext is WorkflowConnectionViewModel model
                 && canvas.Connectors.Contains(model))];
 
-    /// <summary>Finds the button the shell offers for one node type or one label.</summary>
+    /// <summary>
+    /// Finds the button the shell offers for one node type or one label. A catalogue
+    /// entry is commanded with the type it adds and carries its presentation as content,
+    /// so the content is read only when it is the word a button shows.
+    /// </summary>
     /// <param name="root">The element to search.</param>
-    /// <param name="parameter">The catalogue entry's command parameter, or the content.</param>
+    /// <param name="parameter">The command parameter, or the word the button shows.</param>
     /// <returns>The button.</returns>
     private static Button Button(DependencyObject root, string parameter)
         => Descendants<Button>(root).Single(button =>
-            (string?)button.CommandParameter == parameter || (string?)button.Content == parameter);
+            (string?)button.CommandParameter == parameter || button.Content as string == parameter);
 
     /// <summary>Walks the visual tree, which is where the markup's templates live.</summary>
     /// <typeparam name="T">The element type to collect.</typeparam>

@@ -22,6 +22,12 @@ namespace VisionWeave.OpenCv.Nodes;
 /// nodes are the only ones that change a frame without reading it as a measurement:
 /// they mark a rectangle, a line, or a circle on the frame they are given.
 /// </para>
+/// <para>
+/// Every definition also carries the words out of <see cref="OpenCvNodeTags"/> that
+/// describe what it does, which is the axis the catalogue's tag filter is built from:
+/// a category says where a node sits in the library, and a tag cuts across the groups
+/// to say what the node is for.
+/// </para>
 /// </summary>
 public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
 {
@@ -84,7 +90,10 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
                     IsRequired: true,
                     DisplayName: "File"),
             ],
-            OpenCvNodeIds.ImageSourceExecutorTypeId);
+            OpenCvNodeIds.ImageSourceExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.File],
+        };
 
     private static NodeDefinition CreateSaveImage()
         => new(
@@ -114,7 +123,10 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
                     DisplayName: "Replace an existing file",
                     DefaultValue: false),
             ],
-            OpenCvNodeIds.SaveImageExecutorTypeId);
+            OpenCvNodeIds.SaveImageExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.File],
+        };
 
     private static NodeDefinition CreateGaussianBlur()
         => new(
@@ -156,7 +168,10 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
                     Maximum: OpenCvParameterBounds.MaxSigma,
                     DefaultValue: 0d),
             ],
-            OpenCvNodeIds.GaussianBlurExecutorTypeId);
+            OpenCvNodeIds.GaussianBlurExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Smoothing],
+        };
 
     private static NodeDefinition CreateResize()
         => new(
@@ -205,7 +220,10 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
                     Options: OpenCvNodeIds.InterpolationOptions,
                     DefaultValue: OpenCvNodeIds.InterpolationArea),
             ],
-            OpenCvNodeIds.ResizeExecutorTypeId);
+            OpenCvNodeIds.ResizeExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Geometry],
+        };
 
     private static NodeDefinition CreateCvtColor()
         => new(
@@ -238,7 +256,10 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
                     Options: OpenCvNodeIds.ConversionOptions,
                     DefaultValue: OpenCvNodeIds.ConversionGray),
             ],
-            OpenCvNodeIds.CvtColorExecutorTypeId);
+            OpenCvNodeIds.CvtColorExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Colour],
+        };
 
     private static NodeDefinition CreateCrop()
         => new(
@@ -296,7 +317,10 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
                     Maximum: OpenCvParameterBounds.MaxDimension,
                     DefaultValue: 480),
             ],
-            OpenCvNodeIds.CropExecutorTypeId);
+            OpenCvNodeIds.CropExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Geometry],
+        };
 
     private static NodeDefinition CreateMedianBlur()
         => new(
@@ -330,7 +354,10 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
                     Maximum: OpenCvParameterBounds.MaxKernelSize,
                     DefaultValue: 3),
             ],
-            OpenCvNodeIds.MedianBlurExecutorTypeId);
+            OpenCvNodeIds.MedianBlurExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Smoothing],
+        };
 
     private static NodeDefinition CreateThreshold()
         => new(
@@ -379,7 +406,10 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
                     Options: OpenCvNodeIds.ThresholdTypeOptions,
                     DefaultValue: OpenCvNodeIds.ThresholdBinary),
             ],
-            OpenCvNodeIds.ThresholdExecutorTypeId);
+            OpenCvNodeIds.ThresholdExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Threshold, OpenCvNodeTags.Mask],
+        };
 
     private static NodeDefinition CreateBlur()
         => new(
@@ -413,7 +443,10 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
                     Maximum: OpenCvParameterBounds.MaxKernelSize,
                     DefaultValue: 3),
             ],
-            OpenCvNodeIds.BlurExecutorTypeId);
+            OpenCvNodeIds.BlurExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Smoothing],
+        };
 
     private static NodeDefinition CreateBilateralFilter()
         => new(
@@ -463,7 +496,10 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
                     Maximum: OpenCvParameterBounds.MaxBilateralSigma,
                     DefaultValue: 75d),
             ],
-            OpenCvNodeIds.BilateralFilterExecutorTypeId);
+            OpenCvNodeIds.BilateralFilterExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Smoothing],
+        };
 
     private static NodeDefinition CreateAdaptiveThreshold()
         => new(
@@ -527,7 +563,10 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
                     Maximum: OpenCvParameterBounds.MaxConstant,
                     DefaultValue: 5d),
             ],
-            OpenCvNodeIds.AdaptiveThresholdExecutorTypeId);
+            OpenCvNodeIds.AdaptiveThresholdExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Threshold, OpenCvNodeTags.Mask],
+        };
 
     private static NodeDefinition CreatePyrDown()
         => new(
@@ -552,7 +591,10 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
                     DisplayName: "Image"),
             ],
             [],
-            OpenCvNodeIds.PyrDownExecutorTypeId);
+            OpenCvNodeIds.PyrDownExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Geometry],
+        };
 
     private static NodeDefinition CreatePyrUp()
         => new(
@@ -577,7 +619,10 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
                     DisplayName: "Image"),
             ],
             [],
-            OpenCvNodeIds.PyrUpExecutorTypeId);
+            OpenCvNodeIds.PyrUpExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Geometry],
+        };
 
     private static NodeDefinition CreateSobel()
         => new(
@@ -635,7 +680,10 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
                     Maximum: OpenCvParameterBounds.MaxScale,
                     DefaultValue: 1d),
             ],
-            OpenCvNodeIds.SobelExecutorTypeId);
+            OpenCvNodeIds.SobelExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Edges],
+        };
 
     private static NodeDefinition CreateScharr()
         => new(
@@ -685,7 +733,10 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
                     Maximum: OpenCvParameterBounds.MaxScale,
                     DefaultValue: 1d),
             ],
-            OpenCvNodeIds.ScharrExecutorTypeId);
+            OpenCvNodeIds.ScharrExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Edges],
+        };
 
     private static NodeDefinition CreateLaplacian()
         => new(
@@ -727,7 +778,10 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
                     Maximum: OpenCvParameterBounds.MaxScale,
                     DefaultValue: 1d),
             ],
-            OpenCvNodeIds.LaplacianExecutorTypeId);
+            OpenCvNodeIds.LaplacianExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Edges],
+        };
 
     private static NodeDefinition CreateCanny()
         => new(
@@ -783,7 +837,10 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
                     DisplayName: "More accurate gradient",
                     DefaultValue: false),
             ],
-            OpenCvNodeIds.CannyExecutorTypeId);
+            OpenCvNodeIds.CannyExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Edges, OpenCvNodeTags.Mask],
+        };
 
     private static NodeDefinition CreateErode()
         => new(
@@ -819,7 +876,10 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
                     DefaultValue: 3),
                 CreateIterationsParameter(),
             ],
-            OpenCvNodeIds.ErodeExecutorTypeId);
+            OpenCvNodeIds.ErodeExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Morphology],
+        };
 
     private static NodeDefinition CreateDilate()
         => new(
@@ -855,7 +915,10 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
                     DefaultValue: 3),
                 CreateIterationsParameter(),
             ],
-            OpenCvNodeIds.DilateExecutorTypeId);
+            OpenCvNodeIds.DilateExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Morphology],
+        };
 
     private static NodeDefinition CreateMorphologyEx()
         => new(
@@ -898,7 +961,10 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
                     DefaultValue: 3),
                 CreateIterationsParameter(),
             ],
-            OpenCvNodeIds.MorphologyExExecutorTypeId);
+            OpenCvNodeIds.MorphologyExExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Morphology],
+        };
 
     private static NodeDefinition CreateDrawRectangle()
         => new(
@@ -959,7 +1025,10 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
                 CreateThicknessParameter(),
                 CreateFilledParameter(),
             ],
-            OpenCvNodeIds.DrawRectangleExecutorTypeId);
+            OpenCvNodeIds.DrawRectangleExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Marking, OpenCvNodeTags.Mask],
+        };
 
     private static NodeDefinition CreateDrawLine()
         => new(
@@ -1019,7 +1088,10 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
                 .. CreateColourParameters(),
                 CreateThicknessParameter(),
             ],
-            OpenCvNodeIds.DrawLineExecutorTypeId);
+            OpenCvNodeIds.DrawLineExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Marking, OpenCvNodeTags.Mask],
+        };
 
     private static NodeDefinition CreateDrawCircle()
         => new(
@@ -1072,7 +1144,10 @@ public sealed class OpenCvNodeDefinitionProvider : INodeDefinitionProvider
                 CreateThicknessParameter(),
                 CreateFilledParameter(),
             ],
-            OpenCvNodeIds.DrawCircleExecutorTypeId);
+            OpenCvNodeIds.DrawCircleExecutorTypeId)
+        {
+            Tags = [OpenCvNodeTags.Marking, OpenCvNodeTags.Mask],
+        };
 
     private static ParameterDefinition CreateKernelShapeParameter()
         => new(
