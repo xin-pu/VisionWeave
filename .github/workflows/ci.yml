@@ -107,4 +107,8 @@ jobs:
         with:
           name: VisionWeave-win-x64
           path: artifacts/
+          # A build to try, not an archive: the folder is a quarter of a gigabyte
+          # and every push to master produces one. A release artifact is its own
+          # workflow over this one (ADR-0014).
+          retention-days: 14
           if-no-files-found: error
