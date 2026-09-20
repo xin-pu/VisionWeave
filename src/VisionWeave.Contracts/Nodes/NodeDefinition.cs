@@ -24,6 +24,15 @@ public sealed record NodeDefinition(
     string ExecutorTypeId)
 {
     /// <summary>
+    /// Gets the words the catalogue can be filtered by, which describe what the node
+    /// does rather than where it sits in the library: a category groups the catalog,
+    /// and a tag cuts across the groups. A definition that carries none is a
+    /// definition whose only words would repeat its category, which is why the
+    /// vocabulary a provider declares is deliberately small.
+    /// </summary>
+    public IReadOnlyList<string> Tags { get; init; } = [];
+
+    /// <summary>
     /// Gets the input ports.
     /// </summary>
     public IEnumerable<PortDefinition> Inputs

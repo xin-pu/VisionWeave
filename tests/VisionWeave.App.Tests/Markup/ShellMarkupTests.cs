@@ -52,6 +52,7 @@ public sealed class ShellMarkupTests
         typeof(PreviewViewModel),
         typeof(ShellCatalogueGroup),
         typeof(ShellCatalogueEntry),
+        typeof(ShellCatalogueTag),
         typeof(WorkflowNodeViewModel),
         typeof(PortViewModel),
         typeof(WorkflowConnectionViewModel),
@@ -201,9 +202,44 @@ public sealed class ShellMarkupTests
         // write back offers no addable type at all.
         XElement entry = catalogue
             .Descendants()
-            .Single(element => element.Name.LocalName == "Button" && (string?)element.Attribute("Command") is not null);
+            .Single(element => element.Name.LocalName == "Button"
+                && ((string?)element.Attribute("Command"))?.Contains("AddNodeCommand", StringComparison.Ordinal) == true);
         AttributeText(entry, "Command").ShouldContain("Canvas.AddNodeCommand");
         AttributeText(entry, "IsEnabled").ShouldContain("Canvas.IsEditable");
+    }
+
+    [Fact]
+    public void The_catalogue_filters_by_tag_and_shows_a_type_the_words_it_carries()
+    {
+        XElement catalogue = Region("NodeCatalogueRegion");
+
+        // The row is the vocabulary the catalog carries rather than a list the markup
+        // chose, and choosing a chip is the filter's one gesture: it reaches the view
+        // model instead of the region keeping a filtered copy.
+        XElement chip = catalogue
+            .Descendants()
+            .Single(element => (string?)element.Attribute("CommandParameter") == "{Binding Tag}");
+        AttributeText(chip, "Command").ShouldContain("ToggleTagCommand");
+        AttributeText(chip, "Content").ShouldBe("{Binding Label}");
+        AttributeText(chip, "Style").ShouldBe("{StaticResource Shell.CatalogueTag}");
+
+        // A catalog whose definitions carry no tags offers no row rather than a chip
+        // that could only ever empty the region.
+        catalogue.ToString().ShouldContain("{Binding HasTags}");
+        catalogue.ToString().ShouldContain("Collapsed");
+
+        // The type says what it carries where it is chosen, so the filter explains
+        // itself: a tag the user cannot see is a tag they cannot learn.
+        XElement entry = catalogue
+            .Descendants()
+            .Single(element => (string?)element.Attribute("CommandParameter") == "{Binding TypeId}");
+        string drawn = entry.ToString();
+        drawn.ShouldContain("{Binding DisplayName}");
+        drawn.ShouldContain("{Binding TagLine}");
+
+        // The chip that is in force is the chip that is painted, so which tags narrow
+        // the catalogue reads without counting the entries that are left.
+        Template("Shell.CatalogueTag").ToString().ShouldContain("{Binding IsSelected}");
     }
 
     [Fact]
