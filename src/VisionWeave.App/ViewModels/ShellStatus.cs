@@ -100,6 +100,17 @@ internal sealed partial class ShellStatus : ObservableObject
     public partial DiagnosticSeverity? ConditionSeverity { get; private set; }
 
     /// <summary>
+    /// Gets the newest run the shell was told about, which the canvas marks its nodes
+    /// from. It is <see langword="null"/> until a run finishes, and a run that never
+    /// started leaves it <see langword="null"/> rather than holding the run before it,
+    /// because the marks describe a run of the graph rather than a run that was asked
+    /// for. The projection decides whether a summary still describes the document on
+    /// screen, so nothing is filtered here.
+    /// </summary>
+    [ObservableProperty]
+    public partial WorkflowRunSummary? LastRun { get; private set; }
+
+    /// <summary>
     /// Gets the state of the document being edited: whether it has ever been saved
     /// and whether it holds changes its file does not.
     /// </summary>
@@ -164,9 +175,16 @@ internal sealed partial class ShellStatus : ObservableObject
 
     /// <summary>
     /// Reports that a run started, so the readout names the work in progress rather
-    /// than the outcome of the run before it.
+    /// than the outcome of the run before it. The marks of the run before it go with
+    /// it: while a run is in flight there is no finished run for the canvas to
+    /// describe, and leaving the last one standing would say a node succeeded while
+    /// the run that is about to report on it is still going.
     /// </summary>
-    internal void BeginRun() => RunOutcome = RunningText;
+    internal void BeginRun()
+    {
+        RunOutcome = RunningText;
+        LastRun = null;
+    }
 
     /// <summary>
     /// Reports what a run produced.
@@ -184,6 +202,7 @@ internal sealed partial class ShellStatus : ObservableObject
     {
         ArgumentNullException.ThrowIfNull(summary);
 
+        LastRun = summary;
         RunOutcome = summary.WasCancelled
             ? StoppedText
             : summary.Status == WorkflowRunStatus.Failed ? RunFailedText : RanText;
@@ -199,6 +218,7 @@ internal sealed partial class ShellStatus : ObservableObject
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
 
+        LastRun = null;
         RunOutcome = $"Not run: {reason}";
     }
 

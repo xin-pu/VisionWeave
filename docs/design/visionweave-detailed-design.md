@@ -731,6 +731,37 @@ preview that failed to draw. The composite — a real image read from the docume
 folder, resized, written beside it, drawn in the region, and stopped while a node is
 executing — is covered by the shell's own smoke test (10).
 
+### 6.9 Run marks on the canvas as built
+
+The summary the run produces is not only a readout. `ShellStatus` keeps the newest
+one beside the outcome it derives from it, and the canvas redraws from it, so every
+node the run covered says what the run did to it: `Succeeded` or `Failed` in a word
+and in colour, or `Cancelled`, `Blocked`, or `Not run` when the run ended some other
+way, with the time the runner measured for the nodes it measured one for
+(ADR-0013). The node's tooltip carries the run's own condition for it, so the reason
+a node failed is on the node rather than only in the status area. The mark is
+presentation state of its own kind: it is drawn on the node, and the ports and wires
+keep the validation severity they already showed, because a run condition describes
+an execution rather than the wire a value arrived on.
+
+A mark belongs to a revision. A run describes one execution of one revision of one
+document, and `WorkflowRunSummary` carries both facts, so the projection marks nodes
+only while the document on screen is the document that ran, at the revision it ran
+at — the rule `ValidationProjection.Matches` already follows. A parameter edit, a
+new wire, or another document clears the marks, because the graph on screen is no
+longer the graph that ran; dragging a node keeps them, because a move is layout
+rather than a change to the graph and moves no revision; and starting a run clears
+them until it reports, because a run in flight has no outcome yet. Nothing about a
+run is written into `.vwflow`: a saved document never claims that its nodes
+succeeded.
+
+A node that is still executing is deliberately not marked, and that is the one thing
+this presentation does not show. `NodeRunState` is a terminal-state enumeration and
+the runner has no progress seam, so marking a node as running would need a new
+observer contract, an implementation that marshals to the window's thread at every
+node boundary, and an answer for a node still executing inside a quarantined
+executor. The status area says `Running…` for the run as a whole instead.
+
 ## 7. Persistence and compatibility
 
 The `.vwflow` format is a versioned JSON document. It stores only portable

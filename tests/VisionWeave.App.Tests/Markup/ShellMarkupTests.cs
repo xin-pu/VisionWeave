@@ -9,6 +9,7 @@ using VisionWeave.App.Commands;
 using VisionWeave.App.Inspector;
 using VisionWeave.App.Preview;
 using VisionWeave.App.ViewModels;
+using VisionWeave.Application.Execution;
 
 namespace VisionWeave.App.Tests.Markup;
 
@@ -377,6 +378,39 @@ public sealed class ShellMarkupTests
             "{Binding Prompt.CancelText}",
         ]);
     }
+
+    [Fact]
+    public void The_node_template_states_what_the_newest_run_did_to_the_node()
+    {
+        XElement node = Template("Shell.CanvasNode");
+
+        // The mark is written on the node rather than only into the status area, so a
+        // run that fails halfway says where on the surface the user is looking.
+        node.Descendants().ShouldContain(element => (string?)element.Attribute("Text") == "{Binding RunDetail}");
+
+        // It reads by its word and only then by its colour, so every terminal state a
+        // run can report has a mark of its own, and a node no run covered shows none.
+        string markup = node.ToString();
+
+        markup.ShouldContain("{Binding RunState}");
+
+        foreach (NodeRunState state in Enum.GetValues<NodeRunState>())
+        {
+            markup.ShouldContain($"Value=\"{state}\"");
+        }
+
+        markup.ShouldContain("Collapsed");
+    }
+
+    /// <summary>The resource entry the theme declares under a key.</summary>
+    /// <param name="key">The key to read.</param>
+    /// <returns>The element.</returns>
+    private static XElement Template(string key)
+        => XDocument
+            .Load(PathOf("Themes/Shell.xaml"))
+            .Root!
+            .Elements()
+            .Single(entry => (string?)entry.Attribute(Xaml + "Key") == key);
 
     /// <summary>The named region whose contents a test reads.</summary>
     /// <param name="name">The region's name.</param>

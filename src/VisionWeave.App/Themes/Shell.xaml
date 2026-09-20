@@ -305,6 +305,45 @@
                            Foreground="{DynamicResource Brush.Text.Secondary}"
                            Text="{Binding Caption}"
                            TextTrimming="CharacterEllipsis" />
+
+                <!--
+                    What the newest run did to this node, stated in words so the mark
+                    reads without its colour. The row is out of the way until a run
+                    covers the node, and a node that was stopped or never started is
+                    named as plainly as one that succeeded.
+                -->
+                <TextBlock Margin="10,0,10,8"
+                           FontSize="11"
+                           FontWeight="SemiBold"
+                           Text="{Binding RunDetail}">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding RunState}" Value="NotRun">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding RunState}" Value="Blocked">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Setter Property="Foreground" Value="{DynamicResource Brush.State.Warning}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding RunState}" Value="Cancelled">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Setter Property="Foreground" Value="{DynamicResource Brush.State.Warning}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding RunState}" Value="Succeeded">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Setter Property="Foreground" Value="{DynamicResource Brush.State.Success}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding RunState}" Value="Failed">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Setter Property="Foreground" Value="{DynamicResource Brush.State.Danger}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
             </StackPanel>
         </Border>
     </DataTemplate>

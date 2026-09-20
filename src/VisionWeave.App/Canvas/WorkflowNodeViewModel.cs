@@ -1,6 +1,7 @@
 ﻿using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using VisionWeave.App.Presentation;
+using VisionWeave.Application.Execution;
 using VisionWeave.Contracts.Diagnostics;
 using VisionWeave.Domain.Workflows;
 
@@ -25,6 +26,7 @@ internal sealed partial class WorkflowNodeViewModel : ObservableObject
     /// <param name="outputs">The output ports, in the order the schema declares them.</param>
     /// <param name="severity">The worst condition the node owns, or <see langword="null"/>.</param>
     /// <param name="condition">The condition that severity belongs to, or an empty string.</param>
+    /// <param name="run">What the newest run did to the node, or <see langword="null"/> when no run covers it.</param>
     internal WorkflowNodeViewModel(
         Guid instanceId,
         string displayName,
@@ -33,7 +35,8 @@ internal sealed partial class WorkflowNodeViewModel : ObservableObject
         IReadOnlyList<PortViewModel> inputs,
         IReadOnlyList<PortViewModel> outputs,
         DiagnosticSeverity? severity,
-        string condition)
+        string condition,
+        NodeRunMark? run)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
         ArgumentException.ThrowIfNullOrWhiteSpace(caption);
@@ -48,11 +51,10 @@ internal sealed partial class WorkflowNodeViewModel : ObservableObject
         Outputs = outputs;
         Severity = severity;
         Condition = condition;
+        Run = run;
         Location = new Point(position.X, position.Y);
 
-        Summary = condition.Length == 0
-            ? caption
-            : $"{caption}{Environment.NewLine}{condition}";
+        Summary = Compose(caption, condition, run);
     }
 
     /// <summary>Gets the instance the document holds, which every edit to this node names.</summary>
@@ -75,6 +77,26 @@ internal sealed partial class WorkflowNodeViewModel : ObservableObject
 
     /// <summary>Gets the condition that severity belongs to, or an empty string.</summary>
     public string Condition { get; }
+
+    /// <summary>
+    /// Gets what the newest run did to this node, or <see langword="null"/> when no
+    /// run covers it: nothing has run, the run belongs to another document or to a
+    /// revision this one has moved past, or the plan never reached the node.
+    /// </summary>
+    internal NodeRunMark? Run { get; }
+
+    /// <summary>
+    /// Gets how the newest run ended for this node, which also picks the colour of
+    /// the mark. It is <see langword="null"/> when there is nothing to mark.
+    /// </summary>
+    public NodeRunState? RunState => Run?.State;
+
+    /// <summary>
+    /// Gets what the node says about the run: the outcome and the time the run
+    /// measured for it, or nothing when no run covers it.
+    /// </summary>
+    public string RunDetail
+        => Run is { } run ? RunText.Describe(run.State, run.Duration) : string.Empty;
 
     /// <summary>
     /// Gets the severity as a word, so the node states its condition in text as
@@ -110,4 +132,32 @@ internal sealed partial class WorkflowNodeViewModel : ObservableObject
     /// the position a completed drag commits.
     /// </summary>
     internal CanvasPosition SnappedPosition => new(Math.Round(Location.X), Math.Round(Location.Y));
+
+    /// <summary>
+    /// Writes what the pointer resting on the node reads: what the node is, the
+    /// condition the validator reported for it, and what the newest run did to it,
+    /// each on its own line and each left out when there is nothing to say.
+    /// </summary>
+    /// <param name="caption">The line naming the type and version.</param>
+    /// <param name="condition">The condition the node owns, or an empty string.</param>
+    /// <param name="run">What the newest run did to the node, or <see langword="null"/>.</param>
+    /// <returns>The tooltip.</returns>
+    private static string Compose(string caption, string condition, NodeRunMark? run)
+    {
+        string text = caption;
+
+        foreach (string line in new[] { condition, Describe(run), run?.Condition ?? string.Empty })
+        {
+            if (line.Length > 0)
+            {
+                text = $"{text}{Environment.NewLine}{line}";
+            }
+        }
+
+        return text;
+    }
+
+    /// <summary>Describes what the run did, or nothing when no run covers the node.</summary>
+    private static string Describe(NodeRunMark? run)
+        => run is null ? string.Empty : RunText.Describe(run.State, run.Duration);
 }

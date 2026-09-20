@@ -5,6 +5,7 @@ using VisionWeave.App.Sessions;
 using VisionWeave.App.Tests.Support;
 using VisionWeave.Application.Definitions;
 using VisionWeave.Application.Editing;
+using VisionWeave.Application.Execution;
 using VisionWeave.Application.Validation;
 using VisionWeave.Contracts.Diagnostics;
 using VisionWeave.Contracts.Nodes;
@@ -249,8 +250,144 @@ public sealed class CanvasProjectionTests : IDisposable
         wire.Target.Summary.ShouldContain(DiagnosticCodes.IncompatiblePort);
     }
 
+    [Fact]
+    public void A_node_the_newest_run_covered_says_what_the_run_did_to_it()
+    {
+        Guid blur = Add(OpenCvNodeIds.GaussianBlurTypeId, 0, 0);
+        Guid resize = Add(OpenCvNodeIds.ResizeTypeId, 300, 0);
+        var failure = new NodeDiagnostic(
+            DiagnosticCodes.NodeExecutionFailed,
+            DiagnosticSeverity.Error,
+            "The executor refused the frame.");
+
+        CanvasProjectedDocument projected = Project(_session, run: Run(
+            (blur, NodeRunState.Succeeded, TimeSpan.FromMilliseconds(12.3), []),
+            (resize, NodeRunState.Failed, TimeSpan.FromMilliseconds(3), [failure])));
+
+        WorkflowNodeViewModel succeeded = projected.Nodes.Single(node => node.InstanceId == blur);
+        WorkflowNodeViewModel failed = projected.Nodes.Single(node => node.InstanceId == resize);
+
+        // The outcome is a word as well as a colour, and the time is the one the run
+        // measured rather than one the node or the canvas invented.
+        succeeded.RunState.ShouldBe(NodeRunState.Succeeded);
+        succeeded.RunDetail.ShouldBe("Succeeded in 12.3 ms");
+        succeeded.Summary.ShouldContain("Succeeded in 12.3 ms");
+
+        // A node the run is unhappy about carries the run's own condition, so the
+        // reason is on the node rather than only in the status area.
+        failed.RunState.ShouldBe(NodeRunState.Failed);
+        failed.RunDetail.ShouldBe("Failed in 3 ms");
+        failed.Summary.ShouldContain(DiagnosticCodes.NodeExecutionFailed);
+        failed.Summary.ShouldContain("The executor refused the frame.");
+    }
+
+    [Fact]
+    public void A_node_the_run_never_covered_is_shown_without_a_mark()
+    {
+        Guid blur = Add(OpenCvNodeIds.GaussianBlurTypeId, 0, 0);
+        Guid resize = Add(OpenCvNodeIds.ResizeTypeId, 300, 0);
+
+        // Both nodes are placed, but the plan reached only one of them: it can only
+        // have been switched off or unresolvable, and either way the run has nothing
+        // to say about it rather than reporting it as a node the run skipped.
+        CanvasProjectedDocument projected = Project(
+            _session,
+            run: Run((blur, NodeRunState.Succeeded, TimeSpan.FromMilliseconds(4), [])));
+
+        projected.Nodes.Single(node => node.InstanceId == blur).RunState.ShouldBe(NodeRunState.Succeeded);
+
+        WorkflowNodeViewModel uncovered = projected.Nodes.Single(node => node.InstanceId == resize);
+
+        uncovered.RunState.ShouldBeNull();
+        uncovered.RunDetail.ShouldBeEmpty();
+        // A node the run never covered says nothing about the run: the caption and the
+        // condition the validator reported are all it shows.
+        uncovered.Summary.ShouldNotContain("Succeeded in");
+    }
+
+    [Fact]
+    public void A_node_that_never_started_is_named_as_such_without_a_time()
+    {
+        Guid blur = Add(OpenCvNodeIds.GaussianBlurTypeId, 0, 0);
+
+        WorkflowNodeViewModel node = Project(
+            _session,
+            run: Run((blur, NodeRunState.NotRun, TimeSpan.Zero, []))).Nodes.ShouldHaveSingleItem();
+
+        // A node that never started is measured by nothing, so it is named plainly:
+        // showing it a duration would report a measurement the run never made.
+        node.RunState.ShouldBe(NodeRunState.NotRun);
+        node.RunDetail.ShouldBe("Not run");
+    }
+
+    [Fact]
+    public void A_run_of_another_revision_marks_nothing()
+    {
+        Guid blur = Add(OpenCvNodeIds.GaussianBlurTypeId, 0, 0);
+        WorkflowRunSummary run = Run((blur, NodeRunState.Succeeded, TimeSpan.FromMilliseconds(4), []));
+
+        // The graph on screen is no longer the graph that ran, so its marks describe
+        // work the user has since changed.
+        _session.Execute(new SetNodeParameterCommand(blur, OpenCvNodeIds.KernelSizeParameter, 9))
+            .IsAccepted.ShouldBeTrue();
+
+        Project(_session, run: run).Nodes.ShouldHaveSingleItem().RunState.ShouldBeNull();
+    }
+
+    [Fact]
+    public void A_move_keeps_the_marks_of_the_run_because_the_graph_did_not_change()
+    {
+        Guid blur = Add(OpenCvNodeIds.GaussianBlurTypeId, 0, 0);
+        WorkflowRunSummary run = Run((blur, NodeRunState.Succeeded, TimeSpan.FromMilliseconds(4), []));
+
+        // A move is layout rather than a change to the graph, so it does not move the
+        // revision — and a user who drags a node has not invalidated what the run said.
+        _session.Execute(new MoveNodesCommand([(blur, new CanvasPosition(40, 40))])).IsAccepted.ShouldBeTrue();
+
+        Project(_session, run: run).Nodes.ShouldHaveSingleItem().RunState.ShouldBe(NodeRunState.Succeeded);
+    }
+
+    [Fact]
+    public void A_run_of_another_document_marks_nothing()
+    {
+        Guid blur = Add(OpenCvNodeIds.GaussianBlurTypeId, 0, 0);
+        WorkflowRunSummary run = Run((blur, NodeRunState.Succeeded, TimeSpan.FromMilliseconds(4), []));
+
+        _session.New("Another workflow");
+
+        Project(_session, catalog: NodeDefinitionCatalog.Empty, run: run)
+            .Nodes.ShouldBeEmpty("the new document holds no nodes to mark.");
+
+        // The same node in another document is another instance, so the rule is not
+        // about the nodes being gone: the summary describes a document this is not.
+        Guid replaced = Add(OpenCvNodeIds.GaussianBlurTypeId, 0, 0);
+        replaced.ShouldNotBe(blur);
+
+        Project(_session, run: run).Nodes.ShouldHaveSingleItem().RunState.ShouldBeNull();
+    }
+
     /// <inheritdoc />
     public void Dispose() => _directory.Dispose();
+
+    /// <summary>
+    /// A run summary of the document the session holds right now, covering one node
+    /// per entry, which is what the projection reads a mark from.
+    /// </summary>
+    /// <param name="nodes">How each covered node ended, how long it took, and what the run reported for it.</param>
+    /// <returns>The summary, describing the current document at its current revision.</returns>
+    private WorkflowRunSummary Run(
+        params (Guid InstanceId, NodeRunState State, TimeSpan Duration, IReadOnlyList<NodeDiagnostic> Diagnostics)[] nodes)
+        => new()
+        {
+            OperationId = Guid.NewGuid(),
+            DocumentId = _session.Document.Id,
+            Revision = _session.Document.Revision,
+            Duration = TimeSpan.FromMilliseconds(20),
+            Nodes = [.. nodes.Select(node => new NodeRunReport(node.InstanceId, node.State, node.Duration, node.Diagnostics))],
+            Diagnostics = [],
+            WasCancelled = false,
+            QuarantinedNodeIds = [],
+        };
 
     /// <summary>
     /// Projects the document the session holds, judged by the same catalog. The
@@ -260,7 +397,10 @@ public sealed class CanvasProjectionTests : IDisposable
     /// <param name="session">The session holding the document.</param>
     /// <param name="catalog">The catalog to resolve node types against, or the built-in one.</param>
     /// <returns>What the canvas would draw.</returns>
-    private static CanvasProjectedDocument Project(EditorSession session, NodeDefinitionCatalog? catalog = null)
+    private static CanvasProjectedDocument Project(
+        EditorSession session,
+        NodeDefinitionCatalog? catalog = null,
+        WorkflowRunSummary? run = null)
     {
         NodeDefinitionCatalog resolved = catalog ?? Catalog;
 
@@ -268,7 +408,8 @@ public sealed class CanvasProjectionTests : IDisposable
             session.Document,
             resolved,
             new WorkflowValidator(resolved).Project(session.Document),
-            session.Selection);
+            session.Selection,
+            run);
     }
 
     private Guid Add(string typeId, double x, double y) => Add(_session, Catalog, typeId, x, y);
